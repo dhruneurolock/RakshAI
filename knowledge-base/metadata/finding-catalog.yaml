@@ -1,0 +1,216 @@
+metadata_type: "Finding Catalog"
+version: "1.0"
+last_updated: "2026-04-26"
+
+finding_catalog:
+  INSECURE_TRANSPORT:
+    label: "Insecure Transport (HTTP)"
+    title_template: "Insecure Transport (HTTP) detected at {endpoint}"
+    owasp_category: "A02"
+    severity: "MEDIUM"
+
+  SECURITY_MISCONFIGURATION:
+    label: "Missing Security Headers"
+    title_template: "Missing Security Headers detected at {endpoint}"
+    owasp_category: "A05"
+    severity: "LOW"
+
+  INFORMATION_DISCLOSURE:
+    label: "Server Fingerprinting via Response Headers"
+    title_template: "Server Fingerprinting via Response Headers detected at {endpoint}"
+    owasp_category: "A05"
+    severity: "INFO"
+
+  INSECURE_SESSION_COOKIE:
+    label: "Session Cookie Missing Secure Attributes"
+    title_template: "Session Cookie Missing Secure Attributes detected at {endpoint}"
+    owasp_category: "A07"
+    severity: "MEDIUM"
+
+  AUTH_SURFACE:
+    label: "Authentication Surface Requires Hardening"
+    title_template: "Authentication Surface Requires Hardening detected at {endpoint}"
+    owasp_category: "A07"
+    severity: "INFO"
+
+  POTENTIAL_IDOR:
+    label: "Potential IDOR / Access Control Hotspots"
+    title_template: "Potential IDOR / Access Control Hotspots detected at {endpoint}"
+    owasp_category: "A01"
+    severity: "MEDIUM"
+
+  EXPOSED_API_DOCS:
+    label: "Swagger API Documentation Exposed"
+    title_template: "Swagger API Documentation Exposed at {endpoint}"
+    owasp_category: "A05"
+    severity: "HIGH"
+
+  CGI_EXPOSURE:
+    label: "Public CGI/Executable Endpoint Exposure"
+    title_template: "Public CGI/Executable Endpoint Exposure at {endpoint}"
+    owasp_category: "A05"
+    severity: "HIGH"
+
+  MISSING_CSRF_TOKEN:
+    label: "Login/Form Missing Anti-CSRF Controls"
+    title_template: "Missing Anti-CSRF Controls detected at {endpoint}"
+    owasp_category: "A01"
+    severity: "MEDIUM"
+
+  POTENTIAL_REFLECTED_XSS:
+    label: "Potential Reflected XSS"
+    title_template: "Potential Reflected XSS detected at {endpoint}"
+    owasp_category: "A03"
+    severity: "HIGH"
+
+  POTENTIAL_SQL_INJECTION:
+    label: "Potential SQL Injection"
+    title_template: "Potential SQL Injection detected at {endpoint}"
+    owasp_category: "A03"
+    severity: "CRITICAL"
+
+  POTENTIAL_FORM_XSS:
+    label: "Potential Form Input XSS"
+    title_template: "Potential Form Input XSS detected at {endpoint}"
+    owasp_category: "A03"
+    severity: "HIGH"
+
+  POTENTIAL_FORM_SQLI:
+    label: "Potential SQL Injection in Form Input"
+    title_template: "Potential SQL Injection in Form Input detected at {endpoint}"
+    owasp_category: "A03"
+    severity: "CRITICAL"
+
+  SQL_INJECTION:
+    label: "SQL Injection"
+    title_template: "SQL Injection confirmed at {endpoint}"
+    owasp_category: "A03"
+    severity: "CRITICAL"
+
+  XSS:
+    label: "Reflected XSS"
+    title_template: "Reflected XSS identified at {endpoint}"
+    owasp_category: "A03"
+    severity: "HIGH"
+
+  IDOR:
+    label: "IDOR"
+    title_template: "Potential IDOR via predictable object references at {endpoint}"
+    owasp_category: "A01"
+    severity: "MEDIUM"
+
+  AUTH_BYPASS:
+    label: "Authentication Bypass"
+    title_template: "Potential authentication bypass surface at {endpoint}"
+    owasp_category: "A07"
+    severity: "HIGH"
+
+  LLM_INFERRED:
+    label: "LLM Candidate Vulnerability"
+    title_template: "LLM Candidate Vulnerability at {endpoint}"
+    owasp_category: "A05"
+    severity: "INFO"
+
+  # ===== Advanced Discovery Engine Finding Types =====
+
+  TECHNOLOGY_DETECTED:
+    label: "Technology / Framework Detected"
+    title_template: "Technology / Framework Detected at {endpoint}"
+    owasp_category: "A05"
+    severity: "INFO"
+
+  SSL_CERTIFICATE_EXPIRED:
+    label: "SSL/TLS Certificate Expired"
+    title_template: "SSL Certificate Expired on {endpoint}"
+    owasp_category: "A02"
+    severity: "HIGH"
+
+  SSL_CERTIFICATE_EXPIRING:
+    label: "SSL/TLS Certificate Expiring Soon"
+    title_template: "SSL Certificate Expiring Soon on {endpoint}"
+    owasp_category: "A02"
+    severity: "MEDIUM"
+
+  SSL_SELF_SIGNED:
+    label: "Self-Signed SSL/TLS Certificate"
+    title_template: "Self-Signed SSL Certificate on {endpoint}"
+    owasp_category: "A02"
+    severity: "MEDIUM"
+
+  SSL_CERTIFICATE_INVALID:
+    label: "SSL/TLS Certificate Verification Failed"
+    title_template: "SSL Certificate Verification Failed on {endpoint}"
+    owasp_category: "A02"
+    severity: "MEDIUM"
+
+  CORS_MISCONFIGURATION:
+    label: "CORS Misconfiguration"
+    title_template: "CORS Misconfiguration detected at {endpoint}"
+    owasp_category: "A01"
+    severity: "HIGH"
+
+  CLICKJACKING_VULNERABLE:
+    label: "Clickjacking Vulnerability"
+    title_template: "Clickjacking Vulnerability at {endpoint}"
+    owasp_category: "A05"
+    severity: "MEDIUM"
+
+  HTTP_METHOD_OVERRIDE:
+    label: "Dangerous HTTP Methods Enabled"
+    title_template: "Dangerous HTTP Methods Enabled at {endpoint}"
+    owasp_category: "A05"
+    severity: "LOW"
+
+  DIRECTORY_LISTING:
+    label: "Directory Listing Enabled"
+    title_template: "Directory Listing Enabled at {endpoint}"
+    owasp_category: "A01"
+    severity: "MEDIUM"
+
+  SENSITIVE_FILE_EXPOSURE:
+    label: "Sensitive File Exposed"
+    title_template: "Sensitive File Exposed at {endpoint}"
+    owasp_category: "A01"
+    severity: "HIGH"
+
+  ROBOTS_TXT_DISCLOSURE:
+    label: "Robots.txt Discloses Sensitive Paths"
+    title_template: "Robots.txt Discloses Sensitive Paths at {endpoint}"
+    owasp_category: "A01"
+    severity: "LOW"
+
+  OPEN_REDIRECT:
+    label: "Open Redirect"
+    title_template: "Open Redirect detected at {endpoint}"
+    owasp_category: "A01"
+    severity: "MEDIUM"
+
+  PATH_TRAVERSAL:
+    label: "Path Traversal / Local File Inclusion"
+    title_template: "Path Traversal detected at {endpoint}"
+    owasp_category: "A01"
+    severity: "CRITICAL"
+
+  REFLECTED_XSS:
+    label: "Reflected Cross-Site Scripting (XSS)"
+    title_template: "Reflected XSS detected at {endpoint}"
+    owasp_category: "A03"
+    severity: "HIGH"
+
+  SQL_INJECTION_ERROR:
+    label: "SQL Injection (Error-Based)"
+    title_template: "SQL Injection (Error-Based) detected at {endpoint}"
+    owasp_category: "A03"
+    severity: "CRITICAL"
+
+  SQL_INJECTION_TIME_BLIND:
+    label: "SQL Injection (Time-Based Blind)"
+    title_template: "SQL Injection (Time-Based Blind) detected at {endpoint}"
+    owasp_category: "A03"
+    severity: "CRITICAL"
+
+  OUTDATED_COMPONENT:
+    label: "Outdated / End-of-Life Component"
+    title_template: "Outdated Component detected at {endpoint}"
+    owasp_category: "A06"
+    severity: "MEDIUM"

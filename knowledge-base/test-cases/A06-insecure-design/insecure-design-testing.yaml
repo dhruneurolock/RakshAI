@@ -1,0 +1,141 @@
+# A06:2025 - Insecure Design Test Cases
+# Business Logic Vulnerabilities and Design Flaws
+
+test_category: "A06-insecure-design"
+owasp_2025: "A06"
+severity: "HIGH"
+description: "Flaws in design and architecture, not implementation bugs"
+
+test_cases:
+  - id: "DESIGN-001"
+    name: "Race Condition Testing"
+    description: "Test for TOCTOU (Time-of-check to Time-of-use) vulnerabilities"
+    scenarios:
+      - "Multiple simultaneous withdrawals from same account"
+      - "Parallel discount code usage"
+      - "Concurrent profile updates"
+    test_steps:
+      - "Send 100 identical requests simultaneously"
+      - "Check if resource limits enforced"
+      - "Verify transaction atomicity"
+    payloads:
+      - "POST /withdraw amount=100 (x100 parallel)"
+      - "POST /apply_coupon code=SAVE50 (x10 parallel)"
+    vulnerable_result: "Race condition allows duplicate operations"
+    tools: ["Burp Intruder", "Turbo Intruder", "Custom script"]
+    
+  - id: "DESIGN-002"
+    name: "Business Logic Bypass"
+    description: "Bypass workflow steps or business rules"
+    test_steps:
+      - "Skip payment step by direct URL"
+      - "Access order confirmation without checkout"
+      - "Bypass approval workflows"
+    examples:
+      - "POST /order/123/confirm (skip /order/123/payment)"
+      - "Change order status directly"
+      - "Access admin functions without privilege check"
+    vulnerable_result: "Critical steps can be skipped"
+    
+  - id: "DESIGN-003"
+    name: "Price Manipulation"
+    description: "Modify prices, quantities, or discounts"
+    test_steps:
+      - "Modify price parameter in request"
+      - "Send negative quantities"
+      - "Stack multiple discount codes"
+    payloads:
+      - "price=-100"
+      - "quantity=-5 (refund instead of purchase)"
+      - "discount=100 (100% off)"
+      - "total=0.01"
+    vulnerable_result: "Server accepts client-side pricing"
+    
+  - id: "DESIGN-004"
+    name: "Unlimited Resource Consumption"
+    description: "Test for missing rate limits and quotas"
+    test_steps:
+      - "Request massive file generation"
+      - "Unlimited API calls without throttling"
+      - "Infinite loop in user-controlled workflow"
+    payloads:
+      - "GET /export?records=999999999"
+      - "POST /image/resize width=99999&height=99999"
+      - "WebSocket flood with 10000 messages/sec"
+    expected_result: "Rate limits enforced"
+    vulnerable_result: "No limits, DoS possible"
+    
+  - id: "DESIGN-005"
+    name: "Trust Boundary Violation"
+    description: "Test for client-side security controls"
+    test_steps:
+      - "Modify hidden form fields"
+      - "Change disabled input values"
+      - "Bypass JavaScript validation"
+    payloads:
+      - "<input type='hidden' name='isAdmin' value='true'>"
+      - "Remove 'disabled' attribute and modify"
+      - "Submit form without client-side checks"
+    vulnerable_result: "Server trusts client-side data"
+    
+  - id: "DESIGN-006"
+    name: "Insufficient Anti-Automation"
+    description: "Test for lack of CAPTCHA or bot protection"
+    test_steps:
+      - "Automated account creation (1000+ accounts)"
+      - "Scraping without rate limits"
+      - "Automated voting/rating manipulation"
+    expected_result: "CAPTCHA or bot detection after N attempts"
+    vulnerable_result: "Unlimited automation possible"
+    
+  - id: "DESIGN-007"
+    name: "Logic Flaw in Referral System"
+    description: "Self-referral or referral abuse"
+    test_steps:
+      - "Refer yourself for bonus"
+      - "Circular referral chains"
+      - "Create fake accounts to farm referrals"
+    payloads:
+      - "referral_code=MY_OWN_CODE"
+      - "User A refers B, B refers A"
+    vulnerable_result: "Referral bonuses can be farmed"
+    
+  - id: "DESIGN-008"
+    name: "Missing Function-Level Access Control"
+    description: "Access admin functions without proper role check"
+    test_steps:
+      - "Call admin API as regular user"
+      - "Access hidden admin endpoints"
+      - "Execute privileged operations"
+    payloads:
+      - "POST /admin/deleteUser id=123"
+      - "GET /admin/reports"
+      - "PUT /api/admin/config"
+    expected_result: "403 Forbidden for non-admin users"
+    vulnerable_result: "Admin functions accessible to all"
+
+common_design_flaws:
+  - "Client-side security controls"
+  - "Lack of rate limiting"
+  - "Missing workflow validation"
+  - "Improper trust boundaries"
+  - "Sequential ID predictability"
+  - "No anti-automation measures"
+  - "Race condition vulnerabilities"
+  - "Business logic bypasses"
+
+prevention:
+  - "Server-side validation for all inputs"
+  - "Rate limiting on all sensitive endpoints"
+  - "Transaction atomicity (database locks)"
+  - "Workflow state validation"
+  - "Anti-automation (CAPTCHA, device fingerprinting)"
+  - "Threat modeling during design phase"
+  - "Principle of least privilege"
+  - "Defense in depth"
+
+references:
+  - "OWASP Top 10:2025 A06"
+  - "CWE-840: Business Logic Errors"
+  - "CWE-362: Race Condition"
+  - "CWE-799: Improper Control of Interaction Frequency"

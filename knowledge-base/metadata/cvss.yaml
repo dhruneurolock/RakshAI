@@ -1,0 +1,335 @@
+# Metadata - CVSS v3.1 Scoring System
+# Common Vulnerability Scoring System for Security Assessment
+
+metadata_category: "cvss"
+version: "3.1"
+description: "CVSS v3.1 scoring methodology for vulnerability severity assessment"
+
+# CVSS v3.1 Base Score Metrics
+base_metrics:
+  exploitability:
+    attack_vector:
+      description: "How the vulnerability is exploited"
+      metric_id: "AV"
+      values:
+        network:
+          code: "N"
+          value: 0.85
+          description: "Vulnerable component bound to network stack, remotely exploitable"
+          examples: ["Remote RCE", "SQL Injection over HTTP", "XSS"]
+        
+        adjacent:
+          code: "A"
+          value: 0.62
+          description: "Exploitable from adjacent network (same subnet)"
+          examples: ["ARP spoofing", "VLAN attacks"]
+        
+        local:
+          code: "L"
+          value: 0.55
+          description: "Requires local access or local account"
+          examples: ["Local privilege escalation", "File access"]
+        
+        physical:
+          code: "P"
+          value: 0.20
+          description: "Requires physical access to device"
+          examples: ["Cold boot attacks", "Physical console access"]
+    
+    attack_complexity:
+      description: "Conditions beyond attacker's control"
+      metric_id: "AC"
+      values:
+        low:
+          code: "L"
+          value: 0.77
+          description: "No special conditions, repeatable exploit"
+          examples: ["Basic SQL injection", "Unauthenticated RCE"]
+        
+        high:
+          code: "H"
+          value: 0.44
+          description: "Requires specific conditions, race condition, timing"
+          examples: ["Race conditions", "Timing attacks", "TOCTOU"]
+    
+    privileges_required:
+      description: "Level of privileges attacker must possess"
+      metric_id: "PR"
+      values:
+        none:
+          code: "N"
+          value_unchanged: 0.85
+          value_changed: 0.85
+          description: "No authentication required"
+          examples: ["Unauthenticated SQLi", "Public API abuse"]
+        
+        low:
+          code: "L"
+          value_unchanged: 0.62
+          value_changed: 0.68
+          description: "Basic user privileges"
+          examples: ["Authenticated IDOR", "User-level command injection"]
+        
+        high:
+          code: "H"
+          value_unchanged: 0.27
+          value_changed: 0.50
+          description: "Admin or significant privileges"
+          examples: ["Admin panel RCE", "Privileged API exploitation"]
+    
+    user_interaction:
+      description: "Requires action from another user"
+      metric_id: "UI"
+      values:
+        none:
+          code: "N"
+          value: 0.85
+          description: "Exploitation without user interaction"
+          examples: ["RCE", "SQLi", "SSRF"]
+        
+        required:
+          code: "R"
+          value: 0.62
+          description: "Requires user to perform action"
+          examples: ["Phishing", "XSS requiring click", "CSRF"]
+    
+    scope:
+      description: "Can vulnerability affect resources beyond authorization scope"
+      metric_id: "S"
+      values:
+        unchanged:
+          code: "U"
+          description: "Impact limited to vulnerable component"
+          examples: ["XSS in single app", "SQLi in one database"]
+        
+        changed:
+          code: "C"
+          description: "Can affect resources beyond vulnerable component"
+          examples: ["Container escape", "VM escape", "SSRF to internal network"]
+  
+  impact:
+    confidentiality:
+      description: "Information disclosure impact"
+      metric_id: "C"
+      values:
+        none:
+          code: "N"
+          value: 0.00
+          description: "No information disclosure"
+        
+        low:
+          code: "L"
+          value: 0.22
+          description: "Limited information disclosure"
+          examples: ["Non-sensitive user data", "Version info"]
+        
+        high:
+          code: "H"
+          value: 0.56
+          description: "Total information disclosure"
+          examples: ["All database contents", "Password hashes", "API keys"]
+    
+    integrity:
+      description: "Data/system modification impact"
+      metric_id: "I"
+      values:
+        none:
+          code: "N"
+          value: 0.00
+          description: "No data modification possible"
+        
+        low:
+          code: "L"
+          value: 0.22
+          description: "Limited data modification"
+          examples: ["Modify own profile", "Limited file write"]
+        
+        high:
+          code: "H"
+          value: 0.56
+          description: "Complete data modification"
+          examples: ["RCE", "Database modification", "System file write"]
+    
+    availability:
+      description: "Service disruption impact"
+      metric_id: "A"
+      values:
+        none:
+          code: "N"
+          value: 0.00
+          description: "No availability impact"
+        
+        low:
+          code: "L"
+          value: 0.22
+          description: "Reduced performance or partial service loss"
+          examples: ["Temporary slowdown", "Resource consumption"]
+        
+        high:
+          code: "H"
+          value: 0.56
+          description: "Complete denial of service"
+          examples: ["Crash", "System hang", "Resource exhaustion"]
+
+# CVSS v3.1 Temporal Metrics (Optional)
+temporal_metrics:
+  exploit_code_maturity:
+    metric_id: "E"
+    values:
+      not_defined: { code: "X", value: 1.00 }
+      unproven: { code: "U", value: 0.91, description: "No exploit code available" }
+      proof_of_concept: { code: "P", value: 0.94, description: "PoC exists" }
+      functional: { code: "F", value: 0.97, description: "Functional exploit exists" }
+      high: { code: "H", value: 1.00, description: "Automated exploit widely available" }
+  
+  remediation_level:
+    metric_id: "RL"
+    values:
+      not_defined: { code: "X", value: 1.00 }
+      official_fix: { code: "O", value: 0.95 }
+      temporary_fix: { code: "T", value: 0.96 }
+      workaround: { code: "W", value: 0.97 }
+      unavailable: { code: "U", value: 1.00 }
+  
+  report_confidence:
+    metric_id: "RC"
+    values:
+      not_defined: { code: "X", value: 1.00 }
+      unknown: { code: "U", value: 0.92 }
+      reasonable: { code: "R", value: 0.96 }
+      confirmed: { code: "C", value: 1.00 }
+
+# Severity Ratings
+severity_ratings:
+  none:
+    score: 0.0
+    description: "No impact"
+  
+  low:
+    score_range: "0.1 - 3.9"
+    color: "BLUE"
+    description: "Low severity, minimal impact"
+    examples:
+      - "Information disclosure of non-sensitive data"
+      - "Minor configuration issues"
+  
+  medium:
+    score_range: "4.0 - 6.9"
+    color: "YELLOW"
+    description: "Medium severity, moderate impact"
+    examples:
+      - "XSS with limited scope"
+      - "CSRF on non-critical functions"
+      - "Information disclosure of semi-sensitive data"
+  
+  high:
+    score_range: "7.0 - 8.9"
+    color: "ORANGE"
+    description: "High severity, significant impact"
+    examples:
+      - "SQL Injection"
+      - "Remote File Inclusion"
+      - "Authentication bypass"
+      - "SSRF with internal access"
+  
+  critical:
+    score_range: "9.0 - 10.0"
+    color: "RED"
+    description: "Critical severity, severe impact"
+    examples:
+      - "Unauthenticated Remote Code Execution"
+      - "Authentication bypass to admin"
+      - "Full database disclosure"
+      - "Complete system compromise"
+
+# Common Vulnerability CVSS Examples
+vulnerability_examples:
+  unauthenticated_rce:
+    vector_string: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"
+    score: 10.0
+    severity: "CRITICAL"
+    description: "Remote code execution without authentication"
+    breakdown:
+      - "AV:N - Network exploitable"
+      - "AC:L - Low complexity"
+      - "PR:N - No privileges required"
+      - "UI:N - No user interaction"
+      - "S:C - Scope changed (can affect other systems)"
+      - "C:H - High confidentiality impact"
+      - "I:H - High integrity impact"
+      - "A:H - High availability impact"
+  
+  sql_injection:
+    vector_string: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+    score: 9.8
+    severity: "CRITICAL"
+    description: "SQL injection allowing data extraction and modification"
+  
+  authenticated_idor:
+    vector_string: "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N"
+    score: 6.5
+    severity: "MEDIUM"
+    description: "IDOR allowing access to other users' data"
+  
+  stored_xss:
+    vector_string: "CVSS:3.1/AV:N/AC:L/PR:L/UI:R/S:C/C:L/I:L/A:N"
+    score: 5.4
+    severity: "MEDIUM"
+    description: "Stored XSS requiring user interaction"
+  
+  reflected_xss:
+    vector_string: "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+    score: 6.1
+    severity: "MEDIUM"
+    description: "Reflected XSS via phishing"
+  
+  csrf:
+    vector_string: "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:H/A:N"
+    score: 6.5
+    severity: "MEDIUM"
+    description: "CSRF on state-changing operation"
+  
+  path_traversal:
+    vector_string: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"
+    score: 7.5
+    severity: "HIGH"
+    description: "Path traversal reading sensitive files"
+  
+  ssrf:
+    vector_string: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:L/A:N"
+    score: 9.3
+    severity: "CRITICAL"
+    description: "SSRF accessing internal network"
+
+# CVSS Calculator Reference
+calculator:
+  online_tools:
+    - "https://nvd.nist.gov/vuln-metrics/cvss/v3-calculator"
+    - "https://www.first.org/cvss/calculator/3.1"
+  
+  formula:
+    base_score: |
+      If (Impact == 0): 0
+      Else if (Scope Unchanged): Roundup(Minimum[(Impact + Exploitability), 10])
+      Else: Roundup(Minimum[1.08 × (Impact + Exploitability), 10])
+    
+    impact_unchanged: "6.42 × ISS"
+    impact_changed: "7.52 × [ISS - 0.029] - 3.25 × [ISS - 0.02]^15"
+    
+    iss: "1 - [(1 - C) × (1 - I) × (1 - A)]"
+    
+    exploitability: "8.22 × AV × AC × PR × UI"
+
+usage_guidelines:
+  - "Always use CVSS 3.1 for new assessments"
+  - "Score from attacker's perspective (worst case)"
+  - "Consider changed scope carefully"
+  - "Document assumptions in score rationale"
+  - "Update temporal metrics as situation evolves"
+  - "Use environmental metrics for org-specific context"
+
+references:
+  - "FIRST CVSS v3.1 Specification"
+  - "NVD CVSS v3.1 Calculator"
+  - "CVSS v3.1 User Guide"
+  - "OWASP Risk Rating Methodology"

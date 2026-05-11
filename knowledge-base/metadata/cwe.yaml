@@ -1,0 +1,269 @@
+# CWE (Common Weakness Enumeration) Metadata
+# Mapping of CWE IDs to vulnerability types
+
+metadata_type: "CWE"
+version: "4.12"
+last_updated: "2026-01-31"
+source: "https://cwe.mitre.org/"
+
+top_25_dangerous:
+  CWE-79:
+    name: "Improper Neutralization of Input During Web Page Generation (Cross-site Scripting)"
+    rank: 1
+    cvss_score: 6.1
+    description: "Allows attackers to inject malicious scripts into web pages viewed by other users"
+    owasp_mapping: "A03:2021 - Injection"
+  
+  CWE-89:
+    name: "Improper Neutralization of Special Elements used in an SQL Command (SQL Injection)"
+    rank: 2
+    cvss_score: 9.8
+    description: "Allows attackers to interfere with database queries"
+    owasp_mapping: "A03:2021 - Injection"
+  
+  CWE-20:
+    name: "Improper Input Validation"
+    rank: 3
+    cvss_score: 7.5
+    description: "Product does not validate or incorrectly validates input"
+    owasp_mapping: "A03:2021 - Injection"
+  
+  CWE-125:
+    name: "Out-of-bounds Read"
+    rank: 4
+    cvss_score: 7.5
+    description: "Software reads data past the end of intended buffer"
+  
+  CWE-78:
+    name: "Improper Neutralization of Special Elements used in an OS Command (OS Command Injection)"
+    rank: 5
+    cvss_score: 9.8
+    description: "Allows attackers to execute arbitrary operating system commands"
+    owasp_mapping: "A03:2021 - Injection"
+  
+  CWE-416:
+    name: "Use After Free"
+    rank: 6
+    cvss_score: 9.8
+    description: "Memory corruption vulnerability"
+  
+  CWE-22:
+    name: "Improper Limitation of a Pathname to a Restricted Directory (Path Traversal)"
+    rank: 7
+    cvss_score: 7.5
+    description: "Allows attackers to access files and directories outside web root"
+    owasp_mapping: "A01:2021 - Broken Access Control"
+  
+  CWE-352:
+    name: "Cross-Site Request Forgery (CSRF)"
+    rank: 8
+    cvss_score: 8.8
+    description: "Allows attackers to trick users into performing unwanted actions"
+    owasp_mapping: "A01:2021 - Broken Access Control"
+  
+  CWE-434:
+    name: "Unrestricted Upload of File with Dangerous Type"
+    rank: 9
+    cvss_score: 8.8
+    description: "Allows attackers to upload executable files"
+    owasp_mapping: "A03:2021 - Injection"
+  
+  CWE-476:
+    name: "NULL Pointer Dereference"
+    rank: 10
+    cvss_score: 7.5
+    description: "Causes application crash or code execution"
+
+web_application_cwes:
+  authentication:
+    CWE-287:
+      name: "Improper Authentication"
+      description: "Authentication mechanism can be bypassed or is weak"
+      owasp: "A07:2021"
+    
+    CWE-798:
+      name: "Use of Hard-coded Credentials"
+      description: "Credentials are hard-coded in source code"
+      owasp: "A07:2021"
+      severity: "CRITICAL"
+    
+    CWE-521:
+      name: "Weak Password Requirements"
+      description: "Password policy does not enforce strong passwords"
+      owasp: "A07:2021"
+    
+    CWE-640:
+      name: "Weak Password Recovery Mechanism for Forgotten Password"
+      description: "Password reset process is insecure"
+      owasp: "A07:2021"
+  
+  authorization:
+    CWE-639:
+      name: "Authorization Bypass Through User-Controlled Key"
+      description: "IDOR vulnerability - direct object reference"
+      owasp: "A01:2021"
+      severity: "HIGH"
+    
+    CWE-863:
+      name: "Incorrect Authorization"
+      description: "Authorization checks are missing or incorrect"
+      owasp: "A01:2021"
+    
+    CWE-285:
+      name: "Improper Authorization"
+      description: "User can perform actions they shouldn't have access to"
+      owasp: "A01:2021"
+  
+  session_management:
+    CWE-384:
+      name: "Session Fixation"
+      description: "Attacker can hijack user session"
+      owasp: "A07:2021"
+      severity: "HIGH"
+    
+    CWE-613:
+      name: "Insufficient Session Expiration"
+      description: "Sessions don't expire or expire too slowly"
+      owasp: "A07:2021"
+    
+    CWE-614:
+      name: "Sensitive Cookie in HTTPS Session Without 'Secure' Attribute"
+      description: "Session cookies can be intercepted"
+      owasp: "A02:2021"
+  
+  injection:
+    CWE-77:
+      name: "Improper Neutralization of Special Elements used in a Command (Command Injection)"
+      description: "OS command injection vulnerability"
+      owasp: "A03:2021"
+      severity: "CRITICAL"
+    
+    CWE-91:
+      name: "XML Injection (XXE)"
+      description: "XML external entity injection"
+      owasp: "A03:2021"
+      severity: "HIGH"
+    
+    CWE-917:
+      name: "Expression Language Injection"
+      description: "EL injection in frameworks like Spring, JSF"
+      owasp: "A03:2021"
+      severity: "CRITICAL"
+    
+    CWE-643:
+      name: "Improper Neutralization of Data within XPath Expressions (XPath Injection)"
+      description: "XPath query manipulation"
+      owasp: "A03:2021"
+  
+  cryptography:
+    CWE-327:
+      name: "Use of a Broken or Risky Cryptographic Algorithm"
+      description: "Using weak encryption (DES, MD5, SHA1)"
+      owasp: "A02:2021"
+      severity: "HIGH"
+    
+    CWE-328:
+      name: "Use of Weak Hash"
+      description: "Using weak hashing algorithms"
+      owasp: "A02:2021"
+    
+    CWE-295:
+      name: "Improper Certificate Validation"
+      description: "SSL/TLS certificate not properly validated"
+      owasp: "A02:2021"
+    
+    CWE-326:
+      name: "Inadequate Encryption Strength"
+      description: "Encryption key too short or weak"
+      owasp: "A02:2021"
+  
+  information_disclosure:
+    CWE-200:
+      name: "Exposure of Sensitive Information to an Unauthorized Actor"
+      description: "Sensitive data leaked to unauthorized users"
+      owasp: "A01:2021"
+    
+    CWE-209:
+      name: "Generation of Error Message Containing Sensitive Information"
+      description: "Error messages reveal system details"
+      owasp: "A05:2021"
+    
+    CWE-532:
+      name: "Insertion of Sensitive Information into Log File"
+      description: "Passwords, keys logged in cleartext"
+      owasp: "A09:2021"
+  
+  ssrf:
+    CWE-918:
+      name: "Server-Side Request Forgery (SSRF)"
+      description: "Application can be forced to make requests to unintended locations"
+      owasp: "A10:2021"
+      severity: "CRITICAL"
+  
+  deserialization:
+    CWE-502:
+      name: "Deserialization of Untrusted Data"
+      description: "Insecure deserialization leading to RCE"
+      owasp: "A08:2021"
+      severity: "CRITICAL"
+
+cwe_categories:
+  CWE-1003:
+    name: "Weaknesses for Simplified Mapping of Published Vulnerabilities"
+    description: "High-level categories for CVE mapping"
+  
+  CWE-1035:
+    name: "2021 CWE Top 25 Most Dangerous Software Weaknesses"
+    description: "Annual list of most impactful weaknesses"
+  
+  CWE-699:
+    name: "Software Development"
+    description: "Organized by software development lifecycle"
+  
+  CWE-1000:
+    name: "Research Concepts"
+    description: "Organized by underlying research concepts"
+
+severity_scoring:
+  critical:
+    cwes: [CWE-89, CWE-78, CWE-502, CWE-917, CWE-918]
+    impact: "Remote Code Execution, Data Breach"
+    cvss: "9.0 - 10.0"
+  
+  high:
+    cwes: [CWE-79, CWE-639, CWE-327, CWE-384]
+    impact: "XSS, IDOR, Weak Crypto, Session Hijacking"
+    cvss: "7.0 - 8.9"
+  
+  medium:
+    cwes: [CWE-200, CWE-209, CWE-521]
+    impact: "Information Disclosure, Weak Passwords"
+    cvss: "4.0 - 6.9"
+  
+  low:
+    cwes: [CWE-532, CWE-614]
+    impact: "Logging Issues, Missing Cookie Flags"
+    cvss: "0.1 - 3.9"
+
+remediation_effort:
+  high_effort:
+    - CWE-863: "Requires architectural changes to authorization model"
+    - CWE-502: "Requires replacing serialization library/approach"
+  
+  medium_effort:
+    - CWE-89: "Parameterized queries implementation"
+    - CWE-79: "Output encoding implementation"
+  
+  low_effort:
+    - CWE-614: "Add Secure flag to cookies"
+    - CWE-521: "Strengthen password policy"
+
+references:
+  - name: "CWE Top 25 - 2023"
+    url: "https://cwe.mitre.org/top25/archive/2023/2023_top25_list.html"
+  
+  - name: "CWE Glossary"
+    url: "https://cwe.mitre.org/about/glossary.html"
+  
+  - name: "CAPEC (Common Attack Pattern Enumeration)"
+    url: "https://capec.mitre.org/"

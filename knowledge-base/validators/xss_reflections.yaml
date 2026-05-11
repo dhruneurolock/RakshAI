@@ -1,0 +1,307 @@
+# XSS Reflection & Execution Validators
+# Patterns to detect XSS payload reflection and execution
+
+validator_category: "XSS Reflections"
+version: "2.0"
+last_updated: "2026-01-31"
+
+reflection_patterns:
+  script_tags:
+    - pattern: "<script>alert\\((\\d+|'[^']*'|\"[^\"]*\")\\)</script>"
+      severity: "HIGH"
+      confidence: 0.85
+      context: "HTML body"
+      description: "Basic script tag reflected unencoded"
+    
+    - pattern: "<script[^>]*>.*?</script>"
+      severity: "HIGH"
+      confidence: 0.80
+      description: "Any script tag with content"
+    
+    - pattern: "(?i)<script"
+      severity: "MEDIUM"
+      confidence: 0.60
+      description: "Script tag opening (may be partial)"
+  
+  event_handlers:
+    - pattern: "onerror\\s*=\\s*[\"']?alert\\("
+      severity: "HIGH"
+      confidence: 0.90
+      description: "Event handler with alert function"
+    
+    - pattern: "onload\\s*=\\s*[\"']?alert\\("
+      severity: "HIGH"
+      confidence: 0.90
+    
+    - pattern: "(?i)on(error|load|click|focus|mouseover|submit)\\s*=\\s*[\"']?\\w+"
+      severity: "MEDIUM"
+      confidence: 0.70
+      description: "Generic event handler attribute"
+  
+  svg_vectors:
+    - pattern: "<svg[^>]*onload\\s*=\\s*[\"']?alert\\("
+      severity: "HIGH"
+      confidence: 0.90
+      description: "SVG onload event handler"
+    
+    - pattern: "<svg/onload="
+      severity: "HIGH"
+      confidence: 0.85
+
+encoding_detection:
+  unencoded:
+    - pattern: "<script>"
+      encoding: "none"
+      confidence: 1.0
+      description: "Completely unencoded (VULNERABLE)"
+  
+  html_encoded:
+    - pattern: "&lt;script&gt;"
+      encoding: "HTML entities"
+      confidence: 0.0
+      description: "Properly HTML encoded (SAFE)"
+    
+    - pattern: "&#60;script&#62;"
+      encoding: "Numeric HTML entities"
+      confidence: 0.0
+      description: "Properly encoded (SAFE)"
+  
+  partial_encoding:
+    - pattern: "<script&gt;"
+      encoding: "Partial HTML encoding"
+      confidence: 0.50
+      description: "Inconsistent encoding (POSSIBLE VULNERABILITY)"
+    
+    - pattern: "&lt;script>"
+      encoding: "Partial HTML encoding"
+      confidence: 0.50
+
+context_validation:
+  html_body_context:
+    safe_contexts:
+      - description: "Inside HTML comment"
+        pattern: "<!--.*<script>.*-->"
+        vulnerability: false
+        confidence: 0.0
+      
+      - description: "Inside <textarea>"
+        pattern: "<textarea>.*<script>.*</textarea>"
+        vulnerability: false
+        confidence: 0.2
+        note: "Low risk unless textarea can be closed"
+    
+    unsafe_contexts:
+      - description: "Directly in HTML body"
+        pattern: "<body>.*<script>alert\\(1\\)</script>.*</body>"
+        vulnerability: true
+        confidence: 0.95
+      
+      - description: "In <div> or <span>"
+        pattern: "<(div|span)[^>]*>.*<script>"
+        vulnerability: true
+        confidence: 0.90
+  
+  attribute_context:
+    - description: "Unquoted attribute value"
+      pattern: "<\\w+\\s+\\w+=<script>"
+      vulnerability: true
+      confidence: 0.85
+      example: '<input value=<script>alert(1)</script>>'
+    
+    - description: "Breaking out of quoted attribute"
+      pattern: "<\\w+\\s+\\w+=[\"'][^\"']*[\"']\\s+onerror="
+      vulnerability: true
+      confidence: 0.90
+      example: '<img src="x" onerror=alert(1)>'
+  
+  javascript_context:
+    - description: "Inside <script> tag variable assignment"
+      pattern: "var \\w+ = \".*<script>"
+      vulnerability: true
+      confidence: 0.80
+      note: "Need to break out of string first"
+
+response_headers_validation:
+  content_type_check:
+    vulnerable:
+      - header: "Content-Type: text/html"
+        description: "HTML content type - XSS can execute"
+        confidence_multiplier: 1.0
+      
+      - header: "Content-Type: text/html; charset=utf-8"
+        description: "HTML with charset - XSS can execute"
+        confidence_multiplier: 1.0
+    
+    safe:
+      - header: "Content-Type: text/plain"
+        description: "Plain text - browser won't execute scripts"
+        confidence_multiplier: 0.0
+      
+      - header: "Content-Type: application/json"
+        description: "JSON response - typically safe from XSS"
+        confidence_multiplier: 0.2
+        note: "Still check if JSON rendered in HTML context"
+  
+  security_headers:
+    csp_check:
+      - header: "Content-Security-Policy: default-src 'self'"
+        description: "CSP blocks inline scripts"
+        confidence_penalty: -0.5
+        note: "XSS may be blocked by CSP"
+      
+      - header: "Content-Security-Policy: script-src 'unsafe-inline'"
+        description: "CSP allows inline scripts (WEAK)"
+        confidence_multiplier: 1.0
+        note: "Inline XSS still possible"
+      
+      - header_missing: "Content-Security-Policy"
+        description: "No CSP protection"
+        confidence_bonus: 0.2
+    
+    xss_protection:
+      - header: "X-XSS-Protection: 0"
+        description: "XSS filter disabled"
+        confidence_bonus: 0.1
+      
+      - header_missing: "X-XSS-Protection"
+        description: "No XSS protection header"
+        confidence_bonus: 0.1
+
+dom_xss_indicators:
+  javascript_sinks:
+    - pattern: "innerHTML\\s*=\\s*.*(document\\.location|window\\.location|location\\.hash)"
+      severity: "HIGH"
+      confidence: 0.85
+      description: "User-controlled data in innerHTML sink"
+    
+    - pattern: "document\\.write\\(.*location"
+      severity: "HIGH"
+      confidence: 0.90
+      description: "Location data written to document"
+    
+    - pattern: "eval\\(.*location"
+      severity: "CRITICAL"
+      confidence: 0.95
+      description: "User input passed to eval()"
+  
+  url_sources:
+    - "document.location"
+    - "window.location.hash"
+    - "location.search"
+    - "document.referrer"
+    - "window.name"
+
+execution_verification:
+  browser_indicators:
+    - indicator: "alert box appeared"
+      confidence: 1.0
+      description: "Visual confirmation of JavaScript execution"
+    
+    - indicator: "console.log output visible in DevTools"
+      confidence: 1.0
+      description: "JavaScript executed and logged"
+    
+    - indicator: "HTTP request to attacker-controlled server"
+      confidence: 1.0
+      description: "Out-of-band confirmation (e.g., fetch to Burp Collaborator)"
+  
+  response_only_indicators:
+    - indicator: "Payload reflected in HTML source"
+      confidence: 0.70
+      description: "Payload present but execution not confirmed"
+    
+    - indicator: "Payload in DOM but inside comment"
+      confidence: 0.30
+      description: "Reflected but unlikely to execute"
+
+validation_workflow:
+  step_1:
+    action: "Check if payload reflected in response"
+    output: "Boolean: payload_found"
+  
+  step_2:
+    action: "Verify payload encoding"
+    checks:
+      - "Unencoded: HIGH confidence"
+      - "HTML encoded: LOW confidence (safe)"
+      - "Partially encoded: MEDIUM confidence"
+  
+  step_3:
+    action: "Validate execution context"
+    checks:
+      - "Inside HTML comment: LOW confidence"
+      - "Inside <script> tag: HIGH confidence"
+      - "In event handler: HIGH confidence"
+  
+  step_4:
+    action: "Check Content-Type header"
+    checks:
+      - "text/html: Proceed with high confidence"
+      - "text/plain: Reduce confidence significantly"
+  
+  step_5:
+    action: "Check security headers (CSP, X-XSS-Protection)"
+    adjustments:
+      - "CSP present with strict policy: -0.5 confidence"
+      - "No CSP: +0.2 confidence"
+  
+  step_6:
+    action: "Calculate final confidence score"
+    formula: "base_confidence + header_adjustments - encoding_penalty"
+
+confidence_scoring:
+  very_high_0_95:
+    conditions:
+      - "Payload unencoded"
+      - "Content-Type: text/html"
+      - "No CSP header"
+      - "Payload in executable context (not comment)"
+      - "Event handler or <script> tag"
+  
+  high_0_80:
+    conditions:
+      - "Payload unencoded"
+      - "Content-Type: text/html"
+      - "CSP allows unsafe-inline"
+  
+  medium_0_50:
+    conditions:
+      - "Payload reflected but partially encoded"
+      - "Content-Type: application/json (but rendered in HTML)"
+  
+  low_0_30:
+    conditions:
+      - "Payload inside HTML comment"
+      - "Payload inside <textarea> without escape"
+  
+  negligible_0_10:
+    conditions:
+      - "Payload fully HTML encoded"
+      - "Content-Type: text/plain"
+      - "Strict CSP blocking all inline scripts"
+
+usage_example:
+  test_case: "Reflected XSS in search parameter"
+  
+  payload_sent: "<script>alert(1)</script>"
+  
+  response_analysis:
+    payload_location: "Line 42: <div>Search results for: <script>alert(1)</script></div>"
+    encoding: "None (unencoded)"
+    content_type: "text/html; charset=utf-8"
+    csp_header: "Missing"
+    x_xss_protection: "Missing"
+  
+  validation_result:
+    reflection_detected: true
+    encoding_status: "unencoded"
+    execution_context: "HTML body (executable)"
+    security_headers_present: false
+    final_confidence: 0.95
+    severity: "HIGH"
+    verdict: "VULNERABLE - Reflected XSS Confirmed"
+
+references:
+  - "OWASP XSS Prevention Cheat Sheet"
+  - "PortSwigger XSS Detection Guide"
+  - "Content Security Policy Reference"

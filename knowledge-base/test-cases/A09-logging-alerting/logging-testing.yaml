@@ -1,0 +1,173 @@
+# A09:2025 - Security Logging and Alerting Failures Test Cases
+# Detection, Monitoring, and Incident Response
+
+test_category: "A09-logging-alerting"
+owasp_2025: "A09"
+severity: "MEDIUM"
+cwe: "CWE-778"
+
+test_cases:
+  - id: "LOGGING-001"
+    name: "Missing Security Event Logging"
+    description: "Test if security events are logged"
+    events_to_test:
+      - "Failed login attempts"
+      - "Successful login (with IP, timestamp)"
+      - "Password changes"
+      - "Privilege escalation attempts"
+      - "Access control failures"
+      - "Input validation failures"
+    test_steps:
+      - "Trigger security event"
+      - "Check if event appears in logs"
+      - "Verify log contains sufficient context"
+    expected_result: "All security events logged with context"
+    vulnerable_result: "Critical events not logged"
+    
+  - id: "LOGGING-002"
+    name: "Insufficient Log Detail"
+    description: "Test if logs contain actionable information"
+    required_fields:
+      - "Timestamp (with timezone)"
+      - "User ID/Session ID"
+      - "IP address"
+      - "Action performed"
+      - "Resource accessed"
+      - "Success/Failure status"
+    test_steps:
+      - "Review log entries"
+      - "Check for required fields"
+    vulnerable_result: "Logs missing critical context (who, what, when)"
+    
+  - id: "LOGGING-003"
+    name: "Log Injection"
+    description: "Test for log injection vulnerabilities"
+    test_steps:
+      - "Inject newlines in username/input"
+      - "Try to forge log entries"
+      - "Test for CRLF injection"
+    payloads:
+      - "admin\\n[INFO] User admin logged in successfully"
+      - "user%0AAuthentication failed for admin%0AAuthentication successful for attacker"
+      - "test\\r\\n\\r\\nFake log entry"
+    vulnerable_result: "Forged log entries accepted"
+    impact: "Log tampering, forensic confusion"
+    
+  - id: "LOGGING-004"
+    name: "Missing Real-Time Alerting"
+    description: "Test if critical events trigger alerts"
+    critical_events:
+      - "Multiple failed login attempts (brute force)"
+      - "Privilege escalation"
+      - "Admin account created"
+      - "Mass data export"
+      - "Unusual access patterns"
+    test_steps:
+      - "Trigger 10+ failed logins in 1 minute"
+      - "Access 100+ records in short time"
+      - "Create admin user"
+    expected_result: "Real-time alerts sent to security team"
+    vulnerable_result: "No alerts, only passive logging"
+    
+  - id: "LOGGING-005"
+    name: "Sensitive Data in Logs"
+    description: "Test for passwords/tokens in log files"
+    test_steps:
+      - "Trigger authentication with password in URL"
+      - "Check logs for PII, credentials, tokens"
+      - "Review error messages in logs"
+    search_for:
+      - "Passwords (plaintext or hashed)"
+      - "API keys/tokens"
+      - "Credit card numbers"
+      - "SSN, emails, phone numbers"
+    vulnerable_result: "Sensitive data logged in plaintext"
+    
+  - id: "LOGGING-006"
+    name: "Log Tampering/Deletion"
+    description: "Test if logs can be modified or deleted"
+    test_steps:
+      - "Attempt to delete log files"
+      - "Try to modify existing log entries"
+      - "Check for write-once log storage"
+    payloads:
+      - "DELETE /logs/access.log"
+      - "POST /admin/clearLogs"
+    expected_result: "Logs immutable, deletion blocked"
+    vulnerable_result: "Logs can be modified or deleted"
+    
+  - id: "LOGGING-007"
+    name: "Missing Correlation IDs"
+    description: "Test if logs can be correlated across services"
+    test_steps:
+      - "Generate request across microservices"
+      - "Check if same correlation ID in all logs"
+      - "Verify distributed tracing"
+    expected_result: "Correlation ID in all related log entries"
+    vulnerable_result: "Cannot trace requests across services"
+    
+  - id: "LOGGING-008"
+    name: "Log Retention Policy Gaps"
+    description: "Test log retention and archival"
+    test_steps:
+      - "Check log rotation policy"
+      - "Verify long-term archival (90+ days)"
+      - "Test log backup and recovery"
+    checks:
+      - "Logs retained per compliance (PCI-DSS: 1 year)"
+      - "Secure archival storage"
+      - "Regular backup verification"
+    vulnerable_result: "Logs deleted too quickly or not backed up"
+
+log_monitoring_requirements:
+  must_log:
+    - "Authentication events (success/failure)"
+    - "Authorization failures"
+    - "Input validation failures"
+    - "Application errors"
+    - "Session management events"
+    - "Admin actions"
+    - "Data access (especially sensitive data)"
+    - "Security configuration changes"
+  
+  must_alert:
+    - "Brute force attempts (5+ failed logins/minute)"
+    - "Privilege escalation"
+    - "Mass data access"
+    - "Security control bypass attempts"
+    - "Unusual traffic patterns"
+    - "System errors or crashes"
+
+log_format_best_practices:
+  - "Structured logging (JSON preferred)"
+  - "UTC timestamps"
+  - "Correlation/Request IDs"
+  - "Severity levels (DEBUG, INFO, WARN, ERROR, CRITICAL)"
+  - "User/Session context"
+  - "No sensitive data (passwords, tokens, PII)"
+
+prevention:
+  - "Log all security-relevant events"
+  - "Include sufficient context (who, what, when, where)"
+  - "Real-time alerting for critical events"
+  - "Centralized log management (SIEM)"
+  - "Log integrity protection (write-once storage)"
+  - "Secure log storage (encryption at rest)"
+  - "Regular log review and analysis"
+  - "Compliance with retention policies"
+  - "Input validation on logged data (prevent injection)"
+
+tools:
+  - "ELK Stack (Elasticsearch, Logstash, Kibana)"
+  - "Splunk"
+  - "Graylog"
+  - "Datadog"
+  - "Azure Monitor / AWS CloudWatch"
+  - "SIEM (QRadar, ArcSight, Sentinel)"
+
+references:
+  - "OWASP Top 10:2025 A09"
+  - "CWE-778: Insufficient Logging"
+  - "CWE-223: Omission of Security-relevant Information"
+  - "OWASP Logging Cheat Sheet"
+  - "PCI-DSS Requirement 10"

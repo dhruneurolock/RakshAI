@@ -1,0 +1,494 @@
+# GAP 2: Test Case to Payload Binding Schema
+# Prevents payload explosion and improves scan efficiency
+
+metadata_type: "Test Case Payload Binding"
+version: "1.0"
+last_updated: "2026-02-02"
+description: "Maps specific payloads to test cases with safety controls and execution rules"
+
+# Binding Schema Definition
+binding_schema:
+  test_case_id: "string"
+  allowed_payloads: "array[payload_id]"
+  payload_groups: "array[group_name]"
+  max_payloads_per_test: "integer"
+  execution_order: "sequential | parallel | adaptive"
+  stop_on_success: "boolean"
+  environment_override: "object"
+
+# XSS Test Case Bindings
+xss_test_bindings:
+  XSS_DETECTION_BASIC:
+    test_id: "XSS-001"
+    name: "Basic XSS Detection"
+    allowed_payloads:
+      - xss_basic_alert_1
+      - xss_basic_img_onerror
+      - xss_basic_svg_onload
+    payload_groups:
+      - xss_basic_probes
+    max_payloads: 3
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging, prod]
+    explanation: "Use only 3 safe payloads to detect XSS, stop on first success"
+  
+  XSS_FILTER_BYPASS:
+    test_id: "XSS-002"
+    name: "XSS Filter Bypass Testing"
+    allowed_payloads:
+      - xss_encoded_html_entities
+      - xss_encoded_url
+      - xss_no_script_tag
+      - xss_no_parentheses
+      - xss_case_variation
+    payload_groups:
+      - xss_filter_bypass
+      - xss_encoded_payloads
+    max_payloads: 10
+    execution_order: adaptive
+    stop_on_success: false
+    environment: [dev, staging]
+    explanation: "Test filter evasion, try multiple techniques"
+  
+  XSS_WAF_BYPASS:
+    test_id: "XSS-003"
+    name: "WAF Bypass Testing"
+    allowed_payloads:
+      - xss_cloudflare_bypass_1
+      - xss_imperva_bypass_1
+      - xss_akamai_bypass_1
+    payload_groups:
+      - xss_waf_bypass
+    max_payloads: 5
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging]
+    requires_approval: true
+    explanation: "WAF-specific bypasses, requires security team approval"
+  
+  XSS_CONTEXT_HTML:
+    test_id: "XSS-004"
+    name: "HTML Context XSS"
+    allowed_payloads:
+      - xss_context_html_script
+      - xss_context_html_img
+      - xss_context_html_svg
+    payload_groups:
+      - xss_context_html
+    max_payloads: 5
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging, prod]
+  
+  XSS_STORED:
+    test_id: "XSS-005"
+    name: "Stored XSS Detection"
+    allowed_payloads:
+      - xss_basic_alert_1
+      - xss_basic_img_onerror
+    payload_groups:
+      - xss_basic_probes
+    max_payloads: 2
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging]
+    warning: "Stored payloads persist in database - cleanup required"
+    cleanup_required: true
+
+# SQL Injection Test Case Bindings
+sql_injection_bindings:
+  SQLI_AUTH_BYPASS:
+    test_id: "SQLI-001"
+    name: "Authentication Bypass via SQL Injection"
+    allowed_payloads:
+      - sqli_auth_basic_1
+      - sqli_auth_basic_2
+      - sqli_auth_basic_3
+      - sqli_auth_comment_1
+    payload_groups:
+      - sqli_auth_bypass_safe
+    max_payloads: 5
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging, prod]
+    explanation: "Safe auth bypass detection payloads only"
+  
+  SQLI_UNION_SELECT:
+    test_id: "SQLI-002"
+    name: "UNION-based SQL Injection"
+    allowed_payloads:
+      - sqli_union_null_1
+      - sqli_union_null_2
+      - sqli_union_null_3
+      - sqli_union_column_enum
+    payload_groups:
+      - sqli_union_detection
+    max_payloads: 8
+    execution_order: adaptive
+    stop_on_success: false
+    environment: [dev, staging]
+    explanation: "Column enumeration followed by data extraction"
+    phases:
+      - name: "Column Detection"
+        payloads: [sqli_union_null_1, sqli_union_null_2, sqli_union_null_3]
+        stop_on_success: true
+      - name: "Data Extraction"
+        payloads: [sqli_union_extract_users]
+        depends_on: "Column Detection"
+  
+  SQLI_BOOLEAN_BLIND:
+    test_id: "SQLI-003"
+    name: "Boolean-based Blind SQL Injection"
+    allowed_payloads:
+      - sqli_boolean_true
+      - sqli_boolean_false
+      - sqli_boolean_substring
+    payload_groups:
+      - sqli_boolean_blind
+    max_payloads: 10
+    execution_order: sequential
+    stop_on_success: false
+    environment: [dev, staging, prod]
+    explanation: "Requires true/false payload pairs for detection"
+    paired_payloads: true
+  
+  SQLI_TIME_BASED:
+    test_id: "SQLI-004"
+    name: "Time-based Blind SQL Injection"
+    allowed_payloads:
+      - sqli_time_mysql_sleep
+      - sqli_time_postgres_sleep
+      - sqli_time_mssql_waitfor
+    payload_groups:
+      - sqli_time_based
+    max_payloads: 3
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging]
+    requires_approval: true
+    explanation: "Causes delays - medium risk, requires approval"
+    performance_impact: true
+  
+  SQLI_ERROR_BASED:
+    test_id: "SQLI-005"
+    name: "Error-based SQL Injection"
+    allowed_payloads:
+      - sqli_error_extractvalue
+      - sqli_error_updatexml
+      - sqli_error_floor
+    payload_groups:
+      - sqli_error_based
+    max_payloads: 5
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging]
+    explanation: "Forces errors to leak data"
+  
+  SQLI_STACKED_QUERIES:
+    test_id: "SQLI-006"
+    name: "Stacked Queries Detection"
+    allowed_payloads:
+      - sqli_stacked_select
+      - sqli_stacked_sleep
+    payload_groups:
+      - sqli_stacked_safe
+    max_payloads: 2
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev]
+    blocked_payloads:
+      - sqli_stacked_drop
+      - sqli_stacked_insert
+      - sqli_stacked_update
+      - sqli_stacked_delete
+    explanation: "ONLY safe detection - destructive payloads BLOCKED"
+    warning: "DROP/INSERT/UPDATE payloads require isolated environment"
+  
+  SQLI_OUT_OF_BAND:
+    test_id: "SQLI-007"
+    name: "Out-of-Band SQL Injection"
+    allowed_payloads:
+      - sqli_oob_dns_mysql
+      - sqli_oob_http_oracle
+    payload_groups:
+      - sqli_oob
+    max_payloads: 3
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging]
+    requires_approval: true
+    external_callback: true
+    explanation: "Makes external requests - requires monitoring"
+
+# Authentication Bypass Test Bindings
+auth_bypass_bindings:
+  AUTH_SQL_INJECTION:
+    test_id: "AUTH-001"
+    name: "SQL Injection Authentication Bypass"
+    allowed_payloads:
+      - auth_sqli_admin_comment
+      - auth_sqli_or_1_equals_1
+      - auth_sqli_always_true
+    payload_groups:
+      - auth_sqli_safe
+    max_payloads: 5
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging, prod]
+  
+  AUTH_NOSQL_INJECTION:
+    test_id: "AUTH-002"
+    name: "NoSQL Injection Authentication Bypass"
+    allowed_payloads:
+      - auth_nosql_ne_null
+      - auth_nosql_gt_empty
+      - auth_nosql_regex
+    payload_groups:
+      - auth_nosql
+    max_payloads: 5
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging]
+    requires_approval: true
+  
+  AUTH_JWT_MANIPULATION:
+    test_id: "AUTH-003"
+    name: "JWT Token Manipulation"
+    allowed_payloads:
+      - auth_jwt_none_algorithm
+      - auth_jwt_weak_secret
+      - auth_jwt_claim_manipulation
+    payload_groups:
+      - auth_jwt_attacks
+    max_payloads: 8
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging]
+    requires_approval: true
+  
+  AUTH_DEFAULT_CREDS:
+    test_id: "AUTH-004"
+    name: "Default Credentials Testing"
+    allowed_payloads:
+      - auth_default_admin_admin
+      - auth_default_admin_password
+      - auth_default_root_root
+    payload_groups:
+      - auth_default_credentials
+    max_payloads: 20
+    execution_order: parallel
+    stop_on_success: true
+    environment: [dev, staging, prod]
+    rate_limit: "5 attempts per minute"
+
+# SSRF Test Case Bindings
+ssrf_bindings:
+  SSRF_INTERNAL_SCAN:
+    test_id: "SSRF-001"
+    name: "Internal Network Scanning"
+    allowed_payloads:
+      - ssrf_localhost_22
+      - ssrf_localhost_80
+      - ssrf_localhost_3306
+    payload_groups:
+      - ssrf_localhost_probes
+    max_payloads: 10
+    execution_order: parallel
+    stop_on_success: false
+    environment: [dev, staging, prod]
+  
+  SSRF_CLOUD_METADATA:
+    test_id: "SSRF-002"
+    name: "Cloud Metadata Access"
+    allowed_payloads:
+      - ssrf_aws_metadata
+      - ssrf_gcp_metadata
+      - ssrf_azure_metadata
+    payload_groups:
+      - ssrf_cloud_metadata
+    max_payloads: 5
+    execution_order: sequential
+    stop_on_success: true
+    environment: [dev, staging]
+    requires_approval: true
+    explanation: "May leak cloud credentials - requires approval"
+
+# Payload Groups Definition
+payload_groups:
+  xss_basic_probes:
+    description: "Safe XSS detection payloads"
+    safety_level: safe
+    payloads:
+      - xss_basic_alert_1
+      - xss_basic_img_onerror
+      - xss_basic_svg_onload
+    count: 3
+  
+  xss_filter_bypass:
+    description: "Filter evasion techniques"
+    safety_level: low_risk
+    payloads:
+      - xss_no_script_tag
+      - xss_no_parentheses
+      - xss_no_quotes
+    count: 10
+  
+  xss_waf_bypass:
+    description: "WAF-specific bypasses"
+    safety_level: medium_risk
+    payloads:
+      - xss_cloudflare_bypass_1
+      - xss_imperva_bypass_1
+    count: 8
+  
+  sqli_auth_bypass_safe:
+    description: "Safe SQL injection for auth bypass"
+    safety_level: safe
+    payloads:
+      - sqli_auth_basic_1
+      - sqli_auth_basic_2
+      - sqli_auth_comment_1
+    count: 5
+  
+  sqli_union_detection:
+    description: "UNION-based SQLi payloads"
+    safety_level: low_risk
+    payloads:
+      - sqli_union_null_1
+      - sqli_union_null_2
+    count: 8
+  
+  sqli_time_based:
+    description: "Time-based blind SQLi"
+    safety_level: medium_risk
+    payloads:
+      - sqli_time_mysql_sleep
+      - sqli_time_postgres_sleep
+    count: 5
+  
+  sqli_stacked_safe:
+    description: "Safe stacked query detection"
+    safety_level: low_risk
+    payloads:
+      - sqli_stacked_select
+      - sqli_stacked_sleep
+    count: 2
+  
+  sqli_stacked_destructive:
+    description: "DESTRUCTIVE - Manual only"
+    safety_level: destructive
+    payloads:
+      - sqli_stacked_drop
+      - sqli_stacked_insert
+      - sqli_stacked_update
+    count: 10
+    blocked_in_auto_scan: true
+
+# Execution Rules
+execution_rules:
+  sequential:
+    description: "Execute payloads one by one"
+    use_case: "When order matters or stop_on_success is true"
+    example: "Boolean blind SQLi requires ordered pairs"
+  
+  parallel:
+    description: "Execute multiple payloads simultaneously"
+    use_case: "Independent tests like default credentials"
+    max_concurrent: 10
+    example: "Testing 20 default credential pairs"
+  
+  adaptive:
+    description: "AI decides order based on success probability"
+    use_case: "Filter bypass - try most common first"
+    algorithm: "ML-based ranking by historical success rate"
+    example: "XSS filter bypass - try most successful payload first"
+
+# Stop on Success Rules
+stop_on_success_logic:
+  enabled:
+    description: "Stop testing when first vulnerability found"
+    benefits:
+      - "Faster scans"
+      - "Less log noise"
+      - "Lower false positive rate"
+    use_cases:
+      - "XSS detection (found one, vulnerability exists)"
+      - "Auth bypass (successful = proven vulnerability)"
+  
+  disabled:
+    description: "Test all payloads regardless of success"
+    benefits:
+      - "Complete coverage"
+      - "Find multiple injection points"
+      - "Better PoC evidence"
+    use_cases:
+      - "Column enumeration (need to know exact count)"
+      - "Filter bypass (want to know all working techniques)"
+
+# Payload Explosion Prevention
+anti_explosion_rules:
+  max_payloads_per_test:
+    default: 10
+    override_allowed: true
+    explanation: "Prevent 1000+ payload scans per test"
+  
+  intelligent_sampling:
+    enabled: true
+    algorithm: |
+      if payload_count > max_payloads:
+        select top N by:
+          - Historical success rate
+          - Safety level match
+          - Environment compatibility
+          - Diversity (different techniques)
+  
+  progressive_testing:
+    phase_1: "Test with 3 basic payloads"
+    phase_2: "If successful, try 5 filter bypass payloads"
+    phase_3: "If still successful, try 10 WAF bypass payloads"
+    explanation: "Don't fire all 100 payloads at once"
+
+# Cleanup Requirements
+cleanup_rules:
+  stored_xss:
+    cleanup_required: true
+    method: "Delete test comments/posts after scan"
+    auto_cleanup: true
+  
+  sql_injection:
+    cleanup_required: false
+    explanation: "Read-only queries don't need cleanup"
+  
+  file_upload:
+    cleanup_required: true
+    method: "Delete uploaded test files"
+    auto_cleanup: true
+  
+  account_creation:
+    cleanup_required: true
+    method: "Delete test user accounts"
+    auto_cleanup: false
+    manual_review: true
+
+# Binding Validation Rules
+validation:
+  required_fields:
+    - test_id
+    - allowed_payloads
+    - max_payloads
+    - environment
+  
+  constraints:
+    - "allowed_payloads must reference existing payload IDs"
+    - "max_payloads must be > 0 and < 1000"
+    - "environment must be subset of [dev, staging, prod, isolated]"
+    - "blocked_payloads cannot overlap with allowed_payloads"
+  
+  safety_check:
+    rule: "All allowed_payloads must have safety_level <= environment.max_risk"
+    enforcement: "STRICT - reject binding if violated"
+
+references:
+  - "OWASP Testing Guide: Test Coverage vs Scan Time"
+  - "SANS: Preventing Payload Explosion in Automated Scanners"

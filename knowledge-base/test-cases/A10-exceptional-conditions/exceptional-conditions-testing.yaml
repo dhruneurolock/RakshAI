@@ -1,0 +1,190 @@
+# A10:2025 - Mishandling of Exceptional Conditions (NEW)
+# Error Handling, Edge Cases, and Boundary Conditions
+
+test_category: "A10-exceptional-conditions"
+owasp_2025: "A10"
+severity: "MEDIUM"
+description: "NEW in 2025 - Replaces SSRF from 2021"
+
+test_cases:
+  - id: "EXCEPT-001"
+    name: "Verbose Error Messages"
+    description: "Test for information disclosure in error messages"
+    test_steps:
+      - "Send malformed requests"
+      - "Trigger database errors"
+      - "Cause application exceptions"
+    payloads:
+      - "id=abc (non-numeric where number expected)"
+      - "date=invalid-date"
+      - "json={malformed"
+    look_for:
+      - "Stack traces"
+      - "Database connection strings"
+      - "File paths (/var/www/html/app/...)"
+      - "Framework versions"
+      - "SQL query snippets"
+    vulnerable_result: "Detailed error messages expose internals"
+    reference: "validators/error-patterns.yaml"
+    
+  - id: "EXCEPT-002"
+    name: "Null Pointer/Reference Errors"
+    description: "Test for null handling issues"
+    test_steps:
+      - "Omit required parameters"
+      - "Send null values"
+      - "Access non-existent resources"
+    payloads:
+      - "GET /user/ (missing ID)"
+      - '{"user_id": null}'
+      - "Content-Type: null"
+    vulnerable_result: "500 errors with stack traces"
+    
+  - id: "EXCEPT-003"
+    name: "Integer Overflow/Underflow"
+    description: "Test for boundary condition handling"
+    test_steps:
+      - "Send extremely large numbers"
+      - "Send negative numbers where positive expected"
+      - "Test boundary values"
+    payloads:
+      - "quantity=2147483647 (max int32)"
+      - "quantity=-2147483648 (min int32)"
+      - "price=9999999999999999"
+      - "age=-1"
+    vulnerable_result: "Unexpected behavior or errors"
+    
+  - id: "EXCEPT-004"
+    name: "Resource Exhaustion"
+    description: "Test for DoS via resource consumption"
+    test_steps:
+      - "Upload extremely large file"
+      - "Send massive JSON payload"
+      - "Request huge result set"
+    payloads:
+      - "10GB file upload"
+      - '{"nested": {"nested": ... (10000 levels)}}'
+      - "GET /api/users?limit=999999999"
+    expected_result: "Request rejected with 413 or 429"
+    vulnerable_result: "Server accepts and processes, causing DoS"
+    
+  - id: "EXCEPT-005"
+    name: "Timeout Handling"
+    description: "Test for improper timeout handling"
+    test_steps:
+      - "Slowloris attack (slow HTTP requests)"
+      - "Database query timeout bypass"
+      - "Long-running operations without timeout"
+    payloads:
+      - "Send headers one byte at a time"
+      - "Sleep injection: WAITFOR DELAY '00:10:00'"
+    vulnerable_result: "No timeout, resources locked indefinitely"
+    
+  - id: "EXCEPT-006"
+    name: "Unhandled Exceptions"
+    description: "Test for uncaught exceptions leading to crashes"
+    test_steps:
+      - "Send unexpected content types"
+      - "Trigger edge case scenarios"
+      - "Division by zero attempts"
+    payloads:
+      - "Content-Type: application/x-unexpected"
+      - "divisor=0"
+      - "Special characters in unexpected fields"
+    vulnerable_result: "Application crash or restart"
+    
+  - id: "EXCEPT-007"
+    name: "Missing Input Validation on Edge Cases"
+    description: "Test boundary conditions and edge cases"
+    test_steps:
+      - "Empty strings where data expected"
+      - "Extremely long strings"
+      - "Special characters (Unicode, emoji)"
+    payloads:
+      - 'username=""'
+      - "name=[LARGE_STRING_1000000_A]"
+      - "city=🏙️𝕌𝕟𝕚𝕔𝕠𝕕𝕖"
+      - "email=test@\u202e.com"  # right-to-left override
+    vulnerable_result: "Unvalidated input causes errors"
+    
+  - id: "EXCEPT-008"
+    name: "Race Condition on Error Handling"
+    description: "Test for inconsistent state after errors"
+    test_steps:
+      - "Trigger error mid-transaction"
+      - "Check if rollback occurred"
+      - "Verify data consistency"
+    scenario: "Transfer $100 from A to B, abort mid-transaction"
+    vulnerable_result: "Money deducted but not credited (data inconsistency)"
+
+common_exceptional_conditions:
+  input_validation:
+    - "Null/empty values"
+    - "Negative numbers"
+    - "Zero values (division by zero)"
+    - "Extremely large numbers (overflow)"
+    - "Extremely long strings"
+    - "Invalid data types"
+    - "Special characters"
+  
+  system_limits:
+    - "Out of memory"
+    - "Disk full"
+    - "Connection pool exhausted"
+    - "Thread pool exhausted"
+    - "File handle limits"
+  
+  external_dependencies:
+    - "Database connection failure"
+    - "Third-party API timeout"
+    - "Network errors"
+    - "DNS resolution failure"
+  
+  concurrency:
+    - "Deadlocks"
+    - "Race conditions"
+    - "Starvation"
+    - "Lost updates"
+
+error_handling_best_practices:
+  do:
+    - "Catch and handle all exceptions"
+    - "Log errors with context"
+    - "Return generic error to user"
+    - "Fail securely (deny access on error)"
+    - "Rollback transactions on error"
+    - "Set appropriate timeouts"
+    - "Validate all inputs (especially edge cases)"
+  
+  dont:
+    - "Expose stack traces to users"
+    - "Reveal database details"
+    - "Show file paths or version numbers"
+    - "Leave resources locked on error"
+    - "Crash on unexpected input"
+    - "Trust error messages from external systems"
+
+prevention:
+  - "Comprehensive input validation (including edge cases)"
+  - "Generic error messages for users"
+  - "Detailed error logging (internal only)"
+  - "Proper exception handling (try-catch-finally)"
+  - "Resource limits and timeouts"
+  - "Graceful degradation"
+  - "Transaction rollback on errors"
+  - "Null safety (Optional/Maybe types)"
+  - "Boundary testing in development"
+
+testing_approach:
+  - "Fuzz testing (random/malformed inputs)"
+  - "Boundary value analysis"
+  - "Negative testing (invalid inputs)"
+  - "Stress testing (resource limits)"
+  - "Chaos engineering (inject failures)"
+
+references:
+  - "OWASP Top 10:2025 A10 (NEW)"
+  - "CWE-754: Improper Check for Unusual Conditions"
+  - "CWE-755: Improper Handling of Exceptional Conditions"
+  - "CWE-248: Uncaught Exception"
+  - "CWE-209: Information Exposure Through Error Message"

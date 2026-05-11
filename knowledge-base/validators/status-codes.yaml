@@ -1,0 +1,304 @@
+# Validators - Status Codes and Response Patterns
+# HTTP Status Code Analysis for Security Testing
+
+validator_category: "status-codes"
+version: "1.0"
+
+# HTTP Status Codes for Security Testing
+status_codes:
+  success:
+    200:
+      code: "OK"
+      security_implication: "Request successful - verify authorization was checked"
+      test_for: "IDOR, unauthorized access"
+      
+    201:
+      code: "Created"
+      security_implication: "Resource created - verify user can create"
+      test_for: "Unauthorized resource creation"
+      
+    202:
+      code: "Accepted"
+      security_implication: "Request accepted for processing"
+      test_for: "Async operation authorization"
+      
+    204:
+      code: "No Content"
+      security_implication: "Successful deletion - verify authorization"
+      test_for: "Unauthorized deletion"
+  
+  redirection:
+    301:
+      code: "Moved Permanently"
+      security_implication: "May leak internal URLs"
+      test_for: "Open redirects, URL manipulation"
+      
+    302:
+      code: "Found"
+      security_implication: "Temporary redirect - common in login flows"
+      test_for: "Open redirects, authentication bypass"
+      
+    303:
+      code: "See Other"
+      security_implication: "Redirect after POST"
+      test_for: "CSRF, state manipulation"
+      
+    307:
+      code: "Temporary Redirect"
+      security_implication: "Maintains method on redirect"
+      test_for: "Open redirects with method preservation"
+  
+  client_errors:
+    400:
+      code: "Bad Request"
+      security_implication: "Invalid input - check error messages"
+      test_for: "Information disclosure in error details"
+      
+    401:
+      code: "Unauthorized"
+      security_implication: "Authentication required"
+      expected_for: "Unauthenticated access attempts"
+      vulnerable_if: "Missing for protected resources"
+      
+    403:
+      code: "Forbidden"
+      security_implication: "Authenticated but not authorized"
+      expected_for: "IDOR, privilege escalation attempts"
+      vulnerable_if: "Returns 200 instead"
+      
+    404:
+      code: "Not Found"
+      security_implication: "Resource doesn't exist OR access denied"
+      note: "Should return same response time as 403 to prevent user enumeration"
+      test_for: "User enumeration, information disclosure"
+      
+    405:
+      code: "Method Not Allowed"
+      security_implication: "HTTP method not supported"
+      test_for: "HTTP verb tampering"
+      
+    406:
+      code: "Not Acceptable"
+      security_implication: "Content negotiation failed"
+      test_for: "Accept header manipulation"
+      
+    413:
+      code: "Payload Too Large"
+      security_implication: "Request too large"
+      test_for: "DoS via large payloads"
+      
+    429:
+      code: "Too Many Requests"
+      security_implication: "Rate limiting in effect"
+      expected_for: "Brute force protection"
+      vulnerable_if: "Missing on login/sensitive endpoints"
+  
+  server_errors:
+    500:
+      code: "Internal Server Error"
+      security_implication: "Server error - may leak sensitive info"
+      test_for: "Error-based injection, information disclosure"
+      action: "Analyze error messages for stack traces, paths"
+      
+    502:
+      code: "Bad Gateway"
+      security_implication: "Proxy/gateway error"
+      test_for: "Backend service issues, SSRF"
+      
+    503:
+      code: "Service Unavailable"
+      security_implication: "Service down or overloaded"
+      test_for: "DoS effectiveness"
+      
+    504:
+      code: "Gateway Timeout"
+      security_implication: "Timeout waiting for backend"
+      test_for: "Time-based attacks, slow queries"
+
+# Response Time Analysis
+timing_analysis:
+  authentication_bypass:
+    description: "Different response times can leak information"
+    test_cases:
+      - scenario: "Valid vs Invalid Username"
+        method: "Measure response time for login attempts"
+        vulnerable_if: "Valid username takes longer (password check)"
+        secure_if: "Constant time regardless of username validity"
+      
+      - scenario: "SQL Injection Time-based"
+        method: "Inject SLEEP/WAITFOR commands"
+        vulnerable_if: "Response delayed by specified time"
+        example: "username=admin' AND SLEEP(5)--"
+  
+  user_enumeration:
+    description: "Response time differences reveal user existence"
+    test: "Compare time for existing vs non-existing users"
+    mitigation: "Constant-time password hashing, artificial delays"
+
+# Security Header Validation
+security_headers:
+  required:
+    strict_transport_security:
+      header: "Strict-Transport-Security"
+      value: "max-age=31536000; includeSubDomains; preload"
+      purpose: "Force HTTPS"
+      missing_risk: "MitM attacks, session hijacking"
+      
+    content_security_policy:
+      header: "Content-Security-Policy"
+      value: "default-src 'self'; script-src 'self'"
+      purpose: "Prevent XSS, injection attacks"
+      missing_risk: "XSS exploitation"
+      
+    x_frame_options:
+      header: "X-Frame-Options"
+      value: "DENY or SAMEORIGIN"
+      purpose: "Prevent clickjacking"
+      missing_risk: "Clickjacking attacks"
+      
+    x_content_type_options:
+      header: "X-Content-Type-Options"
+      value: "nosniff"
+      purpose: "Prevent MIME sniffing"
+      missing_risk: "MIME confusion attacks"
+      
+    referrer_policy:
+      header: "Referrer-Policy"
+      value: "strict-origin-when-cross-origin"
+      purpose: "Control referrer information"
+      missing_risk: "Information leakage"
+  
+  deprecated:
+    x_xss_protection:
+      header: "X-XSS-Protection"
+      value: "1; mode=block"
+      note: "Deprecated - use CSP instead"
+      
+  cookies:
+    secure:
+      flag: "Secure"
+      required_for: "All cookies over HTTPS"
+      missing_risk: "Cookie interception over HTTP"
+      
+    httponly:
+      flag: "HttpOnly"
+      required_for: "Session cookies, authentication tokens"
+      missing_risk: "XSS cookie theft"
+      
+    samesite:
+      flag: "SameSite"
+      values: ["Strict", "Lax", "None"]
+      recommended: "Strict or Lax"
+      missing_risk: "CSRF attacks"
+
+# Error Message Validation
+error_patterns:
+  information_disclosure:
+    stack_traces:
+      patterns:
+        - "at com.example.ClassName.methodName"
+        - "Exception in thread"
+        - "Traceback (most recent call last)"
+        - "System.NullReferenceException"
+      risk: "Reveals application structure, file paths"
+      
+    database_errors:
+      mysql:
+        - "You have an error in your SQL syntax"
+        - "Warning: mysql_"
+        - "MySQLSyntaxErrorException"
+      postgresql:
+        - "ERROR: syntax error at or near"
+        - "pg_query()"
+      mssql:
+        - "Unclosed quotation mark"
+        - "Microsoft SQL Server"
+        - "Incorrect syntax near"
+      oracle:
+        - "ORA-00933"
+        - "ORA-01756"
+      risk: "Confirms SQL injection, reveals database type"
+      
+    system_paths:
+      windows:
+        - "C:\\inetpub\\wwwroot"
+        - "C:\\Program Files"
+        - "C:\\Windows\\System32"
+      linux:
+        - "/var/www/html"
+        - "/usr/local/apache2"
+        - "/home/user"
+      risk: "Reveals server structure, aids in path traversal"
+      
+    version_info:
+      patterns:
+        - "Apache/2.4.41"
+        - "PHP/7.4.3"
+        - "nginx/1.18.0"
+        - "Microsoft-IIS/10.0"
+      risk: "Reveals versions with known vulnerabilities"
+
+# Response Size Analysis
+response_size_validation:
+  sql_injection:
+    description: "Response size changes indicate successful injection"
+    test: "Compare response sizes for true vs false conditions"
+    example:
+      baseline: "id=1 (response: 5000 bytes)"
+      true_condition: "id=1' AND 1=1-- (response: 5000 bytes)"
+      false_condition: "id=1' AND 1=2-- (response: 3000 bytes)"
+    conclusion: "Different sizes confirm boolean-based SQLi"
+  
+  idor:
+    description: "Different response sizes for different user IDs"
+    vulnerable: "200 OK with varying response sizes"
+    secure: "403 Forbidden or consistent 404"
+
+# Content Type Validation
+content_type_checks:
+  expected_vs_actual:
+    api_json:
+      expected: "application/json"
+      vulnerable_responses:
+        - "text/html (may contain error page with sensitive info)"
+        - "text/plain (may leak raw data)"
+    
+    file_upload:
+      expected: "Based on Content-Type header"
+      test: "Upload .php file with image/jpeg Content-Type"
+      vulnerable_if: "Server executes based on extension not content"
+
+# Authentication State Validation
+auth_state_patterns:
+  authenticated:
+    indicators:
+      - "Set-Cookie: session_id=..."
+      - "Set-Cookie: auth_token=..."
+      - "Redirect to /dashboard"
+      - "Welcome, [username]"
+    
+  unauthenticated:
+    indicators:
+      - "Redirect to /login"
+      - "401 Unauthorized"
+      - "Please log in to continue"
+    
+  session_fixation:
+    test: "Session ID should change after login"
+    vulnerable: "Same session ID before and after login"
+
+validation_checklist:
+  - "Check status code matches expected security behavior"
+  - "Verify authentication required (401) for protected resources"
+  - "Verify authorization enforced (403) for unauthorized access"
+  - "Check for consistent response times (no timing leaks)"
+  - "Validate all required security headers present"
+  - "Ensure no sensitive information in error messages"
+  - "Verify cookies have Secure, HttpOnly, SameSite flags"
+  - "Check response size doesn't leak information"
+  - "Validate Content-Type matches expected format"
+
+references:
+  - "OWASP Testing Guide: Testing for Error Handling"
+  - "OWASP Secure Headers Project"
+  - "MDN HTTP Status Codes"

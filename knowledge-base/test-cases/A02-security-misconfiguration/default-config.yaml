@@ -1,0 +1,409 @@
+# Test Cases - A02: Security Misconfiguration
+# OWASP Top 10:2025 A02 - Security Misconfiguration Testing
+
+category: "A02-security-misconfiguration"
+owasp_2025: "A02"
+severity: "HIGH"
+description: "Testing for insecure default configurations, incomplete setups, misconfigured permissions, and verbose error messages"
+
+cwe_mappings:
+  - "CWE-16: Configuration"
+  - "CWE-2: Environmental Security Flaws"
+  - "CWE-209: Information Exposure Through Error Messages"
+  - "CWE-215: Information Exposure Through Debug Information"
+  - "CWE-548: Information Exposure Through Directory Listing"
+  - "CWE-732: Incorrect Permission Assignment for Critical Resource"
+
+test_cases:
+  - id: "MISCON-001"
+    name: "Default Credentials Testing"
+    description: "Test for default/common credentials on admin panels, databases, and services"
+    severity: "CRITICAL"
+    
+    common_defaults:
+      admin_panels:
+        - username: "admin"
+          password: "admin"
+        - username: "admin"
+          password: "password"
+        - username: "administrator"
+          password: "administrator"
+        - username: "root"
+          password: "root"
+        - username: "admin"
+          password: ""  # empty
+      
+      databases:
+        mysql:
+          - username: "root"
+            password: ""  # empty
+          - username: "root"
+            password: "root"
+        postgresql:
+          - username: "postgres"
+            password: "postgres"
+        mongodb:
+          - username: "admin"
+            password: "admin"
+          - no authentication enabled
+        redis:
+          - no authentication (default)
+      
+      application_servers:
+        tomcat:
+          - username: "tomcat"
+            password: "tomcat"
+          - username: "admin"
+            password: "admin"
+        jenkins:
+          - username: "admin"
+            password: "password"
+        grafana:
+          - username: "admin"
+            password: "admin"
+    
+    testing_methodology:
+      - "Identify login pages/panels"
+      - "Try common default credentials"
+      - "Check for hardcoded credentials in source code"
+      - "Test database connections with default creds"
+      - "Check for credential disclosure in config files"
+    
+    tools:
+      - "Hydra: hydra -L users.txt -P passwords.txt http-post-form"
+      - "Burp Intruder with SecLists/Passwords/Default-Credentials"
+      - "Nmap scripts: http-default-accounts, mysql-empty-password"
+      - "Metasploit: auxiliary/scanner/http/tomcat_mgr_login"
+    
+    prevention:
+      - "Force password change on first login"
+      - "No default credentials in production"
+      - "Automated credential rotation"
+      - "Strong password policy enforcement"
+  
+  - id: "MISCON-002"
+    name: "Missing Security Headers"
+    description: "Check for absence of critical security headers"
+    severity: "MEDIUM"
+    
+    required_headers:
+      strict_transport_security:
+        header: "Strict-Transport-Security"
+        expected: "max-age=31536000; includeSubDomains; preload"
+        missing_risk: "MitM attacks, session hijacking"
+        
+      content_security_policy:
+        header: "Content-Security-Policy"
+        expected: "default-src 'self'; script-src 'self'"
+        missing_risk: "XSS exploitation"
+        
+      x_frame_options:
+        header: "X-Frame-Options"
+        expected: "DENY or SAMEORIGIN"
+        missing_risk: "Clickjacking attacks"
+        
+      x_content_type_options:
+        header: "X-Content-Type-Options"
+        expected: "nosniff"
+        missing_risk: "MIME sniffing attacks"
+        
+      referrer_policy:
+        header: "Referrer-Policy"
+        expected: "strict-origin-when-cross-origin"
+        missing_risk: "Referrer leakage"
+        
+      permissions_policy:
+        header: "Permissions-Policy"
+        expected: "geolocation=(), microphone=(), camera=()"
+        missing_risk: "Feature abuse"
+    
+    cookie_security:
+      - "Secure flag (HTTPS only)"
+      - "HttpOnly flag (prevent XSS theft)"
+      - "SameSite attribute (CSRF protection)"
+    
+    testing_tools:
+      - "curl -I https://target.com"
+      - "securityheaders.com"
+      - "Mozilla Observatory"
+      - "Burp Scanner"
+    
+    prevention:
+      - "Implement all security headers"
+      - "Use web server config or middleware"
+      - "Regular header audits"
+  
+  - id: "MISCON-003"
+    name: "Verbose Error Messages"
+    description: "Check for information disclosure through error messages"
+    severity: "MEDIUM"
+    
+    sensitive_info_in_errors:
+      stack_traces:
+        - "File paths (/var/www/html/app.php)"
+        - "Class/method names"
+        - "Line numbers"
+        - "Framework versions"
+      
+      database_errors:
+        - "SQL syntax errors revealing query structure"
+        - "Table/column names"
+        - "Database type and version"
+      
+      system_info:
+        - "Server software versions"
+        - "Operating system details"
+        - "Installed modules/libraries"
+    
+    test_payloads:
+      - "Invalid SQL: ' OR 1=1--"
+      - "Path traversal: ../../etc/passwd"
+      - "Invalid JSON: {invalid}"
+      - "Malformed XML: <root><unclosed>"
+      - "Division by zero: ?param=0"
+      - "Type confusion: ?id=string_instead_of_int"
+    
+    tools:
+      - "Burp Intruder with fuzzing payloads"
+      - "OWASP ZAP Active Scan"
+      - "Manual testing with invalid inputs"
+    
+    prevention:
+      - "Disable debug mode in production"
+      - "Generic error messages for users"
+      - "Detailed logging server-side only"
+      - "Custom error pages"
+  
+  - id: "MISCON-004"
+    name: "Directory Listing Enabled"
+    description: "Check if web server exposes directory contents"
+    severity: "MEDIUM"
+    
+    common_directories:
+      - "/uploads/"
+      - "/images/"
+      - "/backup/"
+      - "/files/"
+      - "/documents/"
+      - "/assets/"
+      - "/static/"
+    
+    risks:
+      - "Sensitive file disclosure"
+      - "Backup file access (.bak, .old, .zip)"
+      - "Source code disclosure"
+      - "Configuration file exposure"
+    
+    testing:
+      method: "GET request to directories without index file"
+      vulnerable_response: "Index of /uploads"
+      secure_response: "403 Forbidden or custom 404"
+    
+    prevention:
+      apache: "Options -Indexes in .htaccess"
+      nginx: "autoindex off; in nginx.conf"
+      iis: "Disable Directory Browsing in IIS Manager"
+  
+  - id: "MISCON-005"
+    name: "Backup and Config File Exposure"
+    description: "Test for accessible backup and configuration files"
+    severity: "CRITICAL"
+    
+    common_backup_files:
+      - ".env"
+      - ".env.production"
+      - ".env.backup"
+      - "config.php.bak"
+      - "web.config.old"
+      - "database.yml"
+      - "application.properties"
+      - "settings.py.bak"
+      - "backup.zip"
+      - "db_backup.sql"
+    
+    common_paths:
+      - "/.env"
+      - "/config/.env"
+      - "/backup/database.sql"
+      - "/admin/config.php.bak"
+      - "/.git/config"
+      - "/.svn/entries"
+    
+    testing_methodology:
+      - "Try common backup extensions (.bak, .old, .backup, ~)"
+      - "Check for compressed backups (.zip, .tar.gz, .rar)"
+      - "Look for version control files (.git, .svn, .hg)"
+      - "Test for config files in default locations"
+    
+    tools:
+      - "DirBuster with backup-files.txt wordlist"
+      - "Gobuster: gobuster dir -u target -w wordlist"
+      - "GitDumper for .git exposure"
+      - "Manual: curl https://target.com/.env"
+    
+    critical_files:
+      - "/.git/HEAD (reveals Git repo)"
+      - "/web.config (ASP.NET config)"
+      - "/WEB-INF/web.xml (Java config)"
+      - "/composer.json (PHP dependencies)"
+      - "/package.json (Node.js dependencies)"
+    
+    prevention:
+      - "Exclude backup files from web root"
+      - "Block access via .htaccess or web.config"
+      - "Disable version control in production"
+      - "Automated cleanup of backup files"
+  
+  - id: "MISCON-006"
+    name: "Cloud Storage Misconfiguration"
+    description: "Test for publicly accessible cloud storage buckets"
+    severity: "CRITICAL"
+    
+    aws_s3:
+      testing:
+        - "http://bucket-name.s3.amazonaws.com/"
+        - "http://s3.amazonaws.com/bucket-name/"
+        - "Check for ListBucket permission"
+      
+      tools:
+        - "aws s3 ls s3://bucket-name --no-sign-request"
+        - "S3Scanner: python s3scanner.py"
+        - "Bucket Finder"
+      
+      vulnerabilities:
+        - "Public read access"
+        - "Public write access"
+        - "Authenticated users (any AWS account) access"
+      
+      prevention:
+        - "Block all public access"
+        - "S3 Bucket Policies review"
+        - "AWS Config rules for public buckets"
+    
+    azure_blob:
+      testing:
+        - "https://storage-account.blob.core.windows.net/container-name"
+        - "List blobs with anonymous access"
+      
+      tools:
+        - "Azure Storage Explorer"
+        - "MicroBurst (PowerShell)"
+      
+      prevention:
+        - "Private access only"
+        - "SAS tokens with expiration"
+        - "Azure Policy enforcement"
+    
+    gcp_storage:
+      testing:
+        - "https://storage.googleapis.com/bucket-name/"
+        - "Check for allUsers or allAuthenticatedUsers"
+      
+      tools:
+        - "gsutil ls gs://bucket-name"
+        - "GCP IAM policy review"
+      
+      prevention:
+        - "Uniform bucket-level access"
+        - "No public allUsers role"
+        - "Organization policy constraints"
+    
+    common_bucket_names:
+      - "company-backup"
+      - "company-logs"
+      - "company-data"
+      - "app-uploads"
+      - "website-assets"
+  
+  - id: "MISCON-007"
+    name: "Unnecessary Services Running"
+    description: "Identify and test unnecessary open ports and services"
+    severity: "MEDIUM"
+    
+    common_unnecessary_services:
+      - port: 22
+        service: "SSH"
+        note: "Should be restricted to management IPs"
+      - port: 3306
+        service: "MySQL"
+        note: "Should not be public"
+      - port: 5432
+        service: "PostgreSQL"
+        note: "Should not be public"
+      - port: 27017
+        service: "MongoDB"
+        note: "Should not be public"
+      - port: 6379
+        service: "Redis"
+        note: "Should not be public"
+      - port: 9200
+        service: "Elasticsearch"
+        note: "Should not be public"
+      - port: 8080
+        service: "HTTP-Alt"
+        note: "Often dev/admin panels"
+    
+    testing:
+      - "nmap -sV -p- target.com"
+      - "masscan -p1-65535 target.com"
+      - "Check for services responding publicly"
+    
+    prevention:
+      - "Firewall rules (allow only necessary ports)"
+      - "VPN/bastion for management services"
+      - "Regular port scans and audits"
+  
+  - id: "MISCON-008"
+    name: "Insecure HTTP Methods Enabled"
+    description: "Test for dangerous HTTP methods like PUT, DELETE, TRACE"
+    severity: "MEDIUM"
+    
+    dangerous_methods:
+      PUT:
+        test: "curl -X PUT -d 'malicious content' https://target.com/file.txt"
+        risk: "Upload arbitrary files"
+      
+      DELETE:
+        test: "curl -X DELETE https://target.com/file.txt"
+        risk: "Delete files"
+      
+      TRACE:
+        test: "curl -X TRACE https://target.com/"
+        risk: "XSS via TRACE (XST)"
+      
+      OPTIONS:
+        test: "curl -X OPTIONS https://target.com/"
+        response: "Check Allow header for enabled methods"
+    
+    testing_tools:
+      - "Burp Repeater (change method)"
+      - "nmap: nmap --script http-methods target.com"
+      - "curl -X OPTIONS"
+    
+    prevention:
+      apache: "Limit GET POST in .htaccess"
+      nginx: "limit_except GET POST { deny all; }"
+      iis: "Configure request filtering"
+
+prevention_summary:
+  - "Use infrastructure-as-code for consistent configuration"
+  - "Automated security scanning in CI/CD"
+  - "Regular configuration audits"
+  - "Principle of least privilege"
+  - "Disable unnecessary features and services"
+  - "Secure defaults and hardening guides"
+  - "Configuration management tools (Ansible, Chef, Puppet)"
+
+tools:
+  - "Nmap: Network and service scanning"
+  - "Nikto: Web server misconfiguration scanner"
+  - "OWASP ZAP: Security header and config checks"
+  - "Lynis: Linux system auditing"
+  - "Prowler: AWS security assessment"
+  - "ScoutSuite: Multi-cloud security auditing"
+
+references:
+  - "OWASP Top 10:2025 A02"
+  - "CIS Benchmarks"
+  - "NIST SP 800-123: Guide to General Server Security"
+  - "Cloud Security Alliance: Cloud Controls Matrix"

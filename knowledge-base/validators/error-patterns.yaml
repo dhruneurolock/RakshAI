@@ -1,0 +1,397 @@
+# Validators - Error Patterns and Information Disclosure
+# Detecting Sensitive Information in Error Messages
+
+validator_category: "error-patterns"
+version: "1.0"
+
+# Database Error Patterns
+database_errors:
+  mysql:
+    syntax_errors:
+      - "You have an error in your SQL syntax"
+      - "check the manual that corresponds to your MySQL server version"
+      - "MySQLSyntaxErrorException"
+      - "Warning: mysql_fetch"
+      - "Warning: mysqli"
+      - "com.mysql.jdbc.exceptions"
+    
+    connection_errors:
+      - "Access denied for user"
+      - "Can't connect to MySQL server"
+      - "MySQL server has gone away"
+      - "Too many connections"
+    
+    data_errors:
+      - "Duplicate entry"
+      - "Column count doesn't match"
+      - "Unknown column"
+      - "Table doesn't exist"
+    
+    detection_value: "Confirms MySQL database, aids SQL injection"
+  
+  postgresql:
+    syntax_errors:
+      - "ERROR: syntax error at or near"
+      - "ERROR: unterminated quoted string"
+      - "pg_query()"
+      - "org.postgresql.util.PSQLException"
+      - "PSQLException"
+    
+    type_errors:
+      - "ERROR: operator does not exist"
+      - "ERROR: invalid input syntax"
+      - "ERROR: column does not exist"
+    
+    detection_value: "Confirms PostgreSQL, reveals column/table names"
+  
+  mssql:
+    syntax_errors:
+      - "Unclosed quotation mark"
+      - "Incorrect syntax near"
+      - "Microsoft SQL Server"
+      - "SQLServerException"
+      - "System.Data.SqlClient.SqlException"
+    
+    conversion_errors:
+      - "Conversion failed when converting"
+      - "Cannot convert varchar to int"
+    
+    detection_value: "Confirms MSSQL, reveals data types"
+  
+  oracle:
+    syntax_errors:
+      - "ORA-00933: SQL command not properly ended"
+      - "ORA-01756: quoted string not properly terminated"
+      - "ORA-00923: FROM keyword not found"
+      - "ORA-00936: missing expression"
+    
+    object_errors:
+      - "ORA-00942: table or view does not exist"
+      - "ORA-00904: invalid identifier"
+    
+    detection_value: "Confirms Oracle, error codes aid exploitation"
+  
+  mongodb:
+    errors:
+      - "MongoError"
+      - "SyntaxError: Unexpected token"
+      - "MongoServerError"
+      - "Cannot convert"
+    
+    detection_value: "Confirms MongoDB NoSQL injection"
+  
+  sqlite:
+    errors:
+      - "SQLite error"
+      - "SQLITE_ERROR"
+      - "sqlite3.OperationalError"
+      - "unrecognized token"
+    
+    detection_value: "Confirms SQLite, reveals query structure"
+
+# Application Framework Errors
+framework_errors:
+  django:
+    debug_mode:
+      - "DebugToolbarMiddleware"
+      - "Django Version:"
+      - "Python Executable:"
+      - "INSTALLED_APPS"
+      - "MIDDLEWARE"
+    
+    exceptions:
+      - "DoesNotExist"
+      - "FieldError"
+      - "ValidationError"
+      - "IntegrityError"
+    
+    risk: "Reveals application structure, settings, database schema"
+  
+  laravel:
+    debug_mode:
+      - "Whoops, looks like something went wrong"
+      - "Laravel Debugbar"
+      - "SQLSTATE"
+      - "Illuminate\\"
+    
+    exceptions:
+      - "QueryException"
+      - "ModelNotFoundException"
+      - "TokenMismatchException"
+    
+    risk: "Exposes routes, queries, environment variables"
+  
+  spring_boot:
+    errors:
+      - "Whitelabel Error Page"
+      - "There was an unexpected error (type="
+      - "org.springframework"
+      - "java.lang.NullPointerException"
+    
+    risk: "Reveals Java stack traces, class names"
+  
+  aspnet:
+    errors:
+      - "Server Error in '/' Application"
+      - "System.NullReferenceException"
+      - "System.Data.SqlClient"
+      - "Stack Trace:"
+      - "Description: An unhandled exception"
+    
+    risk: "Exposes .NET version, file paths, database info"
+  
+  nodejs_express:
+    errors:
+      - "at Function.Module"
+      - "at Object.<anonymous>"
+      - "Error: Cannot find module"
+      - "SyntaxError: Unexpected token"
+    
+    risk: "Reveals module structure, file paths"
+
+# System Path Disclosure
+path_disclosure:
+  windows:
+    patterns:
+      - "C:\\inetpub\\wwwroot"
+      - "C:\\Program Files"
+      - "C:\\Windows\\System32"
+      - "C:\\Users\\"
+      - "D:\\www\\"
+    
+    iis_specific:
+      - "C:\\inetpub\\logs"
+      - "C:\\Windows\\Microsoft.NET\\Framework"
+    
+    risk: "Aids path traversal, reveals directory structure"
+  
+  linux:
+    patterns:
+      - "/var/www/html"
+      - "/usr/local/apache2"
+      - "/home/"
+      - "/etc/"
+      - "/opt/"
+      - "/usr/share/"
+    
+    common_paths:
+      - "/var/www/html/public"
+      - "/usr/share/nginx/html"
+      - "/opt/lampp/htdocs"
+    
+    risk: "Reveals file system structure for LFI attacks"
+
+# Version Information Disclosure
+version_disclosure:
+  web_servers:
+    apache:
+      - "Apache/2.4.41 (Ubuntu)"
+      - "Server: Apache/2.4"
+      - "Apache Tomcat/"
+    
+    nginx:
+      - "nginx/1.18.0"
+      - "Server: nginx/"
+    
+    iis:
+      - "Microsoft-IIS/10.0"
+      - "Server: Microsoft-IIS"
+    
+    risk: "Enables targeted exploits for specific versions"
+  
+  languages:
+    php:
+      - "PHP/7.4.3"
+      - "X-Powered-By: PHP/7.4"
+      - "PHP Warning:"
+    
+    python:
+      - "Python/3.8.10"
+      - "Server: WSGIServer/0.2 CPython/3.8"
+    
+    nodejs:
+      - "X-Powered-By: Express"
+      - "Node.js v14.17.0"
+    
+    risk: "Reveals vulnerable versions"
+  
+  databases:
+    extraction_via_errors:
+      mysql: "SELECT @@version"
+      postgresql: "SELECT version()"
+      mssql: "SELECT @@VERSION"
+      oracle: "SELECT banner FROM v$version"
+
+# Stack Trace Patterns
+stack_traces:
+  java:
+    patterns:
+      - "at com.example.package.ClassName.methodName"
+      - "Exception in thread"
+      - "at sun.reflect.NativeMethodAccessorImpl"
+      - "Caused by:"
+    
+    info_leaked:
+      - "Class names and packages"
+      - "Method names"
+      - "Line numbers"
+      - "Library versions"
+  
+  python:
+    patterns:
+      - "Traceback (most recent call last):"
+      - "File \"/path/to/file.py\", line"
+      - "in <module>"
+      - "raise Exception"
+    
+    info_leaked:
+      - "File paths"
+      - "Module names"
+      - "Line numbers"
+      - "Variable values"
+  
+  dotnet:
+    patterns:
+      - "at System.Web"
+      - "at Microsoft.AspNetCore"
+      - "System.NullReferenceException:"
+      - "Stack Trace:"
+    
+    info_leaked:
+      - "Namespace structure"
+      - "Assembly names"
+      - "File paths"
+      - "Method signatures"
+  
+  php:
+    patterns:
+      - "Fatal error:"
+      - "Warning:"
+      - "Notice:"
+      - "in /path/to/file.php on line"
+    
+    info_leaked:
+      - "File paths"
+      - "Function names"
+      - "Line numbers"
+      - "Variable names"
+
+# Sensitive Data in Errors
+sensitive_data_patterns:
+  credentials:
+    - "password="
+    - "api_key="
+    - "secret="
+    - "token="
+    - "Authorization: Bearer"
+  
+  database_connections:
+    - "jdbc:mysql://localhost:3306"
+    - "Server=localhost;Database="
+    - "mongodb://username:password@host"
+    - "postgresql://user:pass@host"
+  
+  api_keys:
+    aws:
+      - "AKIA[0-9A-Z]{16}"
+      - "aws_access_key_id"
+    
+    google:
+      - "AIza[0-9A-Za-z\\-_]{35}"
+    
+    github:
+      - "gh[pousr]_[0-9a-zA-Z]{36}"
+  
+  private_keys:
+    - "-----BEGIN RSA PRIVATE KEY-----"
+    - "-----BEGIN PRIVATE KEY-----"
+    - "-----BEGIN OPENSSH PRIVATE KEY-----"
+
+# Configuration Exposure
+config_disclosure:
+  environment_variables:
+    patterns:
+      - "DB_HOST="
+      - "DATABASE_URL="
+      - "SECRET_KEY="
+      - "AWS_ACCESS_KEY="
+      - "API_SECRET="
+    
+    risk: "Complete compromise of secrets"
+  
+  debug_info:
+    patterns:
+      - "DEBUG = True"
+      - "debug: true"
+      - "development mode"
+      - "SHOW_ERRORS = 1"
+    
+    risk: "Verbose errors enabled"
+
+# Security Mechanism Bypass Indicators
+bypass_indicators:
+  authentication:
+    patterns:
+      - "Authentication failed"
+      - "Invalid credentials"
+      - "User not found"
+      - "Password incorrect"
+    note: "Different messages enable user enumeration"
+  
+  authorization:
+    patterns:
+      - "Access denied"
+      - "Permission denied"
+      - "Forbidden"
+      - "Unauthorized"
+    note: "Confirms resource exists but access denied"
+  
+  rate_limiting:
+    patterns:
+      - "Too many requests"
+      - "Rate limit exceeded"
+      - "429 Too Many Requests"
+    note: "Indicates protection is working"
+
+# Validation Patterns
+validation_errors:
+  input_validation:
+    patterns:
+      - "Invalid input"
+      - "Validation error"
+      - "Field is required"
+      - "Must be a valid email"
+    note: "Can reveal validation rules"
+  
+  business_logic:
+    patterns:
+      - "Insufficient balance"
+      - "Item out of stock"
+      - "Invalid coupon code"
+    note: "Reveals business logic"
+
+detection_strategies:
+  grep_patterns:
+    - "error|exception|warning|fatal|traceback"
+    - "SQL|query|database|table|column"
+    - "path|file|directory|line [0-9]+"
+    - "version|powered by|server"
+  
+  response_analysis:
+    - "Check for HTML comments with error info"
+    - "Analyze error page source code"
+    - "Test error pages with different inputs"
+    - "Compare error responses for timing differences"
+
+mitigation:
+  - "Disable debug mode in production"
+  - "Use generic error messages for users"
+  - "Log detailed errors server-side only"
+  - "Remove version headers"
+  - "Custom error pages without sensitive info"
+  - "Sanitize stack traces before logging"
+
+references:
+  - "OWASP Testing Guide: Error Handling"
+  - "CWE-209: Information Exposure Through Error Messages"
+  - "OWASP Top 10:2025 A02 (Security Misconfiguration)"

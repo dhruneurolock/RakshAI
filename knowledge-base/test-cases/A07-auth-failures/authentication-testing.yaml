@@ -1,0 +1,406 @@
+# Test Cases - A07: Authentication Failures
+# OWASP Top 10:2025 A07 - Identification and Authentication Failures
+
+category: "A07-auth-failures"
+owasp_2025: "A07"
+severity: "CRITICAL"
+description: "Testing for weak authentication mechanisms, credential stuffing, brute force vulnerabilities, session management issues, and MFA bypass"
+
+cwe_mappings:
+  - "CWE-287: Improper Authentication"
+  - "CWE-307: Improper Restriction of Excessive Authentication Attempts"
+  - "CWE-521: Weak Password Requirements"
+  - "CWE-798: Use of Hard-coded Credentials"
+  - "CWE-640: Weak Password Recovery Mechanism"
+  - "CWE-916: Use of Password Hash with Insufficient Computational Effort"
+
+test_cases:
+  - id: "AUTH-001"
+    name: "Credential Stuffing Attack"
+    description: "Test using known username/password combinations from data breaches"
+    severity: "CRITICAL"
+    
+    attack_methodology:
+      - "Obtain credential lists from breaches (HaveIBeenPwned, etc.)"
+      - "Test credentials against target login"
+      - "Use distributed IPs to evade rate limiting"
+      - "Rotate User-Agent headers"
+    
+    breach_databases:
+      - "Collection #1 (773M emails, 21M passwords)"
+      - "RockYou2021 (8.4B passwords)"
+      - "Compilation of Many Breaches (COMB)"
+    
+    tools:
+      - "Sentry MBA (credential stuffing tool)"
+      - "SNIPR (automated credential stuffing)"
+      - "OpenBullet (custom configs)"
+      - "Custom Python scripts with requests library"
+    
+    detection_evasion:
+      - "Use residential proxies (not datacenter IPs)"
+      - "Randomize request timing (mimic human behavior)"
+      - "Rotate User-Agent strings"
+      - "CAPTCHA solving services (2captcha, Anti-Captcha)"
+    
+    indicators_of_success:
+      - "200 OK with session cookie"
+      - "Redirect to dashboard/profile"
+      - "Different response size for valid credentials"
+    
+    prevention:
+      - "Rate limiting per IP and per username"
+      - "Account lockout after N failed attempts"
+      - "MFA enforcement"
+      - "Monitor for password spray patterns"
+      - "Check passwords against breach databases (HaveIBeenPwned API)"
+      - "Device fingerprinting for new logins"
+  
+  - id: "AUTH-002"
+    name: "Brute Force Attack"
+    description: "Systematically test password combinations to gain access"
+    severity: "HIGH"
+    
+    attack_types:
+      dictionary_attack:
+        description: "Use common password wordlists"
+        wordlists:
+          - "rockyou.txt (14M passwords)"
+          - "SecLists/Passwords/Common-Credentials"
+          - "10-million-password-list-top-1000000.txt"
+        
+      targeted_attack:
+        description: "Create custom wordlist based on OSINT"
+        sources:
+          - "Company name variations"
+          - "Employee names from LinkedIn"
+          - "Product/service names"
+          - "Years (2020, 2021, 2022, 2023, 2024)"
+        
+        tools:
+          - "CeWL: Website wordlist generator"
+          - "Mentalist: Custom wordlist generator"
+      
+      hybrid_attack:
+        description: "Combine dictionary words with mutations"
+        mutations:
+          - "Append numbers: password123"
+          - "Append special chars: password!"
+          - "Leetspeak: p@ssw0rd"
+          - "Capitalization: Password, PASSWORD"
+    
+    testing_tools:
+      - "Hydra: hydra -l admin -P rockyou.txt http-post-form '/login:username=^USER^&password=^PASS^:F=incorrect'"
+      - "Medusa: medusa -h target.com -u admin -P passwords.txt -M http"
+      - "Burp Intruder with Sniper/Cluster bomb attacks"
+      - "Patator: patator http_fuzz method=POST url=https://target/login body='user=admin&pass=FILE0' 0=passwords.txt"
+    
+    timing_optimization:
+      - "Parallel requests: 5-10 threads"
+      - "Delays between requests: 100-500ms"
+      - "Session handling: Maintain cookies/tokens"
+    
+    prevention:
+      - "Account lockout: Lock after 5 failed attempts"
+      - "Progressive delays: Exponential backoff"
+      - "CAPTCHA after 3 failed attempts"
+      - "Rate limiting: Max 5 attempts per minute"
+      - "Strong password policy"
+  
+  - id: "AUTH-003"
+    name: "Session Fixation"
+    description: "Force user to use attacker-controlled session ID"
+    severity: "HIGH"
+    
+    attack_flow:
+      - step: 1
+        action: "Obtain valid session ID from application"
+        example: "GET /login → Set-Cookie: SESSIONID=ABC123"
+      
+      - step: 2
+        action: "Send victim link with attacker's session ID"
+        example: "https://target.com/login?SESSIONID=ABC123"
+      
+      - step: 3
+        action: "Victim logs in using that session ID"
+        vulnerable: "Session ID doesn't change after login"
+      
+      - step: 4
+        action: "Attacker uses same session ID to access victim's account"
+    
+    test_methodology:
+      - "Note session ID before login"
+      - "Login with credentials"
+      - "Check if session ID changed after login"
+      - "Vulnerable if session ID remains same"
+    
+    session_id_injection_methods:
+      - "URL parameter: ?sessionid=ABC123"
+      - "Cookie: Cookie: SESSIONID=ABC123"
+      - "Hidden form field: <input name='sessionid' value='ABC123'>"
+      - "HTTP header: X-Session-ID: ABC123"
+    
+    tools:
+      - "Burp Proxy: Compare session IDs before/after login"
+      - "OWASP ZAP: Session management testing"
+      - "Custom scripts to track session lifecycle"
+    
+    prevention:
+      - "Regenerate session ID after login"
+      - "Reject session IDs from URL parameters"
+      - "Only accept server-generated session IDs"
+      - "Bind session to IP/User-Agent (with caution)"
+  
+  - id: "AUTH-004"
+    name: "Weak Password Policy"
+    description: "Test for acceptance of weak passwords"
+    severity: "MEDIUM"
+    
+    weak_password_tests:
+      - password: "password"
+        test: "Most common password"
+      - password: "123456"
+        test: "Numeric sequence"
+      - password: "abc123"
+        test: "Simple combination"
+      - password: "qwerty"
+        test: "Keyboard pattern"
+      - password: "admin"
+        test: "Default/common word"
+      - password: "p@ss"
+        test: "Too short"
+      - password: "aaaaaaa"
+        test: "Repeated characters"
+    
+    password_requirements:
+      minimum_length: 12
+      required_character_types:
+        - "Uppercase (A-Z)"
+        - "Lowercase (a-z)"
+        - "Numbers (0-9)"
+        - "Special characters (!@#$%)"
+      
+      additional_checks:
+        - "No part of username in password"
+        - "Not in common password list"
+        - "Not previously breached (HaveIBeenPwned)"
+        - "No dictionary words"
+    
+    testing:
+      - "Register new account with weak passwords"
+      - "Change password to weak password"
+      - "Check for password strength meter"
+      - "Verify enforcement (not just client-side)"
+    
+    prevention:
+      - "Enforce minimum 12-character length"
+      - "Require character diversity"
+      - "Check against breach databases"
+      - "Implement password strength estimator (zxcvbn)"
+      - "Server-side validation (not just client-side)"
+  
+  - id: "AUTH-005"
+    name: "Username Enumeration"
+    description: "Identify valid usernames through different error messages or response times"
+    severity: "MEDIUM"
+    
+    enumeration_vectors:
+      login_page:
+        valid_user: "Password incorrect"
+        invalid_user: "User not found"
+        note: "Different messages reveal valid usernames"
+      
+      registration:
+        existing_user: "Username already exists"
+        new_user: "Account created successfully"
+        note: "Confirms username existence"
+      
+      password_reset:
+        valid_user: "Reset link sent to email"
+        invalid_user: "User not found"
+        note: "Reveals valid accounts"
+      
+      response_timing:
+        valid_user: "500ms (password hash computed)"
+        invalid_user: "50ms (immediate rejection)"
+        note: "Timing differences leak information"
+    
+    testing_methodology:
+      - "Test login with valid user + wrong password"
+      - "Test login with invalid user + wrong password"
+      - "Compare error messages"
+      - "Measure response times (5+ samples)"
+      - "Test forgot password function"
+    
+    tools:
+      - "Burp Intruder with response analysis"
+      - "OWASP ZAP: Username enumeration scanner"
+      - "Custom Python script with response comparison"
+    
+    prevention:
+      - "Generic error messages: 'Invalid credentials'"
+      - "Constant-time password verification"
+      - "Same response for valid/invalid users"
+      - "Rate limiting on forgot password"
+  
+  - id: "AUTH-006"
+    name: "MFA Bypass"
+    description: "Test for multi-factor authentication weaknesses"
+    severity: "CRITICAL"
+    
+    bypass_techniques:
+      direct_navigation:
+        - "Login with valid credentials"
+        - "Intercept redirect to MFA page"
+        - "Navigate directly to /dashboard or /profile"
+        - "Check if MFA verification is skipped"
+      
+      response_manipulation:
+        - "Login and enter wrong MFA code"
+        - "Capture response: {'success': false, 'mfa_valid': false}"
+        - "Change to: {'success': true, 'mfa_valid': true}"
+        - "Check if application trusts client-side validation"
+      
+      rate_limiting_absence:
+        - "Brute force 6-digit MFA code (000000-999999)"
+        - "If no rate limiting, can try all codes"
+        - "Time required: ~1000 codes at 1/sec = 16 minutes"
+      
+      backup_codes:
+        - "Check if backup codes are weak (sequential, predictable)"
+        - "Test if backup codes can be reused"
+        - "Check if unlimited backup codes can be generated"
+      
+      session_reuse:
+        - "Complete MFA on one device"
+        - "Use session cookie on another device"
+        - "Check if MFA is required per device/IP"
+      
+      remember_device:
+        - "Enable 'Remember this device'"
+        - "Check cookie duration (should be reasonable)"
+        - "Test if cookie can be stolen and reused"
+    
+    testing_tools:
+      - "Burp Proxy: Intercept and modify MFA requests"
+      - "Burp Intruder: Brute force MFA codes"
+      - "Manual testing with multiple browsers/devices"
+    
+    prevention:
+      - "Server-side MFA verification"
+      - "Rate limiting: Lock after 3-5 failed MFA attempts"
+      - "MFA required for sensitive actions"
+      - "Device fingerprinting for 'remember me'"
+      - "Time-based codes (TOTP) expire quickly"
+      - "Secure backup codes (cryptographically random)"
+  
+  - id: "AUTH-007"
+    name: "Password Reset Poisoning"
+    description: "Manipulate password reset links to hijack accounts"
+    severity: "HIGH"
+    
+    attack_techniques:
+      host_header_injection:
+        - "Request password reset"
+        - "Modify Host header: Host: attacker.com"
+        - "Reset link sent: https://attacker.com/reset?token=ABC"
+        - "Victim clicks link, token sent to attacker"
+      
+      x_forwarded_host:
+        - "Add header: X-Forwarded-Host: attacker.com"
+        - "Application uses this to build reset link"
+        - "Token leaked to attacker domain"
+      
+      token_reuse:
+        - "Request reset token"
+        - "Use token to reset password"
+        - "Check if same token can be used again"
+      
+      weak_tokens:
+        - "Analyze reset token pattern"
+        - "Check if predictable (timestamp-based, sequential)"
+        - "Test if token is vulnerable to brute force"
+      
+      no_expiration:
+        - "Request reset token"
+        - "Wait hours/days"
+        - "Check if token still valid"
+    
+    testing:
+      - "Intercept password reset request in Burp"
+      - "Modify Host header to attacker domain"
+      - "Check email for reset link domain"
+      - "Test token expiration (wait 1 hour, try token)"
+      - "Test token reuse after password change"
+    
+    prevention:
+      - "Use HTTPS and validate Host header"
+      - "Ignore X-Forwarded-Host in reset emails"
+      - "Cryptographically secure random tokens"
+      - "Short token expiration (15-30 minutes)"
+      - "Invalidate token after use"
+      - "One-time use tokens only"
+  
+  - id: "AUTH-008"
+    name: "Insecure Password Storage"
+    description: "Identify weak password hashing mechanisms"
+    severity: "CRITICAL"
+    
+    weak_hashing_indicators:
+      plaintext:
+        - "Password visible in source code/database"
+        - "Password in forgot password email"
+        - "Password displayed after registration"
+      
+      weak_algorithms:
+        md5: "5f4dcc3b5aa765d61d8327deb882cf99 (MD5 of 'password')"
+        sha1: "5baa61e4c9b93f3f0682250b6cf8331b7ee68fd8 (SHA1 of 'password')"
+        sha256_no_salt: "Vulnerable to rainbow table attacks"
+        risk: "Fast hashing, easily cracked with modern GPUs"
+      
+      strong_algorithms:
+        bcrypt: "Recommended, adaptive cost factor"
+        argon2: "Modern, memory-hard, best choice"
+        scrypt: "Memory-hard, good for passwords"
+        pbkdf2: "Acceptable with high iteration count (100k+)"
+    
+    testing_methodology:
+      - "SQL injection to extract password hashes"
+      - "Analyze hash format and length"
+      - "MD5: 32 hex chars, SHA1: 40 hex, bcrypt: starts with $2"
+      - "Test if passwords are case-insensitive (weak storage)"
+      - "Check if password is returned in any API response"
+    
+    cracking_weak_hashes:
+      - "Hashcat: hashcat -m 0 hashes.txt rockyou.txt (MD5)"
+      - "John the Ripper: john --format=raw-md5 hashes.txt"
+      - "Online rainbow tables: CrackStation, OnlineHashCrack"
+    
+    prevention:
+      - "Use bcrypt or Argon2 for password hashing"
+      - "Salt every password (unique salt per user)"
+      - "High cost factor (bcrypt: 10-12 rounds)"
+      - "Never store plaintext passwords"
+      - "Never log passwords (even in error logs)"
+
+prevention_summary:
+  - "Strong password policy (length, complexity, breach checking)"
+  - "Multi-factor authentication (TOTP, WebAuthn)"
+  - "Rate limiting and account lockouts"
+  - "Session regeneration after login"
+  - "Secure password reset process"
+  - "Monitor for credential stuffing patterns"
+  - "Use bcrypt/Argon2 for password hashing"
+
+tools:
+  - "Hydra: Brute force authentication"
+  - "Burp Suite: Session management, MFA testing"
+  - "OWASP ZAP: Authentication testing"
+  - "Hashcat: Password hash cracking"
+  - "HaveIBeenPwned API: Check breached passwords"
+
+references:
+  - "OWASP Top 10:2025 A07"
+  - "OWASP Authentication Cheat Sheet"
+  - "NIST SP 800-63B: Digital Identity Guidelines"
+  - "CWE-287: Improper Authentication"

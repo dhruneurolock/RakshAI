@@ -1,0 +1,316 @@
+# Severity Rating and Risk Assessment Metadata
+# CVSS v3.1 scoring and risk classification guidelines
+
+metadata_type: "Severity & Risk Assessment"
+version: "3.1"
+last_updated: "2026-01-31"
+
+cvss_v3_1:
+  version: "3.1"
+  specification_url: "https://www.first.org/cvss/v3.1/specification-document"
+  
+  base_score_ranges:
+    none: "0.0"
+    low: "0.1 - 3.9"
+    medium: "4.0 - 6.9"
+    high: "7.0 - 8.9"
+    critical: "9.0 - 10.0"
+  
+  base_metrics:
+    attack_vector:
+      network: 
+        value: "N"
+        score: 0.85
+        description: "Exploitable remotely over network"
+      
+      adjacent:
+        value: "A"
+        score: 0.62
+        description: "Exploitable from adjacent network (same LAN)"
+      
+      local:
+        value: "L"
+        score: 0.55
+        description: "Requires local access"
+      
+      physical:
+        value: "P"
+        score: 0.20
+        description: "Requires physical access"
+    
+    attack_complexity:
+      low:
+        value: "L"
+        score: 0.77
+        description: "No special conditions required"
+      
+      high:
+        value: "H"
+        score: 0.44
+        description: "Requires specific conditions (race condition, social engineering)"
+    
+    privileges_required:
+      none:
+        value: "N"
+        score: 0.85
+        description: "No authentication required (most severe)"
+      
+      low:
+        value: "L"
+        score: 0.62
+        description: "Basic user privileges required"
+      
+      high:
+        value: "H"
+        score: 0.27
+        description: "Admin/elevated privileges required"
+    
+    user_interaction:
+      none:
+        value: "N"
+        score: 0.85
+        description: "Fully automated exploitation"
+      
+      required:
+        value: "R"
+        score: 0.62
+        description: "User must perform action (click link, open file)"
+    
+    scope:
+      unchanged:
+        value: "U"
+        description: "Vulnerability limited to vulnerable component"
+      
+      changed:
+        value: "C"
+        description: "Vulnerability affects resources beyond vulnerable component"
+    
+    confidentiality_impact:
+      none:
+        value: "N"
+        score: 0.0
+        description: "No information disclosure"
+      
+      low:
+        value: "L"
+        score: 0.22
+        description: "Some information disclosed"
+      
+      high:
+        value: "H"
+        score: 0.56
+        description: "All system information disclosed"
+    
+    integrity_impact:
+      none:
+        value: "N"
+        score: 0.0
+      
+      low:
+        value: "L"
+        score: 0.22
+        description: "Limited data modification"
+      
+      high:
+        value: "H"
+        score: 0.56
+        description: "Total data modification or destruction"
+    
+    availability_impact:
+      none:
+        value: "N"
+        score: 0.0
+      
+      low:
+        value: "L"
+        score: 0.22
+        description: "Reduced performance or interruptions"
+      
+      high:
+        value: "H"
+        score: 0.56
+        description: "Total system shutdown or denial of service"
+
+vulnerability_severity_examples:
+  critical_9_0_10_0:
+    - vulnerability: "Unauthenticated SQL Injection with admin access"
+      cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H"
+      score: 10.0
+      
+    - vulnerability: "Remote Code Execution without authentication"
+      cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"
+      score: 9.8
+    
+    - vulnerability: "SSRF accessing AWS metadata with IAM credentials"
+      cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:N"
+      score: 9.6
+  
+  high_7_0_8_9:
+    - vulnerability: "Authenticated SQL Injection"
+      cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:H/A:H"
+      score: 8.8
+    
+    - vulnerability: "Stored XSS in admin panel"
+      cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:L/UI:R/S:C/C:H/I:L/A:N"
+      score: 7.3
+    
+    - vulnerability: "IDOR exposing PII"
+      cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N"
+      score: 6.5
+  
+  medium_4_0_6_9:
+    - vulnerability: "Reflected XSS"
+      cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:C/C:L/I:L/A:N"
+      score: 6.1
+    
+    - vulnerability: "Information Disclosure via error messages"
+      cvss_vector: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N"
+      score: 5.3
+  
+  low_0_1_3_9:
+    - vulnerability: "Missing Secure flag on cookie"
+      cvss_vector: "CVSS:3.1/AV:A/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N"
+      score: 2.6
+    
+    - vulnerability: "Verbose error messages"
+      cvss_vector: "CVSS:3.1/AV:L/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N"
+      score: 3.3
+
+business_impact_assessment:
+  data_classification:
+    public:
+      sensitivity: "Low"
+      breach_impact: "Minimal"
+      examples: ["Marketing materials", "Public documentation"]
+    
+    internal:
+      sensitivity: "Medium"
+      breach_impact: "Moderate"
+      examples: ["Internal emails", "Employee directory"]
+    
+    confidential:
+      sensitivity: "High"
+      breach_impact: "Significant"
+      examples: ["Financial records", "Customer PII", "Trade secrets"]
+    
+    restricted:
+      sensitivity: "Critical"
+      breach_impact: "Catastrophic"
+      examples: ["Payment card data", "Healthcare records (PHI)", "Authentication credentials"]
+  
+  compliance_impact:
+    gdpr:
+      applicable_to: "EU citizen data"
+      penalty: "Up to €20M or 4% of global revenue"
+      breach_notification: "72 hours"
+    
+    pci_dss:
+      applicable_to: "Payment card data"
+      penalty: "Fines from $5,000 to $100,000 per month"
+      breach_impact: "Loss of payment processing ability"
+    
+    hipaa:
+      applicable_to: "Healthcare data (PHI)"
+      penalty: "Up to $1.5M per violation category per year"
+      breach_notification: "60 days"
+    
+    sox:
+      applicable_to: "Financial reporting (public companies)"
+      penalty: "Criminal penalties, imprisonment"
+
+risk_calculation:
+  formula: "Risk = Likelihood × Impact"
+  
+  likelihood_factors:
+    threat_actor_capability:
+      script_kiddie: 1
+      amateur_hacker: 2
+      professional: 3
+      organized_crime: 4
+      nation_state: 5
+    
+    exploit_availability:
+      public_exploit: 5
+      proof_of_concept: 4
+      skilled_attacker_only: 3
+      theoretical: 1
+    
+    attack_surface:
+      internet_facing: 5
+      internal_network: 3
+      requires_vpn: 2
+      air_gapped: 1
+  
+  impact_factors:
+    data_breach_cost:
+      per_record_average: "$150 - $350"
+      total_incident_cost: "$4.24M average (2021 IBM report)"
+    
+    regulatory_fines:
+      gdpr: "€20M or 4% revenue"
+      ccpa: "$7,500 per violation"
+      pci_dss: "$100,000/month"
+    
+    reputational_damage:
+      customer_churn: "5-10% post-breach"
+      stock_price_impact: "-5% average"
+      brand_value_loss: "Significant long-term"
+
+prioritization_matrix:
+  p0_critical:
+    severity: "Critical (CVSS 9.0+)"
+    exploitability: "Public exploit available"
+    exposure: "Internet-facing"
+    sla: "Patch within 24 hours"
+    examples: ["Unauthenticated RCE", "SQLi with public exploit"]
+  
+  p1_high:
+    severity: "High (CVSS 7.0-8.9)"
+    exploitability: "PoC exists or easy to exploit"
+    exposure: "Internet-facing or internal with high value"
+    sla: "Patch within 7 days"
+    examples: ["Authenticated SQLi", "IDOR exposing PII"]
+  
+  p2_medium:
+    severity: "Medium (CVSS 4.0-6.9)"
+    exploitability: "Requires user interaction"
+    exposure: "Internal or limited scope"
+    sla: "Patch within 30 days"
+    examples: ["Reflected XSS", "Information disclosure"]
+  
+  p3_low:
+    severity: "Low (CVSS 0.1-3.9)"
+    exploitability: "Difficult to exploit"
+    exposure: "Limited or local access"
+    sla: "Patch within 90 days"
+    examples: ["Missing security headers", "Verbose errors"]
+
+reporting_guidelines:
+  executive_summary:
+    - "Total vulnerabilities found by severity"
+    - "Top 3 critical risks"
+    - "Business impact assessment"
+    - "Recommended remediation timeline"
+  
+  technical_details:
+    - "CVE/CWE references"
+    - "CVSS v3.1 score and vector"
+    - "Proof of concept steps"
+    - "Affected components"
+    - "Remediation recommendations"
+  
+  risk_context:
+    - "Exploitability assessment"
+    - "Attack surface analysis"
+    - "Compliance implications"
+    - "Compensating controls"
+
+references:
+  - name: "CVSS v3.1 Calculator"
+    url: "https://www.first.org/cvss/calculator/3.1"
+  
+  - name: "NIST CVE Database"
+    url: "https://nvd.nist.gov/"
+  
+  - name: "OWASP Risk Rating Methodology"
+    url: "https://owasp.org/www-community/OWASP_Risk_Rating_Methodology"

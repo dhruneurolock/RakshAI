@@ -1,0 +1,334 @@
+# Authentication Bypass Indicators Validator
+# Patterns to detect successful authentication bypass
+
+validator_category: "Authentication Indicators"
+version: "2.0"
+last_updated: "2026-01-31"
+
+successful_auth_indicators:
+  response_patterns:
+    - pattern: "\"success\":\\s*true"
+      format: "JSON"
+      confidence: 0.90
+      description: "JSON success flag"
+    
+    - pattern: "\"authenticated\":\\s*true"
+      format: "JSON"
+      confidence: 0.95
+      description: "Explicit authentication confirmation"
+    
+    - pattern: "\"token\":\\s*\"[A-Za-z0-9._-]+\""
+      format: "JSON"
+      confidence: 0.85
+      description: "JWT or session token returned"
+    
+    - pattern: "<success>true</success>"
+      format: "XML"
+      confidence: 0.90
+    
+    - pattern: "Welcome,\\s*(admin|user|\\w+)"
+      format: "HTML"
+      confidence: 0.80
+      description: "Welcome message with username"
+  
+  http_status_codes:
+    - status: 200
+      context: "POST /login"
+      confidence: 0.70
+      description: "Successful response to login attempt"
+    
+    - status: 302
+      location: "/dashboard|/admin|/profile"
+      confidence: 0.85
+      description: "Redirect to authenticated area"
+    
+    - status: 301
+      location: "/home|/account"
+      confidence: 0.80
+
+failed_auth_indicators:
+  response_patterns:
+    - pattern: "Invalid (username|password|credentials)"
+      confidence: 1.0
+      description: "Explicit authentication failure"
+    
+    - pattern: "Login failed"
+      confidence: 0.95
+    
+    - pattern: "\"success\":\\s*false"
+      format: "JSON"
+      confidence: 0.90
+    
+    - pattern: "Incorrect (username|password)"
+      confidence: 1.0
+  
+  http_status_codes:
+    - status: 401
+      description: "Unauthorized"
+      confidence: 1.0
+    
+    - status: 403
+      description: "Forbidden"
+      confidence: 0.95
+
+session_indicators:
+  cookie_patterns:
+    - name: "session_id"
+      pattern: "Set-Cookie:\\s*session_id=[A-Za-z0-9]+;"
+      confidence: 0.85
+      description: "Session cookie set after login"
+    
+    - name: "PHPSESSID"
+      pattern: "Set-Cookie:\\s*PHPSESSID=[A-Za-z0-9]+;"
+      confidence: 0.80
+      description: "PHP session cookie"
+    
+    - name: "auth_token"
+      pattern: "Set-Cookie:\\s*auth_token=[A-Za-z0-9._-]+;"
+      confidence: 0.90
+      description: "Authentication token cookie"
+    
+    - name: "remember_me"
+      pattern: "Set-Cookie:\\s*remember_me="
+      confidence: 0.70
+      description: "Persistent login cookie"
+  
+  jwt_detection:
+    - pattern: "eyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+"
+      description: "JWT token structure (header.payload.signature)"
+      confidence: 0.95
+      location: ["response body", "Authorization header", "cookie"]
+
+privilege_escalation_indicators:
+  role_changes:
+    - pattern: "\"role\":\\s*\"admin\""
+      original: "\"role\":\\s*\"user\""
+      confidence: 0.95
+      description: "User role escalated to admin"
+    
+    - pattern: "\"is_admin\":\\s*true"
+      confidence: 0.90
+    
+    - pattern: "\"permissions\":\\s*\\[.*\"admin\".*\\]"
+      confidence: 0.85
+  
+  access_granted:
+    - pattern: "/admin/dashboard"
+      context: "URL in response"
+      confidence: 0.80
+      description: "Access to admin-only pages"
+    
+    - pattern: "Administrator Panel"
+      context: "Page title"
+      confidence: 0.85
+
+bypass_detection_workflow:
+  step_1:
+    action: "Send authentication request with bypass payload"
+    examples:
+      - "username: admin' OR '1'='1'--"
+      - "password: anything"
+  
+  step_2:
+    action: "Analyze HTTP response status code"
+    success_indicators:
+      - "200 OK (expected for successful login)"
+      - "302 Found with Location: /dashboard"
+    failure_indicators:
+      - "401 Unauthorized"
+      - "403 Forbidden"
+  
+  step_3:
+    action: "Search response body for success patterns"
+    patterns:
+      - '"success": true'
+      - "Welcome back"
+      - "Login successful"
+  
+  step_4:
+    action: "Check for session/token assignment"
+    indicators:
+      - "Set-Cookie: session_id="
+      - '"token": "eyJhbGci..."'
+  
+  step_5:
+    action: "Verify access to authenticated resources"
+    test: "GET /api/profile with session cookie"
+    expected: "200 OK with user data (confirms bypass)"
+  
+  step_6:
+    action: "Calculate confidence score"
+    formula: "status_code_score + response_pattern_score + session_token_score"
+
+sql_injection_auth_bypass_validation:
+  test_payload: "admin' OR '1'='1'--"
+  
+  positive_indicators:
+    - indicator: "HTTP 200 with success message"
+      confidence: 0.80
+    
+    - indicator: "Session cookie set"
+      confidence: 0.90
+    
+    - indicator: "Redirect to /dashboard"
+      confidence: 0.85
+    
+    - indicator: 'Response contains: "Welcome, admin"'
+      confidence: 0.95
+  
+  negative_indicators:
+    - indicator: "SQL error message"
+      interpretation: "SQLi detected but auth bypass failed"
+      confidence: 0.50
+    
+    - indicator: "401 Unauthorized"
+      interpretation: "Bypass attempt blocked"
+      confidence: 0.0
+
+default_credential_validation:
+  common_combinations:
+    - username: "admin"
+      password: "admin"
+    - username: "root"
+      password: "root"
+    - username: "administrator"
+      password: "password"
+  
+  validation:
+    success_criteria:
+      - "HTTP 200 + success message"
+      - "Session cookie set"
+      - "Access to authenticated pages"
+    
+    confidence: 1.0
+    description: "Default credentials confirmed if all criteria met"
+
+session_manipulation_validation:
+  cookie_tampering:
+    original_cookie: "user_id=123; role=user"
+    modified_cookie: "user_id=1; role=admin"
+    
+    validation_steps:
+      - step: 1
+        action: "Send request with modified cookie"
+      
+      - step: 2
+        action: "Check if admin panel accessible"
+        success_indicator: "HTTP 200 for /admin/dashboard"
+        confidence: 0.95
+      
+      - step: 3
+        action: "Verify admin functions work"
+        test: "DELETE /api/users/456"
+        success_indicator: "User deleted successfully"
+        confidence: 1.0
+  
+  jwt_manipulation:
+    original_payload: '{"sub":"user123","role":"user"}'
+    modified_payload: '{"sub":"user123","role":"admin"}'
+    
+    validation:
+      - "Decode JWT"
+      - "Modify payload"
+      - "Re-encode without signature (alg: none attack)"
+      - "Send request with modified JWT"
+      - "Check if elevated privileges granted"
+
+mfa_bypass_validation:
+  response_manipulation:
+    original_response: '{"mfa_verified": false, "access_granted": false}'
+    modified_response: '{"mfa_verified": true, "access_granted": true}'
+    
+    detection:
+      - "Intercept response"
+      - "Modify JSON boolean values"
+      - "Check if dashboard accessible without MFA"
+    confidence: 0.90
+  
+  direct_access:
+    test_sequence:
+      - step: 1
+        request: "POST /login (username, password only)"
+        expected: "Redirect to /mfa-verify"
+      
+      - step: 2
+        request: "GET /dashboard (skip MFA page)"
+        vulnerable_response: "200 OK with dashboard content"
+        secure_response: "302 Redirect to /mfa-verify"
+      
+      - confidence: 0.95
+        description: "MFA bypass confirmed if direct access allowed"
+
+confidence_scoring_rules:
+  very_high_0_95:
+    conditions:
+      - "HTTP 200 response"
+      - "Session token/cookie set"
+      - "Success message in response body"
+      - "Authenticated page content visible"
+      - "Admin functions accessible (if privilege escalation)"
+  
+  high_0_80:
+    conditions:
+      - "HTTP 200 response"
+      - "Session cookie set"
+      - "Welcome message visible"
+  
+  medium_0_60:
+    conditions:
+      - "HTTP 200 response"
+      - "No explicit failure message"
+      - "Ambiguous response content"
+  
+  low_0_30:
+    conditions:
+      - "HTTP 200 but no session cookie"
+      - "Response identical to failed login"
+
+false_positive_detection:
+  misleading_indicators:
+    - pattern: "Welcome to our login page"
+      description: "Generic welcome, not post-auth"
+      confidence_penalty: -0.5
+    
+    - pattern: "Please log in"
+      description: "Login prompt (NOT authenticated)"
+      confidence_penalty: -0.8
+  
+  waf_responses:
+    - pattern: "Request blocked by security policy"
+      description: "WAF blocking bypass attempt"
+      verdict: "NOT bypassed"
+      confidence: 0.0
+
+usage_example:
+  scenario: "SQL injection authentication bypass"
+  
+  request:
+    method: "POST"
+    url: "/api/login"
+    body: "{\"username\": \"admin' OR '1'='1'--\", \"password\": \"anything\"}"
+  
+  response:
+    status: 200
+    headers:
+      - "Set-Cookie: session_id=abc123xyz; Path=/"
+      - "Content-Type: application/json"
+    body: '{"success": true, "message": "Welcome, admin", "token": "eyJhbGci..."}'
+  
+  validation_result:
+    indicators_matched:
+      - "HTTP 200 status (+0.70)"
+      - "Session cookie set (+0.90)"
+      - 'Success: true in JSON (+0.90)'
+      - 'Welcome message (+0.80)'
+      - "JWT token present (+0.85)"
+    
+    final_confidence: 0.95
+    verdict: "VULNERABLE - Authentication Bypass Confirmed"
+    severity: "CRITICAL"
+
+references:
+  - "OWASP Authentication Cheat Sheet"
+  - "PortSwigger Authentication Vulnerabilities"
+  - "NIST Authentication Guidelines"

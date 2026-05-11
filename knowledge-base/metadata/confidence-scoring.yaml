@@ -1,0 +1,536 @@
+# GAP 3: Confidence Scoring Logic (Trust Layer)
+# Mathematical confidence calculation for false positive reduction
+
+metadata_type: "Confidence Scoring System"
+version: "1.0"
+last_updated: "2026-02-02"
+description: "Advanced confidence scoring logic to feed False Positive Reduction Agent"
+
+# Confidence Score Definition
+confidence_score:
+  range: [0.0, 1.0]
+  threshold_vulnerable: 0.75
+  threshold_likely: 0.60
+  threshold_possible: 0.40
+  threshold_uncertain: 0.20
+  
+  classification:
+    confirmed: ">= 0.90"
+    high_confidence: "0.75 - 0.89"
+    medium_confidence: "0.60 - 0.74"
+    low_confidence: "0.40 - 0.59"
+    very_low: "0.20 - 0.39"
+    noise: "< 0.20"
+
+# Base Confidence Scores by Validator Type
+base_confidence:
+  sql_injection:
+    error_pattern_match:
+      base: 0.40
+      description: "SQL error detected in response"
+      examples:
+        - "MySQL syntax error"
+        - "PostgreSQL syntax error"
+    
+    database_version_leak:
+      base: 0.70
+      description: "Database version revealed in error"
+      example: "MySQL 5.7.32"
+    
+    data_extraction:
+      base: 0.85
+      description: "Actual data extracted via UNION"
+      example: "Username: admin, Password: hash123"
+    
+    time_delay_observed:
+      base: 0.60
+      description: "Response delayed by SLEEP(5)"
+      example: "5.2 seconds delay observed"
+    
+    boolean_differential:
+      base: 0.65
+      description: "Different responses for true/false"
+      example: "True: 200 OK, False: 404 Not Found"
+  
+  xss:
+    payload_reflected_unencoded:
+      base: 0.80
+      description: "Payload appears in response without encoding"
+      example: "<script>alert(1)</script> found in HTML"
+    
+    payload_reflected_encoded:
+      base: 0.20
+      description: "Payload HTML-encoded (likely safe)"
+      example: "&lt;script&gt;alert(1)&lt;/script&gt;"
+    
+    payload_executed:
+      base: 0.95
+      description: "JavaScript executed (headless browser confirms)"
+      example: "alert() dialog detected"
+    
+    context_appropriate:
+      base: 0.75
+      description: "Payload reflected in executable context"
+      example: "Reflected in <script> tag or event handler"
+  
+  authentication:
+    bypass_successful:
+      base: 0.90
+      description: "Logged in without valid credentials"
+      example: "admin' OR '1'='1 → 200 OK with session cookie"
+    
+    status_code_change:
+      base: 0.50
+      description: "Different status code with injection"
+      example: "Normal: 401, Injected: 200"
+    
+    session_token_issued:
+      base: 0.85
+      description: "Valid session token received"
+      example: "Set-Cookie: session=abc123"
+    
+    redirect_to_dashboard:
+      base: 0.80
+      description: "Redirected to authenticated area"
+      example: "Location: /dashboard"
+  
+  ssrf:
+    external_callback_received:
+      base: 0.90
+      description: "HTTP/DNS callback to attacker server"
+      example: "GET request received at attacker.com"
+    
+    internal_port_open:
+      base: 0.65
+      description: "Internal port responds"
+      example: "localhost:3306 connection successful"
+    
+    metadata_endpoint_accessed:
+      base: 0.85
+      description: "Cloud metadata endpoint returns data"
+      example: "169.254.169.254 returns AWS credentials"
+    
+    response_time_differential:
+      base: 0.50
+      description: "Different response time suggests connection"
+      example: "Open port: 0.5s, Closed port: 5s timeout"
+
+# Confidence Modifiers (Add/Subtract from Base)
+confidence_modifiers:
+  positive_indicators:
+    repeatable:
+      modifier: +0.15
+      description: "Vulnerability reproduced multiple times"
+      condition: "success_count >= 3"
+    
+    data_leak_confirmed:
+      modifier: +0.20
+      description: "Sensitive data leaked in response"
+      examples:
+        - "Database schema revealed"
+        - "User credentials exposed"
+        - "Internal IP addresses"
+    
+    status_code_change:
+      modifier: +0.10
+      description: "HTTP status code changed"
+      example: "401 Unauthorized → 200 OK"
+    
+    response_length_change:
+      modifier: +0.08
+      description: "Significant response size difference"
+      condition: "abs(attack_length - baseline_length) > 1000 bytes"
+    
+    session_token_granted:
+      modifier: +0.20
+      description: "Valid session token issued"
+      example: "Set-Cookie: PHPSESSID=xyz"
+    
+    error_pattern_specific:
+      modifier: +0.12
+      description: "Specific database error (not generic)"
+      example: "MySQL specific vs generic 500 error"
+    
+    multiple_validators_agree:
+      modifier: +0.15
+      description: "2+ validators confirm vulnerability"
+      example: "Error pattern + time delay both detected"
+    
+    external_callback_confirmed:
+      modifier: +0.25
+      description: "Out-of-band data exfiltration confirmed"
+      example: "DNS lookup received at attacker.com"
+    
+    version_disclosure:
+      modifier: +0.10
+      description: "Software version revealed"
+      example: "Apache/2.4.41 (Ubuntu)"
+    
+    stack_trace_leaked:
+      modifier: +0.12
+      description: "Full stack trace in response"
+      example: "Java exception with line numbers"
+    
+    behavioral_change:
+      modifier: +0.18
+      description: "Application behavior changed"
+      examples:
+        - "Redirect to different page"
+        - "New functionality accessible"
+        - "Error page → success page"
+  
+  negative_indicators:
+    high_false_positive_rate:
+      modifier: -0.20
+      description: "This payload has 50%+ FP rate historically"
+      condition: "historical_fp_rate > 0.5"
+    
+    waf_block_suspected:
+      modifier: -0.25
+      description: "WAF block page detected"
+      patterns:
+        - "403 Forbidden"
+        - "Your request has been blocked"
+        - "Cloudflare security check"
+    
+    response_identical:
+      modifier: -0.30
+      description: "Attack response identical to baseline"
+      condition: "diff_hash == 0"
+    
+    generic_error:
+      modifier: -0.15
+      description: "Generic error page (not specific to attack)"
+      example: "500 Internal Server Error (no details)"
+    
+    timeout:
+      modifier: -0.10
+      description: "Request timed out (inconclusive)"
+      example: "No response after 30 seconds"
+    
+    payload_not_reflected:
+      modifier: -0.25
+      description: "Payload not found in response"
+      condition: "payload not in response_body"
+    
+    encoding_detected:
+      modifier: -0.35
+      description: "Payload properly encoded/sanitized"
+      example: "<script> → &lt;script&gt;"
+    
+    rate_limited:
+      modifier: -0.15
+      description: "Rate limiting detected"
+      example: "429 Too Many Requests"
+    
+    captcha_triggered:
+      modifier: -0.20
+      description: "CAPTCHA or bot detection"
+      example: "Please verify you are human"
+  
+  environmental_factors:
+    prod_environment:
+      modifier: -0.05
+      description: "Slightly lower confidence in prod (WAF/filtering likely)"
+    
+    staging_environment:
+      modifier: +0.05
+      description: "Higher confidence in staging (fewer protections)"
+    
+    first_attempt:
+      modifier: -0.10
+      description: "First attempt - not yet confirmed repeatable"
+    
+    manual_verification:
+      modifier: +0.20
+      description: "Security analyst manually verified"
+
+# Confidence Calculation Algorithm
+calculation_algorithm:
+  formula: |
+    base_confidence = get_base_confidence(validator_type, detection_method)
+    
+    final_confidence = base_confidence
+    
+    # Apply positive modifiers
+    for indicator in positive_indicators:
+      if indicator.condition_met():
+        final_confidence += indicator.modifier
+    
+    # Apply negative modifiers
+    for indicator in negative_indicators:
+      if indicator.condition_met():
+        final_confidence -= indicator.modifier
+    
+    # Apply environmental factors
+    final_confidence += environmental_modifier
+    
+    # Clamp to [0.0, 1.0]
+    final_confidence = max(0.0, min(1.0, final_confidence))
+    
+    return final_confidence
+  
+  examples:
+    sql_injection_confirmed:
+      base: 0.40  # Error pattern match
+      modifiers:
+        - repeatable: +0.15
+        - data_leak_confirmed: +0.20
+        - error_pattern_specific: +0.12
+        - status_code_change: +0.10
+      total: 0.97
+      classification: "CONFIRMED"
+    
+    xss_likely:
+      base: 0.80  # Reflected unencoded
+      modifiers:
+        - context_appropriate: +0.10
+        - first_attempt: -0.10
+      total: 0.80
+      classification: "HIGH CONFIDENCE"
+    
+    xss_false_positive:
+      base: 0.80  # Reflected unencoded
+      modifiers:
+        - encoding_detected: -0.35
+        - payload_not_reflected: -0.25
+        - waf_block_suspected: -0.25
+      total: 0.00
+      classification: "NOISE / FALSE POSITIVE"
+    
+    auth_bypass_medium:
+      base: 0.50  # Status code change
+      modifiers:
+        - repeatable: +0.15
+        - response_identical: -0.30
+      total: 0.35
+      classification: "LOW CONFIDENCE"
+
+# SQL Injection Confidence Rules
+sql_injection_confidence:
+  error_based:
+    scenarios:
+      - condition: "mysql_syntax_error detected"
+        base: 0.40
+        if_database_version_leaked: +0.30
+        if_repeatable: +0.15
+        if_data_extracted: +0.25
+        max_confidence: 1.0
+      
+      - condition: "generic_500_error only"
+        base: 0.15
+        if_payload_not_in_response: -0.10
+        max_confidence: 0.25
+  
+  union_based:
+    scenarios:
+      - condition: "Different column count errors, then success"
+        base: 0.70
+        if_actual_data_returned: +0.25
+        if_schema_leaked: +0.20
+        max_confidence: 1.0
+      
+      - condition: "All UNION attempts fail"
+        base: 0.05
+        classification: "NOT VULNERABLE"
+  
+  boolean_blind:
+    scenarios:
+      - condition: "True/False responses different (status)"
+        base: 0.65
+        if_content_length_differs: +0.10
+        if_repeatable_3_times: +0.15
+        max_confidence: 0.90
+      
+      - condition: "True/False responses identical"
+        base: 0.00
+        classification: "NOT VULNERABLE"
+  
+  time_based:
+    scenarios:
+      - condition: "Delay observed (± 0.5s)"
+        base: 0.60
+        if_exact_delay_match: +0.20
+        if_repeatable: +0.15
+        max_confidence: 0.95
+      
+      - condition: "Network latency inconsistent"
+        base: 0.60
+        if_jitter_high: -0.40
+        max_confidence: 0.30
+
+# XSS Confidence Rules
+xss_confidence:
+  reflected:
+    scenarios:
+      - condition: "Payload reflected unencoded in HTML body"
+        base: 0.80
+        if_executed_in_browser: +0.15
+        if_context_executable: +0.10
+        max_confidence: 1.0
+      
+      - condition: "Payload HTML encoded"
+        base: 0.20
+        if_context_safe: -0.15
+        max_confidence: 0.20
+      
+      - condition: "Payload not reflected"
+        base: 0.00
+        classification: "NOT VULNERABLE"
+  
+  stored:
+    scenarios:
+      - condition: "Payload stored and executed on retrieval"
+        base: 0.95
+        if_persistent: +0.05
+        max_confidence: 1.0
+  
+  dom_based:
+    scenarios:
+      - condition: "JavaScript sink detected + payload executes"
+        base: 0.85
+        if_headless_browser_confirms: +0.15
+        max_confidence: 1.0
+
+# Authentication Bypass Confidence Rules
+auth_bypass_confidence:
+  scenarios:
+    - condition: "Session token issued + redirect to /dashboard"
+      base: 0.90
+      if_admin_panel_accessible: +0.10
+      max_confidence: 1.0
+    
+    - condition: "Status 401 → 200 with injection"
+      base: 0.50
+      if_session_token_issued: +0.35
+      if_repeatable: +0.15
+      max_confidence: 1.0
+    
+    - condition: "Status unchanged, content unchanged"
+      base: 0.00
+      classification: "NOT VULNERABLE"
+
+# SSRF Confidence Rules
+ssrf_confidence:
+  scenarios:
+    - condition: "External DNS callback received"
+      base: 0.90
+      if_data_exfiltrated: +0.10
+      max_confidence: 1.0
+    
+    - condition: "Cloud metadata returned"
+      base: 0.85
+      if_credentials_leaked: +0.15
+      max_confidence: 1.0
+    
+    - condition: "Internal port responds"
+      base: 0.65
+      if_service_banner_detected: +0.20
+      max_confidence: 0.90
+    
+    - condition: "Timeout on all attempts"
+      base: 0.10
+      classification: "INCONCLUSIVE"
+
+# Multi-Validator Confidence Boost
+multi_validator_logic:
+  two_validators_agree:
+    boost: +0.15
+    example: "Error pattern + time delay both confirm SQLi"
+  
+  three_validators_agree:
+    boost: +0.25
+    example: "Error + time + boolean all confirm"
+  
+  conflicting_validators:
+    penalty: -0.20
+    example: "Error says vulnerable, but response identical to baseline"
+
+# Historical Success Rate Integration
+historical_analysis:
+  formula: |
+    historical_modifier = 0
+    
+    if payload.historical_fp_rate > 0.5:
+      historical_modifier = -0.20
+    elif payload.historical_fp_rate > 0.3:
+      historical_modifier = -0.10
+    elif payload.historical_success_rate > 0.7:
+      historical_modifier = +0.10
+    
+    return historical_modifier
+  
+  tracking:
+    - "Track success/failure per payload per vulnerability type"
+    - "Update FP rate after manual verification"
+    - "Use Bayesian updating for confidence adjustment"
+
+# Confidence Reporting
+reporting:
+  output_format:
+    vulnerability_id: "SQLI-001-XYZ"
+    confidence_score: 0.87
+    classification: "HIGH CONFIDENCE"
+    base_confidence: 0.40
+    applied_modifiers:
+      - name: "error_pattern_specific"
+        value: +0.12
+      - name: "repeatable"
+        value: +0.15
+      - name: "data_leak_confirmed"
+        value: +0.20
+    reasoning: "MySQL-specific error detected, vulnerability reproduced 3 times, database version leaked"
+  
+  thresholds_for_action:
+    auto_report: ">= 0.75"
+    manual_review: "0.40 - 0.74"
+    likely_false_positive: "< 0.40"
+    suppress: "< 0.20"
+
+# False Positive Reduction Agent Input
+fp_agent_input:
+  fields:
+    - confidence_score
+    - base_confidence
+    - modifiers_applied
+    - validator_agreement_count
+    - historical_fp_rate
+    - environment
+    - response_diff_hash
+  
+  decision_tree:
+    - if: "confidence >= 0.90"
+      action: "AUTO_REPORT as CONFIRMED"
+    
+    - if: "confidence >= 0.75 AND confidence < 0.90"
+      action: "REPORT as HIGH CONFIDENCE"
+    
+    - if: "confidence >= 0.60 AND confidence < 0.75"
+      action: "REPORT as MEDIUM CONFIDENCE - Manual Review Recommended"
+    
+    - if: "confidence >= 0.40 AND confidence < 0.60"
+      action: "FLAG for Manual Review - LOW CONFIDENCE"
+    
+    - if: "confidence < 0.40"
+      action: "SUPPRESS or mark as INFORMATIONAL"
+
+# Confidence Decay Over Time
+temporal_factors:
+  fresh_finding:
+    age: "< 1 hour"
+    modifier: +0.00
+  
+  recent_finding:
+    age: "1-24 hours"
+    modifier: -0.05
+    reason: "Environment may have changed"
+  
+  old_finding:
+    age: "> 24 hours"
+    modifier: -0.15
+    reason: "Requires re-verification"
+
+references:
+  - "Bayesian Inference for Security Testing"
+  - "OWASP: False Positive Reduction Techniques"
+  - "ML-based Confidence Scoring in Vulnerability Scanners"

@@ -1,0 +1,134 @@
+# A01:2025 - Broken Access Control - IDOR Test Cases
+# Insecure Direct Object References (IDOR)
+# CWE-639: Authorization Bypass Through User-Controlled Key
+
+test_category: "A01-broken-access-control"
+subcategory: "idor"
+owasp_2025: "A01"
+cwe: "CWE-639"
+severity: "HIGH"
+
+test_cases:
+  - id: "IDOR-001"
+    name: "Sequential ID Enumeration"
+    description: "Test for user data access by incrementing/decrementing IDs"
+    method: "GET"
+    endpoint: "/api/users/{id}"
+    test_steps:
+      - "Login as user with ID 100"
+      - "Access /api/users/101, /api/users/99"
+      - "Check if other users' data is returned"
+    payloads:
+      - "GET /api/users/1"
+      - "GET /api/users/2"
+      - "GET /api/users/999"
+      - "GET /api/users/admin"
+    expected_result: "403 Forbidden or 404 Not Found"
+    vulnerable_result: "200 OK with other user's data"
+    risk: "Horizontal privilege escalation"
+    
+  - id: "IDOR-002"
+    name: "Document Access by ID"
+    description: "Access documents/files belonging to other users"
+    method: "GET"
+    endpoint: "/api/documents/{doc_id}"
+    test_steps:
+      - "Upload document as user A (gets ID 500)"
+      - "Login as user B"
+      - "Try GET /api/documents/500"
+    expected_result: "Access denied"
+    vulnerable_result: "User B can access user A's document"
+    
+  - id: "IDOR-003"
+    name: "Parameter Tampering - User Profile"
+    description: "Modify user_id parameter to access other profiles"
+    method: "POST"
+    endpoint: "/profile/update"
+    payloads:
+      - "user_id=1&email=attacker@evil.com"
+      - "user_id=admin&password=hacked"
+      - "userId=2&role=administrator"
+    expected_result: "Update only own profile"
+    vulnerable_result: "Can modify other users' profiles"
+    risk: "Account takeover"
+    
+  - id: "IDOR-004"
+    name: "Order/Transaction IDOR"
+    description: "Access and modify orders belonging to other users"
+    method: "GET/POST/DELETE"
+    endpoints:
+      - "/api/orders/{order_id}"
+      - "/api/orders/{order_id}/cancel"
+      - "/api/invoices/{invoice_id}"
+    test_steps:
+      - "Create order as user A (order_id=1001)"
+      - "Login as user B"
+      - "Try GET /api/orders/1001"
+      - "Try POST /api/orders/1001/cancel"
+    vulnerable_result: "User B can view/cancel user A's orders"
+    
+  - id: "IDOR-005"
+    name: "GUID/UUID IDOR"
+    description: "Even UUIDs can be vulnerable if no authorization check"
+    method: "GET"
+    endpoint: "/api/files/{uuid}"
+    payloads:
+      - "GET /api/files/550e8400-e29b-41d4-a716-446655440000"
+      - "GET /api/files/7c9e6679-7425-40de-944b-e07fc1f90ae7"
+    note: "UUIDs are hard to guess but MUST still have authorization checks"
+    
+  - id: "IDOR-006"
+    name: "Mass Assignment via IDOR"
+    description: "Modify sensitive fields via parameter pollution"
+    method: "PUT"
+    endpoint: "/api/users/update"
+    payloads:
+      - "id=1&isAdmin=true"
+      - "userId=2&role=admin&salary=999999"
+      - "user_id=3&is_verified=true&credits=10000"
+    risk: "Privilege escalation, data manipulation"
+    
+  - id: "IDOR-007"
+    name: "Encoded ID IDOR"
+    description: "Test base64/hex encoded IDs"
+    method: "GET"
+    endpoint: "/api/user/profile/{encoded_id}"
+    payloads:
+      - "MQ== (base64 for '1')"
+      - "Mg== (base64 for '2')"
+      - "YWRtaW4= (base64 for 'admin')"
+      - "31 (hex for '1')"
+    test_steps:
+      - "Decode observed IDs"
+      - "Encode target IDs in same format"
+      - "Test access"
+    
+  - id: "IDOR-008"
+    name: "Wildcard/Batch IDOR"
+    description: "Request multiple IDs or use wildcards"
+    method: "GET/POST"
+    endpoint: "/api/users"
+    payloads:
+      - "GET /api/users?ids=1,2,3,4,5"
+      - "POST /api/users/export {ids: [1-100]}"
+      - "GET /api/users?id=*"
+    vulnerable_result: "Returns all users' data"
+
+prevention:
+  - "Implement proper authorization checks for EVERY request"
+  - "Use session-based authorization (check if user owns resource)"
+  - "Indirect reference maps (use tokens instead of direct IDs)"
+  - "Validate user permissions before returning data"
+  - "Log all access attempts with user context"
+  - "Use UUIDs AND authorization checks together"
+
+automation_tools:
+  - "Burp Suite Autorize extension"
+  - "OWASP ZAP Access Control Testing"
+  - "AuthMatrix Burp extension"
+  - "Auto Repeater for batch testing"
+
+references:
+  - "OWASP Top 10:2025 A01"
+  - "CWE-639: Authorization Bypass Through User-Controlled Key"
+  - "OWASP Testing Guide: Authorization Testing"

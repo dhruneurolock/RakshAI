@@ -1,0 +1,134 @@
+# A04:2025 - Cryptographic Failures Test Cases
+# CWE-327: Use of Broken or Risky Cryptographic Algorithm
+
+test_category: "A04-crypto-failures"
+owasp_2025: "A04"
+cwe: "CWE-327"
+severity: "HIGH"
+
+test_cases:
+  - id: "CRYPTO-001"
+    name: "Weak SSL/TLS Configuration"
+    description: "Test for weak SSL/TLS versions and cipher suites"
+    test_steps:
+      - "Scan for SSL v2, SSL v3, TLS 1.0, TLS 1.1"
+      - "Check for weak cipher suites (DES, RC4, MD5)"
+      - "Test for BEAST, POODLE, CRIME vulnerabilities"
+    tools:
+      - "nmap --script ssl-enum-ciphers"
+      - "testssl.sh"
+      - "SSLyze"
+    expected_result: "Only TLS 1.2+ with strong ciphers"
+    vulnerable_result: "Supports TLS 1.0 or weak ciphers"
+    
+  - id: "CRYPTO-002"
+    name: "Sensitive Data in Transit"
+    description: "Test for unencrypted sensitive data transmission"
+    test_steps:
+      - "Monitor traffic for passwords over HTTP"
+      - "Check for mixed content (HTTPS page loading HTTP)"
+      - "Verify cookies have Secure flag"
+    payloads:
+      - "POST /login HTTP/1.0 (not HTTPS)"
+      - "Check for Set-Cookie without Secure flag"
+    expected_result: "All sensitive data over HTTPS with Secure cookies"
+    vulnerable_result: "Credentials or tokens sent over HTTP"
+    
+  - id: "CRYPTO-003"
+    name: "Weak Password Hashing"
+    description: "Identify weak password storage mechanisms"
+    indicators:
+      - "Base64 encoded passwords in responses"
+      - "MD5/SHA1 hashes without salt"
+      - "Plain text passwords in database"
+    test_steps:
+      - "Analyze password reset tokens"
+      - "Check for reversible encryption"
+      - "Test password complexity requirements"
+    expected_result: "bcrypt, Argon2, or PBKDF2 with salt"
+    vulnerable_result: "MD5, SHA1, or base64 encoding detected"
+    
+  - id: "CRYPTO-004"
+    name: "Insufficient Entropy"
+    description: "Test for predictable tokens and session IDs"
+    test_steps:
+      - "Generate 100+ session tokens"
+      - "Analyze for patterns or predictability"
+      - "Check token length and randomness"
+    analysis:
+      - "Entropy calculation"
+      - "Sequential pattern detection"
+      - "Timestamp-based generation"
+    expected_result: "Cryptographically random tokens (128+ bits)"
+    vulnerable_result: "Predictable or sequential tokens"
+    
+  - id: "CRYPTO-005"
+    name: "Certificate Validation Bypass"
+    description: "Test for improper certificate validation"
+    test_steps:
+      - "Self-signed certificate acceptance"
+      - "Expired certificate bypass"
+      - "Hostname mismatch bypass"
+    payloads:
+      - "Use self-signed cert"
+      - "Use expired cert"
+      - "Use cert for different domain"
+    expected_result: "Certificate validation errors"
+    vulnerable_result: "Invalid certificates accepted"
+    
+  - id: "CRYPTO-006"
+    name: "Hardcoded Cryptographic Keys"
+    description: "Search for hardcoded encryption keys in code/config"
+    search_patterns:
+      - "api_key = "
+      - "secret_key = "
+      - "encryption_key = "
+      - "-----BEGIN PRIVATE KEY-----"
+    locations:
+      - "JavaScript files"
+      - "Configuration files"
+      - "Environment variables exposed"
+      - "Client-side code"
+    vulnerable_result: "Keys found in source code or public files"
+    
+  - id: "CRYPTO-007"
+    name: "Insecure Random Number Generation"
+    description: "Test for weak random number generators"
+    indicators:
+      - "Math.random() in JavaScript"
+      - "rand() in C/C++"
+      - "Random class in Java (not SecureRandom)"
+    test_steps:
+      - "Request multiple password reset tokens"
+      - "Analyze CAPTCHA values"
+      - "Check CSRF token generation"
+    expected_result: "Cryptographically secure RNG"
+    vulnerable_result: "Predictable pseudo-random values"
+    
+  - id: "CRYPTO-008"
+    name: "Missing HSTS Header"
+    description: "Test for HTTP Strict Transport Security"
+    test_steps:
+      - "Check for Strict-Transport-Security header"
+      - "Verify max-age value (min 31536000 seconds)"
+      - "Check for includeSubDomains directive"
+    expected_result: "HSTS header with 1+ year max-age"
+    vulnerable_result: "Missing HSTS or short max-age"
+    impact: "Man-in-the-middle attacks possible"
+
+prevention:
+  - "Use TLS 1.2 or higher only"
+  - "Strong cipher suites (AEAD ciphers preferred)"
+  - "Proper certificate validation"
+  - "Secure flag on all cookies"
+  - "HSTS with long max-age"
+  - "bcrypt/Argon2 for password hashing"
+  - "Cryptographically secure RNG"
+  - "No hardcoded keys in code"
+
+references:
+  - "OWASP Top 10:2025 A04"
+  - "CWE-327: Broken Cryptography"
+  - "CWE-311: Missing Encryption"
+  - "CWE-916: Weak Password Hashing"
+  - "NIST SP 800-52: TLS Guidelines"

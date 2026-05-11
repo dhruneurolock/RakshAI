@@ -1,0 +1,552 @@
+# OWASP Top 10:2025 - Latest Release
+# Source: https://owasp.org/Top10/2025/
+# Release Year: 2025
+# Last Updated: January 31, 2026
+
+metadata:
+  version: "2025"
+  release_year: 2025
+  total_categories: 10
+  source: "OWASP Foundation"
+  url: "https://owasp.org/Top10/2025/"
+  previous_version: "2021"
+  license: "Creative Commons Attribution 3.0 Unported"
+
+# Key Changes from 2021 to 2025
+changes_from_2021:
+  new_entries:
+    - id: "A10"
+      name: "Mishandling of Exceptional Conditions"
+      description: "NEW - Replaces SSRF from 2021"
+  
+  renamed_categories:
+    - old: "A05:2021 - Security Misconfiguration"
+      new: "A02:2025 - Security Misconfiguration"
+      change: "Moved up from #5 to #2"
+    
+    - old: "A06:2021 - Vulnerable and Outdated Components"
+      new: "A03:2025 - Software Supply Chain Failures"
+      change: "Expanded scope beyond just vulnerable components to all supply chain"
+    
+    - old: "A02:2021 - Cryptographic Failures"
+      new: "A04:2025 - Cryptographic Failures"
+      change: "Moved down from #2 to #4"
+    
+    - old: "A03:2021 - Injection"
+      new: "A05:2025 - Injection"
+      change: "Moved down from #3 to #5"
+    
+    - old: "A07:2021 - Identification and Authentication Failures"
+      new: "A07:2025 - Authentication Failures"
+      change: "Simplified name"
+    
+    - old: "A09:2021 - Security Logging and Monitoring Failures"
+      new: "A09:2025 - Security Logging and Alerting Failures"
+      change: "Added 'Alerting' to emphasize response"
+  
+  position_changes:
+    - "A01 Broken Access Control - Remains #1"
+    - "Security Misconfiguration moved from #5 to #2"
+    - "Supply Chain Failures moved from #6 to #3"
+    - "SSRF removed, replaced by A10 Mishandling of Exceptional Conditions"
+
+# OWASP Top 10:2025 Complete List
+top_10_2025:
+  - id: "A01"
+    rank: 1
+    category: "Broken Access Control"
+    status: "Unchanged from 2021"
+    cwes_mapped: 40
+    max_incidence_rate: "20.15%"
+    avg_incidence_rate: "3.74%"
+    max_coverage: "100.00%"
+    avg_coverage: "42.93%"
+    avg_weighted_exploit: 7.04
+    avg_weighted_impact: 3.84
+    total_occurrences: 1839701
+    total_cves: 32654
+    testing_coverage: "100% of applications tested had some form of broken access control"
+    
+    notable_cwes:
+      - "CWE-200: Exposure of Sensitive Information to an Unauthorized Actor"
+      - "CWE-201: Exposure of Sensitive Information Through Sent Data"
+      - "CWE-918: Server-Side Request Forgery (SSRF)"
+      - "CWE-352: Cross-Site Request Forgery (CSRF)"
+      - "CWE-22: Path Traversal"
+      - "CWE-284: Improper Access Control"
+      - "CWE-285: Improper Authorization"
+      - "CWE-425: Direct Request (Forced Browsing)"
+      - "CWE-639: Authorization Bypass Through User-Controlled Key"
+      - "CWE-732: Incorrect Permission Assignment"
+      - "CWE-862: Missing Authorization"
+      - "CWE-863: Incorrect Authorization"
+    
+    common_vulnerabilities:
+      - "Violation of principle of least privilege (deny by default)"
+      - "Bypassing access control via URL/API modification"
+      - "IDOR - Viewing/editing someone else's account"
+      - "Missing access controls for POST, PUT, DELETE"
+      - "Elevation of privilege (acting as admin)"
+      - "Metadata manipulation (JWT, cookie tampering)"
+      - "CORS misconfiguration"
+      - "Force browsing to authenticated pages"
+    
+    prevention:
+      - "Deny by default except for public resources"
+      - "Implement access control once and reuse"
+      - "Model access controls to enforce record ownership"
+      - "Disable web server directory listing"
+      - "Log access control failures, alert admins"
+      - "Rate limit API and controller access"
+      - "Invalidate JWT tokens after logout"
+      - "Use short-lived JWTs with refresh tokens"
+    
+    references:
+      - "OWASP Proactive Controls: C1: Implement Access Control"
+      - "OWASP ASVS: V8 Authorization"
+      - "OWASP Testing Guide: Authorization Testing"
+      - "OWASP Cheat Sheet: Authorization"
+      - "PortSwigger: Exploiting CORS misconfiguration"
+      - "OAuth: Revoking Access"
+  
+  - id: "A02"
+    rank: 2
+    category: "Security Misconfiguration"
+    status: "Moved up from #5 in 2021"
+    cwes_mapped: 16
+    max_incidence_rate: "27.70%"
+    avg_incidence_rate: "3.00%"
+    max_coverage: "100.00%"
+    avg_coverage: "52.35%"
+    avg_weighted_exploit: 7.96
+    avg_weighted_impact: 3.97
+    total_occurrences: 719084
+    total_cves: 1375
+    testing_coverage: "100% of applications had some form of misconfiguration"
+    
+    notable_cwes:
+      - "CWE-16: Configuration"
+      - "CWE-611: Improper Restriction of XML External Entity Reference (XXE)"
+      - "CWE-5: J2EE Misconfiguration: Data Transmission Without Encryption"
+      - "CWE-260: Password in Configuration File"
+      - "CWE-489: Active Debug Code"
+      - "CWE-526: Exposure Through Environmental Variables"
+      - "CWE-614: Sensitive Cookie Without 'Secure' Attribute"
+      - "CWE-1004: Sensitive Cookie Without 'HttpOnly' Flag"
+    
+    common_misconfigurations:
+      - "Missing security hardening across application stack"
+      - "Unnecessary features enabled (ports, services, accounts)"
+      - "Default accounts with unchanged passwords"
+      - "Overly informative error messages (stack traces)"
+      - "Missing or outdated security headers"
+      - "Unpatched software and libraries"
+      - "Insecure default settings"
+      - "Cloud storage with open permissions"
+      - "Directory listing enabled"
+    
+    prevention:
+      - "Repeatable hardening process for all environments"
+      - "Minimal platform without unnecessary features"
+      - "Review and update configurations with security patches"
+      - "Segmented application architecture"
+      - "Send security headers to clients"
+      - "Automated configuration verification"
+      - "Central error message interception"
+      - "Use identity federation, short-lived credentials"
+    
+    references:
+      - "OWASP Testing Guide: Configuration Management"
+      - "OWASP Testing Guide: Testing for Error Codes"
+      - "OWASP ASVS: V13 Configuration"
+      - "NIST Guide to General Server Hardening"
+      - "CIS Security Configuration Guides/Benchmarks"
+  
+  - id: "A03"
+    rank: 3
+    category: "Software Supply Chain Failures"
+    status: "Expanded from 'Vulnerable and Outdated Components' (2021 #6)"
+    cwes_mapped: 6
+    max_incidence_rate: "9.56%"
+    avg_incidence_rate: "5.72%"
+    max_coverage: "65.42%"
+    avg_coverage: "27.47%"
+    avg_weighted_exploit: 8.17
+    avg_weighted_impact: 5.23
+    total_occurrences: 215248
+    total_cves: 11
+    community_ranking: "#1 in Top 10 community survey (50% ranked it #1)"
+    
+    notable_cwes:
+      - "CWE-477: Use of Obsolete Function"
+      - "CWE-1104: Use of Unmaintained Third Party Components"
+      - "CWE-1329: Reliance on Component That is Not Updateable"
+      - "CWE-1357: Reliance on Insufficiently Trustworthy Component"
+      - "CWE-1395: Dependency on Vulnerable Third-Party Component"
+      - "CWE-1035: Using Components with Known Vulnerabilities"
+    
+    scope_expansion:
+      description: "Expanded beyond just vulnerable components to include all supply chain failures"
+      includes:
+        - "Vulnerable, unsupported, out-of-date software"
+        - "Compromised build/deployment pipelines (CI/CD)"
+        - "Malicious packages and dependencies"
+        - "Supply chain attacks (SolarWinds, Shai-Hulud)"
+        - "Developer tooling compromises"
+        - "SBOM management failures"
+    
+    real_world_attacks:
+      - name: "SolarWinds (2019)"
+        description: "Trusted vendor compromise affecting ~18,000 organizations"
+        impact: "Critical"
+      
+      - name: "Bybit Theft (2025)"
+        description: "$1.5 billion stolen via supply chain attack in wallet software"
+        cve: "Targeted wallet execution"
+      
+      - name: "Shai-Hulud npm worm (2025)"
+        description: "First self-propagating npm worm, over 500 package versions compromised"
+        technique: "Post-install scripts, token harvesting, auto-propagation"
+      
+      - name: "Log4Shell"
+        cve: "CVE-2021-44228"
+        description: "Apache Log4j RCE zero-day"
+      
+      - name: "Struts RCE"
+        cve: "CVE-2017-5638"
+        description: "Struts 2 remote code execution"
+    
+    prevention:
+      sbom_management:
+        - "Centrally generate and manage Software Bill of Materials (SBOM)"
+        - "Track direct and transitive dependencies"
+        - "Use OWASP Dependency Track, CycloneDX"
+      
+      dependency_hygiene:
+        - "Remove unused dependencies and features"
+        - "Continuously inventory component versions"
+        - "Monitor CVE, NVD, OSV for vulnerabilities"
+        - "Subscribe to security bulletins"
+        - "Obtain components from official trusted sources"
+        - "Prefer signed packages"
+      
+      supply_chain_hardening:
+        - "Harden CI/CD pipelines (MFA, access control, signed builds)"
+        - "Protect code repositories (branch protection, no secrets)"
+        - "Secure developer workstations (patching, MFA, monitoring)"
+        - "Change management tracking for all supply chain systems"
+        - "Separation of duties (no single person code-to-production)"
+        - "Staged rollouts, canary deployments"
+      
+      monitoring:
+        - "Use software composition analysis tools"
+        - "Virtual patching for unmaintained components"
+        - "Continuous vulnerability monitoring"
+    
+    tools:
+      - "OWASP Dependency Track"
+      - "OWASP Dependency Check"
+      - "OWASP CycloneDX (SBOM)"
+      - "retire.js"
+      - "GitHub Advisory Database"
+      - "OSV (Open Source Vulnerabilities)"
+    
+    references:
+      - "OWASP ASVS: V15 Secure Coding and Architecture"
+      - "OWASP Cheat Sheet: Dependency Graph SBOM"
+      - "OWASP Cheat Sheet: Vulnerable Dependency Management"
+      - "SAFECode Software Integrity Controls"
+      - "CISA: Shai-Hulud npm worm alert (2025)"
+  
+  - id: "A04"
+    rank: 4
+    category: "Cryptographic Failures"
+    status: "Moved down from #2 in 2021"
+    previous_name: "Sensitive Data Exposure"
+    
+    description: "Failures related to cryptography (or lack thereof) which often lead to exposure of sensitive data"
+    focus: "Protection of data in transit and at rest"
+    
+    notable_cwes:
+      - "CWE-259: Use of Hard-coded Password"
+      - "CWE-327: Broken or Risky Crypto Algorithm"
+      - "CWE-331: Insufficient Entropy"
+      - "CWE-338: Use of Cryptographically Weak PRNG"
+      - "CWE-296: Improper Certificate Validation"
+      - "CWE-310: Cryptographic Issues"
+      - "CWE-311: Missing Encryption of Sensitive Data"
+      - "CWE-312: Cleartext Storage of Sensitive Information"
+      - "CWE-319: Cleartext Transmission of Sensitive Information"
+      - "CWE-321: Use of Hard-coded Cryptographic Key"
+      - "CWE-326: Inadequate Encryption Strength"
+    
+    common_failures:
+      - "Transmitting data in clear text (HTTP, FTP, SMTP)"
+      - "Old/weak crypto algorithms (MD5, SHA1, DES, RC4)"
+      - "Default or weak crypto keys"
+      - "Lack of certificate validation (TLS/SSL)"
+      - "Missing encryption at rest"
+      - "Insufficient randomness"
+      - "Weak password hashing (MD5, SHA1 without salt)"
+      - "Improper key management"
+    
+    prevention:
+      - "Classify data, apply controls per classification"
+      - "Don't store sensitive data unnecessarily"
+      - "Encrypt all sensitive data at rest"
+      - "Encrypt all data in transit (TLS, HSTS)"
+      - "Disable caching for sensitive data"
+      - "Use strong adaptive/salted hashing (Argon2, scrypt, bcrypt, PBKDF2)"
+      - "Use authenticated encryption (AES-GCM, ChaCha20-Poly1305)"
+      - "Avoid deprecated algorithms"
+  
+  - id: "A05"
+    rank: 5
+    category: "Injection"
+    status: "Moved down from #3 in 2021 (was #1 in 2017)"
+    
+    description: "User-supplied data is not validated, filtered, or sanitized, allowing hostile data to trick interpreters"
+    
+    notable_cwes:
+      - "CWE-79: Cross-site Scripting (XSS)"
+      - "CWE-89: SQL Injection"
+      - "CWE-73: External Control of File Name or Path"
+      - "CWE-77: Command Injection"
+      - "CWE-78: OS Command Injection"
+      - "CWE-88: Argument Injection"
+      - "CWE-90: LDAP Injection"
+      - "CWE-91: XML Injection"
+      - "CWE-94: Code Injection"
+      - "CWE-917: Expression Language Injection"
+      - "CWE-943: Data Query Logic Neutralization"
+    
+    injection_types:
+      - "SQL Injection"
+      - "Cross-Site Scripting (XSS) - Reflected, Stored, DOM-based"
+      - "OS Command Injection"
+      - "LDAP Injection"
+      - "XPath Injection"
+      - "Template Injection (SSTI)"
+      - "NoSQL Injection"
+      - "Expression Language Injection"
+    
+    prevention:
+      - "Use safe APIs (parameterized interfaces)"
+      - "Positive server-side input validation (whitelist)"
+      - "Escape special characters using interpreter-specific syntax"
+      - "Use LIMIT and SQL controls"
+      - "Implement SAST and DAST scanning"
+  
+  - id: "A06"
+    rank: 6
+    category: "Insecure Design"
+    status: "NEW in 2021, continues in 2025"
+    
+    description: "Risks related to design and architectural flaws, different from insecure implementation"
+    focus: "Threat modeling, secure design patterns, reference architectures"
+    
+    notable_cwes:
+      - "CWE-209: Error Message with Sensitive Information"
+      - "CWE-256: Plaintext Storage of Password"
+      - "CWE-501: Trust Boundary Violation"
+      - "CWE-522: Insufficiently Protected Credentials"
+      - "CWE-426: Untrusted Search Path"
+      - "CWE-494: Download of Code Without Integrity Check"
+    
+    design_principles:
+      - "Establish secure development lifecycle"
+      - "Use library of secure design patterns"
+      - "Use threat modeling for critical flows"
+      - "Integrate security into user stories"
+      - "Integrate plausibility checks at each tier"
+      - "Write security unit/integration tests"
+      - "Segregate tier layers and tenants"
+      - "Limit resource consumption"
+    
+    common_flaws:
+      - "Missing rate limiting"
+      - "Lack of business logic validation"
+      - "Missing trust boundaries"
+      - "Insufficient threat modeling"
+      - "No defense in depth"
+  
+  - id: "A07"
+    rank: 7
+    category: "Authentication Failures"
+    status: "Renamed from 'Identification and Authentication Failures' (2021)"
+    previous_name: "Broken Authentication"
+    
+    notable_cwes:
+      - "CWE-297: Improper Validation of Certificate with Host Mismatch"
+      - "CWE-287: Improper Authentication"
+      - "CWE-384: Session Fixation"
+      - "CWE-259: Use of Hard-coded Password"
+      - "CWE-521: Weak Password Requirements"
+      - "CWE-522: Insufficiently Protected Credentials"
+      - "CWE-640: Weak Password Recovery"
+      - "CWE-798: Use of Hard-coded Credentials"
+    
+    common_vulnerabilities:
+      - "Permits automated attacks (credential stuffing, brute force)"
+      - "Permits default, weak, well-known passwords"
+      - "Weak credential recovery mechanisms"
+      - "Plain text, encrypted, or weakly hashed passwords"
+      - "Missing/ineffective multi-factor authentication"
+      - "Session ID exposed in URL"
+      - "Session ID reuse after login"
+      - "Improper session invalidation"
+    
+    prevention:
+      - "Implement multi-factor authentication"
+      - "No default credentials"
+      - "Weak password checks (NIST 800-63b)"
+      - "Harden registration, credential recovery, API pathways"
+      - "Limit/delay failed login attempts"
+      - "Use server-side, secure session manager"
+      - "Generate new random session ID after login"
+      - "Never expose session ID in URL"
+      - "Invalidate sessions properly after logout"
+  
+  - id: "A08"
+    rank: 8
+    category: "Software or Data Integrity Failures"
+    status: "Renamed from 'Software and Data Integrity Failures' (2021)"
+    
+    description: "Code and infrastructure that does not protect against integrity violations"
+    scope: "Insecure deserialization, dependencies from untrusted sources, insecure CI/CD pipelines"
+    
+    notable_cwes:
+      - "CWE-345: Insufficient Verification of Data Authenticity"
+      - "CWE-353: Missing Support for Integrity Check"
+      - "CWE-426: Untrusted Search Path"
+      - "CWE-494: Download of Code Without Integrity Check"
+      - "CWE-502: Deserialization of Untrusted Data"
+      - "CWE-565: Reliance on Cookies without Validation"
+      - "CWE-829: Inclusion of Functionality from Untrusted Control Sphere"
+    
+    vulnerability_areas:
+      - "Insecure deserialization (Java, PHP, Python, .NET, Ruby)"
+      - "Unsigned software updates"
+      - "CDN content without SRI (Subresource Integrity)"
+      - "CI/CD pipeline poisoning"
+    
+    prevention:
+      - "Use digital signatures for software verification"
+      - "Ensure libraries from trusted repositories"
+      - "Use software supply chain security tools"
+      - "Review code and configuration changes"
+      - "CI/CD pipeline segregation, access control"
+      - "Avoid deserialization or implement integrity checks"
+  
+  - id: "A09"
+    rank: 9
+    category: "Security Logging and Alerting Failures"
+    status: "Renamed from 'Security Logging and Monitoring Failures' (2021)"
+    change: "Added 'Alerting' to emphasize response"
+    
+    notable_cwes:
+      - "CWE-117: Improper Output Neutralization for Logs"
+      - "CWE-223: Omission of Security-relevant Information"
+      - "CWE-532: Insertion of Sensitive Information into Log File"
+      - "CWE-778: Insufficient Logging"
+    
+    common_failures:
+      - "Login, failed login, high-value transactions not logged"
+      - "Warnings/errors generate inadequate logs"
+      - "Logs not monitored for suspicious activity"
+      - "Logs stored locally only"
+      - "Missing alerting thresholds and escalation"
+      - "Penetration testing doesn't trigger alerts"
+      - "Can't detect, escalate, alert for active attacks"
+    
+    what_to_log:
+      - "Login, failed login, logout events"
+      - "High-value transactions"
+      - "Access control failures"
+      - "Input validation failures"
+      - "Authentication failures"
+      - "Session management failures"
+      - "Application errors and system events"
+      - "Crypto module failures"
+      - "TLS failures"
+    
+    prevention:
+      - "Ensure logs contain sufficient user context"
+      - "Log data encoded correctly to prevent injection"
+      - "High-value transactions have audit trail"
+      - "Establish effective monitoring and alerting"
+      - "Establish incident response and recovery plan (NIST 800-61)"
+      - "Use RASP (Runtime Application Self-Protection)"
+  
+  - id: "A10"
+    rank: 10
+    category: "Mishandling of Exceptional Conditions"
+    status: "NEW in 2025 - Replaces SSRF from 2021"
+    
+    description: "Improper handling of errors, exceptions, and unexpected conditions that can lead to security vulnerabilities"
+    
+    scope:
+      - "Unchecked error conditions"
+      - "Improper exception handling"
+      - "Information leakage through error messages"
+      - "Denial of service through unhandled exceptions"
+      - "Resource exhaustion from error conditions"
+    
+    common_vulnerabilities:
+      - "Exposing stack traces to users"
+      - "Revealing sensitive system information in errors"
+      - "Not handling null pointer exceptions"
+      - "Unchecked return values"
+      - "Catch-all exception handlers hiding issues"
+      - "Error messages revealing system architecture"
+      - "Denial of service via exception triggering"
+    
+    prevention:
+      - "Implement proper exception handling"
+      - "Generic error messages for users"
+      - "Detailed logging for developers/admins"
+      - "Validate all return values"
+      - "Fail securely (fail closed, not open)"
+      - "Centralized error handling"
+      - "Never expose stack traces to end users"
+      - "Resource cleanup in finally blocks"
+
+# Summary Statistics 2025
+statistics_2025:
+  total_cwes_mapped: "~150+ across all categories"
+  total_cves_tracked: "35,000+"
+  total_occurrences_analyzed: "3,000,000+"
+  applications_tested: "Thousands"
+  
+  highest_incidence:
+    category: "A02 - Security Misconfiguration"
+    rate: "27.70% max incidence"
+  
+  highest_occurrences:
+    category: "A01 - Broken Access Control"
+    count: 1839701
+  
+  highest_cves:
+    category: "A01 - Broken Access Control"
+    count: 32654
+  
+  highest_exploit_score:
+    category: "A03 - Software Supply Chain Failures"
+    score: 8.17
+
+# Testing and Verification
+testing_resources:
+  owasp_proactive_controls: "Security controls mapped to each category"
+  owasp_asvs: "Application Security Verification Standard"
+  owasp_testing_guide: "Web Security Testing Guide (WSTG)"
+  owasp_cheat_sheets: "Category-specific prevention cheat sheets"
+
+references:
+  - url: "https://owasp.org/Top10/2025/"
+    title: "OWASP Top 10:2025 Official Site"
+  - url: "https://github.com/OWASP/Top10"
+    title: "OWASP Top 10 GitHub Repository"
+  - url: "https://www.owasptopten.org/"
+    title: "Making of OWASP Top 10"
+  - url: "https://owasp.org/Top10/2021/"
+    title: "OWASP Top 10:2021 (Previous Version)"

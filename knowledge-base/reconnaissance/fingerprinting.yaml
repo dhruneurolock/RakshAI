@@ -1,0 +1,367 @@
+# Web Application Fingerprinting & Technology Detection
+# Reconnaissance phase for identifying tech stack
+
+category: "reconnaissance"
+phase: "discovery"
+purpose: "Identify technologies, frameworks, and versions"
+
+# ===== SERVER DETECTION =====
+server_fingerprinting:
+  http_headers:
+    server_header:
+      - "Server: Apache/2.4.52 (Ubuntu)"
+      - "Server: nginx/1.21.6"
+      - "Server: Microsoft-IIS/10.0"
+      - "Server: cloudflare"
+    
+    x_powered_by:
+      - "X-Powered-By: PHP/8.1.0"
+      - "X-Powered-By: ASP.NET"
+      - "X-Powered-By: Express"
+    
+    specific_headers:
+      - "X-AspNet-Version: 4.0.30319"
+      - "X-AspNetMvc-Version: 5.2"
+      - "X-Drupal-Cache: HIT"
+      - "X-Generator: Drupal 9"
+      - "X-Powered-CMS: WordPress 6.4"
+
+# ===== FRAMEWORK DETECTION =====
+framework_signatures:
+  python:
+    django:
+      indicators:
+        - "csrfmiddlewaretoken in forms"
+        - "__admin/ endpoint exists"
+        - "Set-Cookie: csrftoken="
+        - "X-Frame-Options: DENY"
+      version_detection:
+        - "Error page signature"
+        - "Admin panel styling"
+    
+    flask:
+      indicators:
+        - "Set-Cookie: session=eyJ (JWT)"
+        - "Werkzeug debugger"
+        - "/static/ directory"
+      errors:
+        - "werkzeug.exceptions"
+    
+    fastapi:
+      indicators:
+        - "/docs (Swagger UI)"
+        - "/redoc (ReDoc)"
+        - "/openapi.json"
+  
+  javascript:
+    express:
+      indicators:
+        - "X-Powered-By: Express"
+        - "connect.sid cookie"
+      errors:
+        - "Cannot GET /"
+    
+    nextjs:
+      indicators:
+        - "_next/static/"
+        - "__NEXT_DATA__ in HTML"
+        - "/_next/image"
+    
+    react:
+      indicators:
+        - "react-dom.production.min.js"
+        - "data-reactroot"
+        - "__REACT_DEVTOOLS_GLOBAL_HOOK__"
+    
+    vue:
+      indicators:
+        - "data-v-"
+        - "__vue__ in window"
+        - "Vue.js devtools detected"
+  
+  php:
+    laravel:
+      indicators:
+        - "laravel_session cookie"
+        - "XSRF-TOKEN cookie"
+        - "/vendor/laravel"
+      errors:
+        - "Illuminate\\"
+    
+    symfony:
+      indicators:
+        - "/_profiler/"
+        - "/_wdt/ (Web Debug Toolbar)"
+        - "symfony-profiler cookie"
+    
+    wordpress:
+      indicators:
+        - "/wp-admin/"
+        - "/wp-content/"
+        - "/wp-includes/"
+        - "<meta name='generator' content='WordPress 6.4'>"
+      files:
+        - "/wp-login.php"
+        - "/xmlrpc.php"
+        - "/readme.html"
+  
+  java:
+    spring:
+      indicators:
+        - "Whitelabel Error Page"
+        - "X-Application-Context header"
+        - "/actuator/health"
+        - "/actuator/info"
+      errors:
+        - "org.springframework"
+    
+    struts:
+      indicators:
+        - ".action extensions"
+        - "struts.xml reference"
+      errors:
+        - "org.apache.struts2"
+  
+  ruby:
+    rails:
+      indicators:
+        - "X-Runtime header"
+        - "_session_id cookie"
+        - "authenticity_token in forms"
+      errors:
+        - "ActionController::"
+        - "ActiveRecord::"
+  
+  dotnet:
+    aspnet:
+      indicators:
+        - "X-AspNet-Version"
+        - "X-AspNetMvc-Version"
+        - "ASP.NET_SessionId cookie"
+        - ".aspx extensions"
+      errors:
+        - "System.Web"
+        - "Microsoft.AspNetCore"
+
+# ===== CMS DETECTION =====
+cms_fingerprints:
+  wordpress:
+    files:
+      - "/wp-login.php"
+      - "/wp-admin/"
+      - "/xmlrpc.php"
+    meta_tag: "<meta name='generator' content='WordPress 6.4'>"
+    version_files:
+      - "/readme.html"
+      - "/wp-includes/version.php"
+  
+  drupal:
+    files:
+      - "/user/login"
+      - "/CHANGELOG.txt"
+      - "/core/misc/drupal.js"
+    headers:
+      - "X-Generator: Drupal 9"
+    meta_tag: "<meta name='Generator' content='Drupal 9'>"
+  
+  joomla:
+    files:
+      - "/administrator/"
+      - "/components/"
+      - "/modules/"
+    meta_tag: "<meta name='generator' content='Joomla! 4.2'>"
+    version_file: "/language/en-GB/en-GB.xml"
+  
+  magento:
+    files:
+      - "/skin/frontend/"
+      - "/js/mage/"
+      - "/admin_[random]/"
+    cookies:
+      - "frontend cookie"
+  
+  shopify:
+    indicators:
+      - "cdn.shopify.com"
+      - "Shopify.theme"
+      - "/cart endpoint"
+    headers:
+      - "X-ShopId"
+
+# ===== DATABASE DETECTION =====
+database_fingerprinting:
+  error_based:
+    mysql:
+      - "You have an error in your SQL syntax"
+      - "mysql_fetch_array()"
+    
+    postgresql:
+      - "pg_query() expects"
+      - "PostgreSQL query failed"
+    
+    mssql:
+      - "Microsoft SQL Native Client error"
+      - "ODBC SQL Server Driver"
+    
+    oracle:
+      - "ORA-00933"
+      - "Oracle JDBC Driver"
+    
+    mongodb:
+      - "MongoError"
+      - "db.collection is not a function"
+  
+  timing_based:
+    mysql: "SLEEP(5)"
+    postgresql: "pg_sleep(5)"
+    mssql: "WAITFOR DELAY '00:00:05'"
+    oracle: "dbms_pipe.receive_message('x',5)"
+
+# ===== CDN / WAF DETECTION =====
+cdn_waf_detection:
+  cloudflare:
+    headers:
+      - "Server: cloudflare"
+      - "CF-RAY:"
+      - "CF-Cache-Status:"
+    ips: "103.21.244.0/22, 103.22.200.0/22"
+  
+  akamai:
+    headers:
+      - "X-Akamai-Request-ID"
+    cookies:
+      - "AKA_"
+  
+  aws_cloudfront:
+    headers:
+      - "X-Amz-Cf-Id"
+      - "X-Cache: Hit from cloudfront"
+  
+  imperva:
+    cookies:
+      - "incap_ses_"
+      - "visid_incap_"
+  
+  f5_bigip:
+    cookies:
+      - "BIGipServer"
+      - "F5_"
+
+# ===== VERSION DETECTION =====
+version_fingerprinting:
+  methods:
+    meta_tags:
+      - "<meta name='generator' content='WordPress 6.4'>"
+      - "<meta name='version' content='1.2.3'>"
+    
+    comments:
+      - "<!-- WordPress 6.4 -->"
+      - "<!-- Built with Next.js 13.5 -->"
+    
+    static_files:
+      - "/static/version.txt"
+      - "/VERSION"
+      - "/CHANGELOG.md"
+    
+    api_endpoints:
+      - "/api/version"
+      - "/actuator/info"
+      - "/.well-known/security.txt"
+    
+    error_pages:
+      - "404 pages with framework name"
+      - "500 errors with stack traces"
+
+# ===== SUBDOMAIN ENUMERATION =====
+subdomain_discovery:
+  passive:
+    certificate_transparency:
+      - "crt.sh"
+      - "censys.io"
+    
+    search_engines:
+      - "site:example.com -www"
+    
+    dns_aggregators:
+      - "VirusTotal"
+      - "SecurityTrails"
+  
+  active:
+    brute_force:
+      tools:
+        - "subfinder"
+        - "amass"
+        - "dnsrecon"
+      wordlists:
+        - "common subdomains list"
+        - "SecLists DNS"
+
+# ===== DIRECTORY DISCOVERY =====
+directory_fuzzing:
+  common_paths:
+    admin:
+      - "/admin/"
+      - "/administrator/"
+      - "/admin-panel/"
+      - "/manage/"
+    
+    api:
+      - "/api/"
+      - "/api/v1/"
+      - "/graphql"
+      - "/swagger/"
+    
+    backups:
+      - "/.git/"
+      - "/.svn/"
+      - "/backup/"
+      - "/.env"
+      - "/config.php.bak"
+    
+    sensitive:
+      - "/phpinfo.php"
+      - "/test.php"
+      - "/debug/"
+      - "/.DS_Store"
+
+# ===== TOOLS =====
+tools:
+  automated:
+    - "Wappalyzer (browser extension)"
+    - "WhatWeb"
+    - "BuiltWith"
+    - "Retire.js (JavaScript library vulnerabilities)"
+  
+  manual:
+    - "Burp Suite"
+    - "curl with header inspection"
+    - "nmap scripts (http-enum)"
+  
+  specialized:
+    - "CMSmap (CMS detection)"
+    - "WPScan (WordPress)"
+    - "droopescan (Drupal/Joomla)"
+    - "nuclei (template-based scanning)"
+
+# ===== TESTING METHODOLOGY =====
+fingerprinting_workflow:
+  step1_passive:
+    - "Check HTTP headers"
+    - "View page source for meta tags"
+    - "Check robots.txt"
+    - "Check sitemap.xml"
+  
+  step2_active:
+    - "Test common paths"
+    - "Trigger errors for error-based detection"
+    - "Check version endpoints"
+  
+  step3_analysis:
+    - "Correlate findings"
+    - "Search for known vulnerabilities"
+    - "Prioritize attack surface"
+
+references:
+  - "OWASP Testing Guide v4 - Information Gathering"
+  - "PTES Technical Guidelines"
+  - "NIST SP 800-115"

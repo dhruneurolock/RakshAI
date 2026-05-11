@@ -1,0 +1,833 @@
+# Rule Engine Implementation Guide
+# Code Templates & Implementation Details
+
+document_type: "implementation_guide"
+companion_to: "rule-engine-architecture.yaml"
+purpose: "Concrete Python implementation patterns"
+date: "2026-02-06"
+
+# ===== CORE DATA MODELS =====
+
+data_models:
+  http_method_enum:
+    type: "enum.Enum"
+    values:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "DELETE"
+      - "PATCH"
+      - "HEAD"
+      - "OPTIONS"
+  
+  parameter_type_enum:
+    type: "enum.Enum"
+    values:
+      - "PATH - path"
+      - "QUERY - query"
+      - "BODY - body"
+      - "HEADER - header"
+      - "COOKIE - cookie"
+  
+  normalized_context:
+    file: "models/context.py"
+    class: "NormalizedContext"
+    type: "dataclass"
+    
+    fields:
+      core:
+        endpoint: "str"
+        method: "HTTPMethod"
+        parameters: "List[str]"
+        parameter_types: "Dict[str, ParameterType]"
+      
+      authentication:
+        authentication_required: "bool"
+        user_role: "Optional[str]"
+        auth_type: "Optional[str] - jwt/session/basic/etc"
+      
+      content_metadata:
+        content_type: "Optional[str]"
+        accepts: "Optional[str]"
+      
+      endpoint_classification:
+        has_dynamic_params: "bool"
+        is_api_endpoint: "bool"
+        is_admin_endpoint: "bool"
+        is_file_upload: "bool"
+        is_form_submission: "bool"
+      
+      framework_hints:
+        framework_hints: "List[str]"
+      
+      metadata:
+        metadata: "Dict - Additional data"
+    
+    properties:
+      has_path_parameters: "bool - Check PATH parameters exist"
+      has_query_parameters: "bool - Check QUERY parameters exist"
+      is_state_changing: "bool - Check POST/PUT/DELETE/PATCH"
+  
+  attack_plan_status:
+    type: "enum.Enum"
+    values:
+      - "READY - Attack plan ready for execution"
+      - "SKIP - No applicable test cases or payloads"
+      - "BLOCKED - Safety violations detected"
+  
+  safety_level:
+    type: "enum.Enum"
+    values:
+      - "SAFE - safe"
+      - "LOW_RISK - low_risk"
+      - "MEDIUM_RISK - medium_risk"
+      - "HIGH_RISK - high_risk"
+      - "DESTRUCTIVE - destructive"
+  
+  payload:
+    file: "models/attack_plan.py"
+    class: "Payload"
+    type: "dataclass"
+    
+    fields:
+      id: "str - Payload identifier"
+      value: "str - Actual payload value"
+      safety: "SafetyLevel - Safety classification"
+      risk_level: "int - Risk score 0-5"
+      destructive: "bool - Can destroy data/systems"
+      environment: "List[str] - Allowed environments"
+      description: "Optional[str] - Human-readable description"
+      type: "Optional[str] - sql_injection/xss/idor/etc"
+      external_callback: "bool - Requires external server"
+      metadata: "Dict - Additional payload metadata"
+  
+  attack_plan:
+    file: "models/attack_plan.py"
+    class: "AttackPlan"
+    type: "dataclass"
+    
+    fields:
+      status: "AttackPlanStatus - READY/SKIP/BLOCKED"
+      
+      endpoint_info:
+        endpoint: "str"
+        method: "str"
+      
+      test_case_info:
+        test_case_id: "str"
+        test_case_name: "str"
+        owasp_category: "str"
+        cwe: "Optional[str]"
+        severity: "Optional[str]"
+      
+      execution_details:
+        payloads: "List[Payload]"
+        validators: "List[str]"
+        execution_order: "str - sequential/parallel/adaptive"
+        stop_on_success: "bool"
+        max_requests: "int"
+      
+      safety_metadata:
+        safety_level: "SafetyLevel"
+        risk_level: "int"
+      
+      status_info:
+        reason: "Optional[str] - Why SKIP/BLOCKED"
+        violations: "List[str] - Safety violations"
+        recommendation: "Optional[str] - What to do instead"
+      
+      explainability:
+        explanation: "Dict - Complete execution log"
+    
+    methods:
+      to_dict: "Convert to JSON-serializable dict"
+
+# ===== COMPONENT IMPLEMENTATIONS =====
+
+components:
+  context_normalizer:
+    file: "components/context_normalizer.py"
+    class: "ContextNormalizer"
+    
+    initialization:
+      endpoint_patterns:
+        api: "regex: /api/"
+        admin: "regex: /(admin|administrator|management)/"
+        auth: "regex: /(login|auth|oauth|signin|signup)/"
+        file_upload: "regex: /(upload|attach|file)/"
+    
+    methods:
+      normalize:
+        input: "Dict - Discovery Agent output"
+        output: "NormalizedContext"
+        steps:
+          - "Extract core fields (endpoint, method, params)"
+          - "Detect parameter types (path/query/body/header)"
+          - "Classify endpoint (API, admin, auth, upload)"
+          - "Detect framework hints"
+          - "Build NormalizedContext object"
+      
+      _detect_parameter_types:
+        input: "endpoint: str, params: List[str]"
+        output: "Dict[str, ParameterType]"
+        logic: "Check {param} or :param in endpoint → PATH, else QUERY"
+      
+      _has_dynamic_params:
+        input: "endpoint: str"
+        output: "bool"
+        logic: "regex: \\{[^}]+\\} or :[^/]+"
+      
+      _is_api_endpoint:
+        input: "endpoint: str"
+        output: "bool"
+        logic: "Match /api/ pattern"
+      
+      _is_admin_endpoint:
+        input: "endpoint: str"
+        output: "bool"
+        logic: "Match admin patterns"
+      
+      _is_file_upload:
+        input: "endpoint: str"
+        output: "bool"
+        logic: "Match upload patterns"
+      
+      _detect_framework:
+        input: "discovery_input: Dict"
+        output: "List[str]"
+        logic: "json content-type → REST, xml → SOAP"
+
+  owasp_mapper:
+    file: "components/owasp_mapper.py"
+    class: "OWASPMapper"
+    
+    initialization:
+      rules: "Build mapping rules on init"
+    
+    methods:
+      map:
+        input: "context: NormalizedContext"
+        output: "List[Tuple[str, str]] - (owasp_category, reason)"
+        logic: "Apply all rules, collect applicable categories"
+      
+      _build_rules:
+        output: "List[Dict]"
+        rules:
+          - name: "A01 - Dynamic params + auth"
+            condition: "has_dynamic_params AND authentication_required"
+            owasp: "A01"
+            reason: "Dynamic path parameter with auth → IDOR risk"
+          
+          - name: "A01 - Admin endpoint"
+            condition: "is_admin_endpoint"
+            owasp: "A01"
+            reason: "Admin endpoint → Authorization bypass risk"
+          
+          - name: "A01 - State-changing on resource"
+            condition: "method in [PUT, DELETE] AND has_path_parameters"
+            owasp: "A01"
+            reason: "State-changing operation on resource → Access control risk"
+          
+          - name: "A05 - User input"
+            condition: "len(parameters) > 0"
+            owasp: "A05"
+            reason: "User-controlled input → Injection risk"
+          
+          - name: "A05 - Query parameters"
+            condition: "has_query_parameters"
+            owasp: "A05"
+            reason: "Query parameters → SQL/NoSQL injection risk"
+          
+          - name: "A07 - Auth endpoint"
+            condition: "login/auth/signin in endpoint"
+            owasp: "A07"
+            reason: "Authentication endpoint → Auth bypass risk"
+          
+          - name: "A08 - File upload"
+            condition: "is_file_upload"
+            owasp: "A08"
+            reason: "File upload → Integrity/malware risk"
+          
+          - name: "A08 - State-changing"
+            condition: "is_state_changing"
+            owasp: "A08"
+            reason: "State-changing operation → Data integrity risk"
+
+  test_case_evaluator:
+    file: "components/test_case_evaluator.py"
+    class: "TestCaseEvaluator"
+    
+    initialization:
+      test_cases: "List[Dict] - Loaded from YAML"
+      pattern_matcher: "PatternMatcher instance"
+      scorer: "TestCaseScorer instance"
+    
+    methods:
+      evaluate:
+        input:
+          context: "NormalizedContext"
+          owasp_categories: "List[Tuple[str, str]]"
+        output: "List[TestCaseMatch] - Ranked by score"
+        steps:
+          - "Score all test cases"
+          - "Filter by threshold (score >= 10)"
+          - "Sort by score (descending)"
+          - "Return ranked matches"
+      
+      _score_test_case:
+        input:
+          test_case: "Dict"
+          context: "NormalizedContext"
+          owasp_categories: "List[Tuple[str, str]]"
+        output: "Tuple[int, List[str]] - (score, reasons)"
+        scoring_logic:
+          owasp_match: "+10 points"
+          method_match: "+5 points"
+          dynamic_params_match: "+5 points"
+          auth_match: "+3 points"
+          pattern_match: "+7 points"
+          content_type_match: "+2 points"
+        threshold: 10
+
+  payload_binder:
+    file: "components/payload_binder.py"
+    class: "PayloadBinder"
+    
+    initialization:
+      environment: "str - prod/staging/dev"
+    
+    methods:
+      bind:
+        input:
+          test_case_id: "str"
+          bindings_metadata: "Dict - test-payload-binding.yaml"
+          safety_metadata: "Dict - payload-safety.yaml"
+          payloads_data: "Dict - payloads/**/*.yaml"
+        output: "PayloadBinding"
+        steps:
+          - "Get binding for test_case_id"
+          - "Check environment compatibility"
+          - "Get allowed payload IDs"
+          - "Filter by safety for environment"
+          - "Apply max_payloads limit"
+          - "Return PayloadBinding"
+      
+      _is_safe_for_environment:
+        input: "payload_safety: Dict"
+        output: "bool"
+        checks:
+          - "environment in payload.environment"
+          - "destructive == false"
+          - "risk_level <= max_risk[environment]"
+          - "If prod: safety in [safe, low_risk]"
+      
+      _get_payload_data:
+        input:
+          payload_id: "str"
+          payloads_data: "Dict"
+        output: "Optional[Dict]"
+        logic: "Search all payload files for matching ID"
+      
+      _intelligent_sampling:
+        input:
+          payloads: "List[Payload]"
+          max_count: "int"
+        output: "List[Payload]"
+        strategy: "Sort by (risk_level, -historical_success_rate), take [:max_count]"
+
+  safety_enforcer:
+    file: "components/safety_enforcer.py"
+    class: "SafetyEnforcer"
+    
+    methods:
+      enforce:
+        input:
+          attack_plan: "AttackPlan"
+          environment: "str"
+        output: "SafetyResult - {safe: bool, violations: List[str]}"
+        rules:
+          production:
+            - "Payload safety in [safe, low_risk]"
+            - "Payload risk_level <= 1"
+            - "No destructive payloads"
+            - "No time-based payloads (SLEEP/WAITFOR)"
+            - "No external callbacks"
+            - "Max 10 requests"
+            - "DELETE/PUT require approval"
+          
+          staging:
+            - "No destructive payloads"
+            - "Payload risk_level <= 3"
+            - "Max 50 requests"
+          
+          dev:
+            - "Max 100 requests"
+
+  validator_selector:
+    file: "components/validator_selector.py"
+    class: "ValidatorSelector"
+    
+    methods:
+      select:
+        input:
+          test_case: "Dict"
+          payloads: "List[Payload]"
+          context: "NormalizedContext"
+        output: "List[str] - Validator names"
+        selection_logic:
+          - "Include test_case.default_validators"
+          - "Map payload.type to validators"
+          - "If auth_required: add auth_indicators"
+          - "If is_api_endpoint: add error-patterns"
+          - "Always add response-comparison"
+          - "Deduplicate"
+        
+        payload_type_mappings:
+          sql_injection: ["sql_errors", "status-codes", "response-diff"]
+          xss: ["xss_reflections", "status-codes"]
+          idor: ["status-codes", "response-diff", "data-leak"]
+          nosql_injection: ["error-patterns", "status-codes"]
+          xxe: ["error-patterns", "data-leak"]
+          ssrf: ["status-codes", "data-leak", "error-patterns"]
+
+  attack_plan_generator:
+    file: "components/attack_plan_generator.py"
+    class: "AttackPlanGenerator"
+    
+    methods:
+      build:
+        input:
+          context: "NormalizedContext"
+          test_case: "Dict"
+          payloads: "List[Payload]"
+          validators: "List[str]"
+          execution_order: "str"
+          stop_on_success: "bool"
+        output: "AttackPlan"
+        logic: "Combine all inputs into AttackPlan dataclass"
+
+# ===== RULE ENGINE ORCHESTRATOR =====
+
+orchestrator:
+  file: "rule_engine/orchestrator.py"
+  class: "RuleEngine"
+  
+  initialization:
+    parameters:
+      knowledge_base_path: "str - Path to YAML files"
+      environment: "str - prod/staging/dev"
+    
+    components:
+      - "ContextNormalizer()"
+      - "OWASPMapper()"
+      - "TestCaseEvaluator()"
+      - "PayloadBinder(environment)"
+      - "SafetyEnforcer()"
+      - "ValidatorSelector()"
+      - "AttackPlanGenerator()"
+    
+    loaders:
+      - "YAMLLoader(knowledge_base_path)"
+      - "TestCaseLoader(yaml_loader)"
+      - "PayloadLoader(yaml_loader)"
+      - "MetadataLoader(yaml_loader)"
+    
+    state:
+      explanation_log: "ExplanationLog()"
+      test_cases: "Dict - Loaded test cases"
+      payloads: "Dict - Loaded payloads"
+      metadata: "Dict - Loaded metadata"
+  
+  methods:
+    load_knowledge_base:
+      type: "async"
+      description: "Load all YAML files into memory (cached)"
+      steps:
+        - "Load test cases"
+        - "Load payloads"
+        - "Load metadata"
+        - "Log to explanation"
+    
+    generate_attack_plan:
+      type: "async"
+      input: "discovery_input: Dict"
+      output: "AttackPlan"
+      
+      execution_flow:
+        step_1:
+          action: "Normalize context"
+          component: "context_normalizer.normalize()"
+          log: "Context normalized"
+        
+        step_2:
+          action: "Map to OWASP"
+          component: "owasp_mapper.map()"
+          log: "OWASP categories mapped"
+          decision: "If empty, return SKIP"
+        
+        step_3:
+          action: "Evaluate test cases"
+          component: "test_case_evaluator.evaluate()"
+          log: "Test cases evaluated"
+          decision: "If empty, return SKIP"
+        
+        step_4:
+          action: "Select top test case"
+          strategy: "applicable_tests[0]"
+          log: "Test case selected"
+        
+        step_5:
+          action: "Bind payloads"
+          component: "payload_binder.bind()"
+          log: "Payloads bound"
+          decision: "If empty, return SKIP"
+        
+        step_6:
+          action: "Select validators"
+          component: "validator_selector.select()"
+          log: "Validators selected"
+        
+        step_7:
+          action: "Build attack plan"
+          component: "attack_plan_generator.build()"
+        
+        step_8:
+          action: "Safety enforcement"
+          component: "safety_enforcer.enforce()"
+          log: "Safety check"
+          decision: "If unsafe, return BLOCKED"
+        
+        step_9:
+          action: "Finalize plan"
+          attach: "explanation log"
+          status: "READY"
+    
+    _skip_plan:
+      input: "reason: str"
+      output: "AttackPlan with status=SKIP"
+    
+    _block_plan:
+      input: "violations: List[str]"
+      output: "AttackPlan with status=BLOCKED"
+
+# ===== UTILITY CLASSES =====
+
+utilities:
+  explanation_log:
+    file: "utils/explainability.py"
+    class: "ExplanationLog"
+    
+    fields:
+      steps: "List[Dict] - Execution steps"
+      timestamp: "datetime - Execution start time"
+    
+    methods:
+      add:
+        input:
+          step_name: "str"
+          data: "Any - Step data"
+        action: "Append {step, timestamp, data} to steps"
+      
+      to_dict:
+        output: "Dict - Full explanation"
+        structure:
+          execution_timestamp: "ISO 8601"
+          steps: "List of step dicts"
+          total_steps: "int"
+      
+      to_human_readable:
+        output: "str - Formatted text"
+        format: |
+          Rule Engine Execution at {timestamp}
+          ============================================================
+          
+          Step {n}: {step_name}
+            Timestamp: {timestamp}
+            Data: {json_data}
+
+  pattern_matcher:
+    file: "utils/pattern_matcher.py"
+    class: "PatternMatcher"
+    
+    methods:
+      matches:
+        input:
+          endpoint: "str - /api/users/123"
+          pattern: "str - /api/{resource}/{id}"
+        output: "bool"
+        logic: "Convert pattern to regex, match endpoint"
+
+  test_case_scorer:
+    file: "utils/scoring.py"
+    class: "TestCaseScorer"
+    
+    methods:
+      score:
+        input:
+          test_case: "Dict"
+          context: "NormalizedContext"
+          owasp_categories: "List[Tuple[str, str]]"
+        output: "Tuple[int, List[str]] - (score, reasons)"
+
+# ===== USAGE EXAMPLES =====
+
+usage_examples:
+  complete_flow:
+    description: "End-to-end rule engine usage"
+    
+    code_structure: |
+      # Initialize
+      rule_engine = RuleEngine(
+          knowledge_base_path="./knowledge-base",
+          environment="prod"
+      )
+      
+      # Load knowledge base (once)
+      await rule_engine.load_knowledge_base()
+      
+      # Discovery input
+      discovery_input = {
+          "endpoint": "/api/orders/123",
+          "method": "GET",
+          "params": ["id"],
+          "auth_required": True,
+          "content_type": "application/json",
+          "role": "user"
+      }
+      
+      # Generate attack plan
+      attack_plan = await rule_engine.generate_attack_plan(discovery_input)
+      
+      # Check status
+      if attack_plan.status == "READY":
+          # Execute attack (Execution Agent)
+          pass
+      elif attack_plan.status == "BLOCKED":
+          # Log violations
+          pass
+      elif attack_plan.status == "SKIP":
+          # Skip endpoint
+          pass
+  
+  unit_testing:
+    description: "Test individual components"
+    
+    test_idor_detection:
+      input:
+        endpoint: "/api/users/456/profile"
+        method: "GET"
+        params: ["id"]
+        auth_required: true
+      
+      expected:
+        status: "READY"
+        test_case_id: "IDOR-001"
+        owasp_category: "A01"
+        payload_count: ">= 1"
+        payload_safety: "[safe, low_risk]"
+        max_requests: "<= 10"
+        validators_include: ["status-codes", "response-diff"]
+    
+    test_production_safety:
+      input:
+        endpoint: "/api/admin/users"
+        method: "DELETE"
+        environment: "prod"
+      
+      expected:
+        status: "BLOCKED"
+        violations:
+          - "DELETE method requires manual approval"
+
+# ===== ASYNC IMPLEMENTATION =====
+
+async_patterns:
+  knowledge_base_loading:
+    method: "load_knowledge_base()"
+    pattern: "asyncio.gather for parallel loading"
+    
+    implementation: |
+      async def load_knowledge_base(self):
+          tasks = [
+              self.test_case_loader.load_all(),
+              self.payload_loader.load_all(),
+              self.metadata_loader.load_all()
+          ]
+          
+          results = await asyncio.gather(*tasks)
+          
+          self.test_cases = results[0]
+          self.payloads = results[1]
+          self.metadata = results[2]
+  
+  attack_plan_generation:
+    method: "generate_attack_plan()"
+    note: "Currently synchronous, ready for async operations"
+    future_async_points:
+      - "Database queries for test cases"
+      - "External API calls for context enrichment"
+      - "Cache lookups (Redis)"
+
+# ===== METRICS & OBSERVABILITY =====
+
+metrics:
+  rule_engine_metrics:
+    type: "dataclass"
+    
+    timing:
+      total_time_ms: "float"
+      normalization_time_ms: "float"
+      owasp_mapping_time_ms: "float"
+      test_evaluation_time_ms: "float"
+      payload_binding_time_ms: "float"
+      safety_check_time_ms: "float"
+    
+    decisions:
+      owasp_categories_found: "int"
+      test_cases_evaluated: "int"
+      test_cases_applicable: "int"
+      payloads_considered: "int"
+      payloads_filtered: "int"
+      payloads_selected: "int"
+    
+    result:
+      result_status: "str - READY/SKIP/BLOCKED"
+      blocked_reason: "Optional[str]"
+  
+  logging:
+    method: "_log_metrics()"
+    format: |
+      Rule Engine Metrics:
+        Total time: {total_time_ms}ms
+        OWASP categories: {owasp_categories_found}
+        Test cases evaluated: {test_cases_evaluated}
+        Payloads selected: {payloads_selected}
+        Result: {result_status}
+
+# ===== TESTING STRATEGY =====
+
+testing:
+  unit_tests:
+    context_normalizer:
+      test_api_endpoint:
+        input:
+          endpoint: "/api/orders/{id}"
+          method: "GET"
+          params: ["id"]
+          auth_required: true
+        
+        assertions:
+          - "result.endpoint == '/api/orders/{id}'"
+          - "result.method == 'GET'"
+          - "result.has_dynamic_params == True"
+          - "result.is_api_endpoint == True"
+          - "'id' in result.parameters"
+          - "result.parameter_types['id'] == 'path'"
+    
+    owasp_mapper:
+      test_idor_detection:
+        input:
+          endpoint: "/api/orders/123"
+          method: "GET"
+          has_dynamic_params: true
+          authentication_required: true
+        
+        assertions:
+          - "('A01', 'Dynamic path parameter with auth → IDOR risk') in result"
+          - "len(result) >= 1"
+    
+    safety_enforcer:
+      test_blocks_risky_payload_in_prod:
+        input:
+          payloads:
+            - id: "risky"
+              safety: "high_risk"
+              risk_level: 3
+          environment: "prod"
+        
+        assertions:
+          - "result.safe == False"
+          - "len(result.violations) > 0"
+          - "'risk level 3 > 1' in result.violations[0]"
+  
+  integration_tests:
+    happy_path_idor: "Complete flow from discovery to READY plan"
+    blocked_path_production_delete: "Safety blocks destructive operation"
+    skip_path_no_test_cases: "Skip when no applicable tests"
+  
+  performance_tests:
+    metrics:
+      - "Knowledge base load time < 1s"
+      - "Attack plan generation < 100ms"
+      - "Memory usage < 100MB"
+
+# ===== CONFIGURATION =====
+
+configuration:
+  environment_settings:
+    file: "config/settings.py"
+    
+    environments:
+      production:
+        max_risk_level: 1
+        max_requests: 10
+        allowed_safety_levels: ["safe", "low_risk"]
+        allow_destructive: false
+        allow_time_based: false
+        allow_external_callbacks: false
+        require_approval_for: ["DELETE", "PUT"]
+      
+      staging:
+        max_risk_level: 3
+        max_requests: 50
+        allow_destructive: false
+      
+      dev:
+        max_risk_level: 4
+        max_requests: 100
+        allow_destructive: true
+  
+  knowledge_base_paths:
+    test_cases: "./knowledge-base/test-cases/**/*.yaml"
+    payloads: "./knowledge-base/payloads/**/*.yaml"
+    validators: "./knowledge-base/validators/**/*.yaml"
+    metadata: "./knowledge-base/metadata/**/*.yaml"
+
+# ===== IMPLEMENTATION SUMMARY =====
+
+implementation_summary:
+  architecture: "Rule-Based Decision Engine (No ML)"
+  language: "Python 3.11+"
+  async_support: true
+  
+  core_files:
+    - "orchestrator.py - RuleEngine class (main entry)"
+    - "components/*.py - 7 component classes"
+    - "models/*.py - 5 data model classes"
+    - "loaders/*.py - 4 YAML loader classes"
+    - "utils/*.py - 3 utility classes"
+  
+  lines_of_code_estimate:
+    orchestrator: "~300 lines"
+    components: "~1500 lines (7 files)"
+    models: "~400 lines (5 files)"
+    loaders: "~300 lines (4 files)"
+    utils: "~200 lines (3 files)"
+    tests: "~2000 lines"
+    total: "~4700 lines"
+  
+  dependencies:
+    - "pydantic - Data validation"
+    - "pyyaml - YAML parsing"
+    - "asyncio - Async support"
+    - "dataclasses - Data models"
+    - "typing - Type hints"
+  
+  test_coverage_target: "95%+"
+  
+  key_principles:
+    - "Deterministic: Same input = Same output"
+    - "Explainable: Every decision logged"
+    - "Safe: Production environment protection"
+    - "Testable: Comprehensive unit tests"
+    - "Async-ready: Future-proof design"

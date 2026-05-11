@@ -1,0 +1,690 @@
+# OWASP Comprehensive Vulnerability Taxonomy
+# Sources: OWASP Top 10 2021, OWASP CheatSheet Series, OWASP Community Vulnerabilities
+# Last Updated: 2026-01-21
+
+metadata:
+  version: "2021"
+  source: "OWASP Foundation"
+  total_categories: 10
+  cheat_sheets: 592
+  community_contributors: 592
+  last_updated: "2026-01-21"
+
+# OWASP Top 10 2021 - Complete Taxonomy
+owasp_top_10_2021:
+  - id: "A01"
+    category: "Broken Access Control"
+    rank: 1
+    incidence_rate: "3.81%"
+    average_weighted_exploit: 6.92
+    average_weighted_impact: 5.93
+    max_incidence: "318,487 occurrences"
+    total_cwes: 34
+    description: "Access control enforces policy such that users cannot act outside of their intended permissions. Failures typically lead to unauthorized information disclosure, modification, or destruction of all data or performing a business function outside the user's limits."
+    notable_cwes:
+      - "CWE-200: Exposure of Sensitive Information"
+      - "CWE-201: Exposure of Sensitive Information Through Sent Data"
+      - "CWE-352: Cross-Site Request Forgery"
+      - "CWE-425: Direct Request (Forced Browsing)"
+      - "CWE-639: Authorization Bypass Through User-Controlled Key"
+      - "CWE-284: Improper Access Control"
+      - "CWE-285: Improper Authorization"
+      - "CWE-732: Incorrect Permission Assignment"
+      - "CWE-862: Missing Authorization"
+      - "CWE-863: Incorrect Authorization"
+    common_vulnerabilities:
+      - "Violation of principle of least privilege"
+      - "Bypassing access control checks by modifying URL, API request"
+      - "Permitting viewing or editing someone else's account (IDOR)"
+      - "Missing access controls for POST, PUT, DELETE"
+      - "Elevation of privilege (acting as user without being logged in, or admin)"
+      - "Metadata manipulation (JWT, cookie tampering)"
+      - "CORS misconfiguration allowing unauthorized API access"
+      - "Force browsing to authenticated pages as unauthenticated user"
+    prevention_techniques:
+      - "Deny by default except for public resources"
+      - "Implement access control mechanisms once and re-use"
+      - "Model access controls to enforce record ownership"
+      - "Disable web server directory listing"
+      - "Log access control failures and alert admins"
+      - "Rate limit API and controller access to minimize harm"
+      - "Invalidate JWT tokens after logout"
+    testing_methods:
+      - "IDOR testing: Modify IDs in requests"
+      - "Horizontal privilege escalation: Access another user's data"
+      - "Vertical privilege escalation: Access admin functions"
+      - "Missing function level access control: Direct URL manipulation"
+      - "Metadata manipulation: JWT/cookie tampering"
+      - "CORS testing: Check cross-origin policies"
+    
+  - id: "A02"
+    category: "Cryptographic Failures"
+    rank: 2
+    previous_name: "Sensitive Data Exposure"
+    incidence_rate: "4.49%"
+    average_weighted_exploit: 7.29
+    average_weighted_impact: 6.81
+    total_cwes: 29
+    description: "Failures related to cryptography (or lack thereof) which often lead to exposure of sensitive data. Focus on protection of data in transit and at rest."
+    notable_cwes:
+      - "CWE-259: Use of Hard-coded Password"
+      - "CWE-327: Broken or Risky Crypto Algorithm"
+      - "CWE-331: Insufficient Entropy"
+      - "CWE-338: Use of Cryptographically Weak PRNG"
+      - "CWE-261: Weak Encoding for Password"
+      - "CWE-296: Improper Certificate Validation"
+      - "CWE-310: Cryptographic Issues"
+      - "CWE-311: Missing Encryption of Sensitive Data"
+      - "CWE-312: Cleartext Storage of Sensitive Information"
+      - "CWE-319: Cleartext Transmission of Sensitive Information"
+      - "CWE-321: Use of Hard-coded Cryptographic Key"
+      - "CWE-322: Key Exchange without Entity Authentication"
+      - "CWE-323: Reusing a Nonce, Key Pair in Encryption"
+      - "CWE-324: Use of a Key Past its Expiration Date"
+      - "CWE-325: Missing Required Cryptographic Step"
+      - "CWE-326: Inadequate Encryption Strength"
+    common_vulnerabilities:
+      - "Transmitting sensitive data in clear text (HTTP, FTP, SMTP)"
+      - "Old or weak cryptographic algorithms (MD5, SHA1, DES, RC4)"
+      - "Default or weak crypto keys"
+      - "Lack of proper certificate validation (TLS/SSL)"
+      - "Missing encryption for sensitive data at rest"
+      - "Insufficient randomness in cryptographic operations"
+      - "Weak password hashing (MD5, SHA1 without salt)"
+      - "Improper key management"
+    prevention_techniques:
+      - "Classify data and apply controls per classification"
+      - "Don't store sensitive data unnecessarily (PCI DSS tokenization)"
+      - "Encrypt all sensitive data at rest"
+      - "Encrypt all data in transit (TLS, HSTS)"
+      - "Disable caching for sensitive data"
+      - "Use strong adaptive/salted hashing (Argon2, scrypt, bcrypt, PBKDF2)"
+      - "Verify independently the effectiveness of configuration"
+      - "Use authenticated encryption (AES-GCM, ChaCha20-Poly1305)"
+      - "Avoid deprecated algorithms (MD5, SHA1, DES, RC4)"
+    
+  - id: "A03"
+    category: "Injection"
+    rank: 3
+    previous_rank: 1
+    incidence_rate: "3.37%"
+    average_weighted_exploit: 7.25
+    average_weighted_impact: 7.15
+    max_incidence: "274,228 occurrences"
+    total_cwes: 33
+    description: "An application is vulnerable to attack when user-supplied data is not validated, filtered, or sanitized by the application. Hostile data can trick the interpreter into executing unintended commands or accessing data without proper authorization."
+    notable_cwes:
+      - "CWE-79: Cross-site Scripting (XSS)"
+      - "CWE-89: SQL Injection"
+      - "CWE-73: External Control of File Name or Path"
+      - "CWE-77: Command Injection"
+      - "CWE-78: OS Command Injection"
+      - "CWE-88: Argument Injection"
+      - "CWE-90: LDAP Injection"
+      - "CWE-91: XML Injection"
+      - "CWE-94: Code Injection"
+      - "CWE-917: Expression Language Injection"
+      - "CWE-943: Improper Neutralization of Special Elements in Data Query Logic"
+    injection_types:
+      sql:
+        description: "Malicious SQL code inserted into application queries"
+        examples:
+          - "' OR '1'='1"
+          - "'; DROP TABLE users--"
+          - "UNION SELECT username, password FROM users"
+        prevention: "Parameterized queries, stored procedures, input validation"
+      xss:
+        description: "Malicious scripts injected into web pages"
+        types:
+          - "Reflected XSS: Non-persistent, returned in immediate response"
+          - "Stored XSS: Persistent, stored in database"
+          - "DOM-based XSS: Client-side script manipulation"
+        prevention: "Output encoding, CSP, input validation"
+      command:
+        description: "OS command execution via application input"
+        examples:
+          - "; rm -rf /"
+          - "| cat /etc/passwd"
+          - "& whoami"
+        prevention: "Avoid system calls, input validation, whitelist commands"
+      ldap:
+        description: "LDAP query manipulation"
+        examples:
+          - "*)(uid=*))(|(uid=*"
+          - "admin)(!(&(1=0"
+        prevention: "Parameterized LDAP queries, input validation"
+      xpath:
+        description: "XML query manipulation"
+        prevention: "Parameterized XPath, input validation"
+      template:
+        description: "Server-side template injection (SSTI)"
+        engines:
+          - "Jinja2"
+          - "Freemarker"
+          - "Velocity"
+          - "Twig"
+        prevention: "Sandboxed environments, input validation"
+      nosql:
+        description: "NoSQL database injection"
+        databases:
+          - "MongoDB"
+          - "CouchDB"
+          - "Cassandra"
+        prevention: "Input validation, parameterized queries"
+    prevention_techniques:
+      - "Use safe APIs that avoid interpreters (parameterized interfaces)"
+      - "Positive server-side input validation (whitelist)"
+      - "Escape special characters using specific syntax for interpreter"
+      - "Use LIMIT and SQL controls to prevent mass disclosure"
+      - "Implement automated scanning (SAST, DAST)"
+    
+  - id: "A04"
+    category: "Insecure Design"
+    rank: 4
+    new_category: true
+    incidence_rate: "3.00%"
+    average_weighted_exploit: 6.46
+    average_weighted_impact: 6.78
+    total_cwes: 40
+    description: "Risks related to design and architectural flaws. Different from insecure implementation. Need threat modeling, secure design patterns, and reference architectures."
+    notable_cwes:
+      - "CWE-209: Generation of Error Message Containing Sensitive Information"
+      - "CWE-256: Plaintext Storage of Password"
+      - "CWE-501: Trust Boundary Violation"
+      - "CWE-522: Insufficiently Protected Credentials"
+      - "CWE-256: Unprotected Storage of Credentials"
+      - "CWE-426: Untrusted Search Path"
+      - "CWE-494: Download of Code Without Integrity Check"
+    secure_design_principles:
+      - "Establish and use a secure development lifecycle"
+      - "Establish and use a library of secure design patterns"
+      - "Use threat modeling for critical flows"
+      - "Integrate security language and controls into user stories"
+      - "Integrate plausibility checks at each tier"
+      - "Write unit and integration tests for security"
+      - "Segregate tier layers and segregate tenants"
+      - "Limit resource consumption by user or service"
+    common_design_flaws:
+      - "Missing rate limiting (credential stuffing, API abuse)"
+      - "Lack of business logic validation"
+      - "Missing trust boundaries"
+      - "Insufficient threat modeling"
+      - "No defense in depth"
+      - "Insecure workflows"
+      - "Missing security requirements"
+    
+  - id: "A05"
+    category: "Security Misconfiguration"
+    rank: 5
+    previous_rank: 6
+    incidence_rate: "4.51%"
+    average_weighted_exploit: 8.12
+    average_weighted_impact: 6.56
+    total_cwes: 20
+    description: "Missing appropriate security hardening, improperly configured permissions, default configurations, overly verbose error messages, missing security headers, unpatched systems."
+    notable_cwes:
+      - "CWE-16: Configuration"
+      - "CWE-209: Generation of Error Message Containing Sensitive Information"
+      - "CWE-215: Information Exposure Through Debug Information"
+      - "CWE-526: Exposure of Sensitive Information Through Environmental Variables"
+      - CWE-537: "Java Runtime Error Message Containing Sensitive Information"
+      - "CWE-541: Inclusion of Sensitive Information in Include File"
+      - "CWE-547: Use of Hard-coded, Security-relevant Constants"
+    common_misconfigurations:
+      - "Missing security hardening across application stack"
+      - "Unnecessary features enabled (ports, services, accounts)"
+      - "Default accounts with unchanged passwords"
+      - "Overly informative error messages (stack traces)"
+      - "Missing or outdated security headers"
+      - "Unpatched software and libraries"
+      - "Insecure default settings"
+      - "Cloud storage buckets with open permissions"
+      - "Misconfigured HTTP security headers"
+      - "Directory listing enabled"
+    prevention_techniques:
+      - "Repeatable hardening process for all environments"
+      - "Minimal platform without unnecessary features"
+      - "Review and update configurations for security notes"
+      - "Segmented application architecture"
+      - "Security directives to clients (security headers)"
+      - "Automated verification of configurations in all environments"
+      - "Disable directory listing and default pages"
+      - "Remove sample applications and configurations"
+    
+  - id: "A06"
+    category: "Vulnerable and Outdated Components"
+    rank: 6
+    previous_name: "Using Components with Known Vulnerabilities"
+    incidence_rate: "8.77%"
+    average_weighted_exploit: 5.00
+    average_weighted_impact: 5.00
+    total_cwes: 3
+    description: "Using components with known vulnerabilities. Includes libraries, frameworks, and software modules that run with the same privileges as the application."
+    notable_cwes:
+      - "CWE-1035: 2017 Top 10 A9: Using Components with Known Vulnerabilities"
+      - "CWE-1104: Use of Unmaintained Third Party Components"
+      - "CWE-937: OWASP Top 10 2013: Using Components with Known Vulnerabilities"
+    risk_factors:
+      - "Unknown versions of client/server-side components"
+      - "Vulnerable, unsupported, or out-of-date software"
+      - "Not scanning for vulnerabilities regularly"
+      - "Not fixing or upgrading platform, frameworks, dependencies timely"
+      - "Software developers don't test compatibility of updated libraries"
+      - "Components running with unnecessary privileges"
+    prevention_techniques:
+      - "Remove unused dependencies, features, components, files"
+      - "Continuously inventory client and server-side components"
+      - "Monitor sources like CVE, NVD for vulnerabilities"
+      - "Obtain components only from official sources over secure links"
+      - "Monitor for unmaintained or unpatched libraries"
+      - "Virtual patching to monitor, detect, protect"
+    tools:
+      - "OWASP Dependency-Check"
+      - "npm audit"
+      - "Retire.js"
+      - "Snyk"
+      - "GitHub Dependabot"
+      - "WhiteSource Bolt"
+    
+  - id: "A07"
+    category: "Identification and Authentication Failures"
+    rank: 7
+    previous_name: "Broken Authentication"
+    incidence_rate: "2.55%"
+    average_weighted_exploit: 7.40
+    average_weighted_impact: 6.50
+    total_cwes: 22
+    description: "Confirmation of user's identity, authentication, and session management is critical. Failures can allow attackers to compromise passwords, keys, session tokens, or exploit implementation flaws to assume other users' identities."
+    notable_cwes:
+      - "CWE-297: Improper Validation of Certificate with Host Mismatch"
+      - "CWE-287: Improper Authentication"
+      - "CWE-384: Session Fixation"
+      - "CWE-259: Use of Hard-coded Password"
+      - "CWE-521: Weak Password Requirements"
+      - "CWE-522: Insufficiently Protected Credentials"
+      - "CWE-640: Weak Password Recovery Mechanism"
+      - "CWE-798: Use of Hard-coded Credentials"
+      - "CWE-836: Use of Password Hash Instead of Password"
+    common_vulnerabilities:
+      - "Permits automated attacks (credential stuffing, brute force)"
+      - "Permits default, weak, or well-known passwords"
+      - "Weak credential recovery (knowledge-based answers)"
+      - "Plain text, encrypted, or weakly hashed passwords"
+      - "Missing or ineffective multi-factor authentication"
+      - "Exposes session identifier in URL"
+      - "Reuses session identifiers after successful login"
+      - "Doesn't properly invalidate sessions during logout"
+    prevention_techniques:
+      - "Implement multi-factor authentication"
+      - "Do not ship with default credentials"
+      - "Implement weak password checks (NIST 800-63b)"
+      - "Align password length, complexity, rotation with guidelines"
+      - "Harden registration, credential recovery, API pathways"
+      - "Limit or delay failed login attempts (rate limiting)"
+      - "Use server-side, secure, built-in session manager"
+      - "Generate new random session ID with high entropy after login"
+      - "Never expose session ID in URL"
+      - "Invalidate session IDs properly after logout"
+    
+  - id: "A08"
+    category: "Software and Data Integrity Failures"
+    rank: 8
+    new_category: true
+    incidence_rate: "2.05%"
+    average_weighted_exploit: 6.94
+    average_weighted_impact: 7.94
+    total_cwes: 10
+    description: "Code and infrastructure that does not protect against integrity violations. Insecure deserialization, dependencies from untrusted sources, insecure CI/CD pipelines."
+    notable_cwes:
+      - "CWE-345: Insufficient Verification of Data Authenticity"
+      - "CWE-353: Missing Support for Integrity Check"
+      - "CWE-426: Untrusted Search Path"
+      - "CWE-494: Download of Code Without Integrity Check"
+      - "CWE-502: Deserialization of Untrusted Data"
+      - "CWE-565: Reliance on Cookies without Validation"
+      - "CWE-784: Reliance on Cookies without Validation and Integrity Checking in a Security Decision"
+      - "CWE-829: Inclusion of Functionality from Untrusted Control Sphere"
+    vulnerability_areas:
+      insecure_deserialization:
+        description: "Deserialization of hostile or tampered objects"
+        languages:
+          - "Java: readObject()"
+          - "PHP: unserialize()"
+          - "Python: pickle"
+          - ".NET: BinaryFormatter"
+          - "Ruby: Marshal"
+        prevention: "Avoid deserialization, integrity checks, strict type constraints"
+      unsigned_updates:
+        description: "Applications without digital signature verification"
+        examples:
+          - "Auto-update without signing"
+          - "Plugin installation without verification"
+          - "CDN content without SRI"
+        prevention: "Digital signatures, TLS, SRI"
+      ci_cd_poisoning:
+        description: "Insecure CI/CD pipeline allowing code injection"
+        risks:
+          - "Unauthorized access"
+          - "Malicious code"
+          - "System compromise"
+        prevention: "Pipeline security, access controls, signing"
+    prevention_techniques:
+      - "Use digital signatures to verify software source"
+      - "Ensure libraries and dependencies are from trusted repositories"
+      - "Use software supply chain security tools (OWASP Dependency Check)"
+      - "Review code and configuration changes"
+      - "Ensure CI/CD pipeline has segregation, configuration, access control"
+      - "Ensure unsigned or unencrypted data is not sent to clients"
+      - "Avoid deserialization or implement integrity checks"
+    
+  - id: "A09"
+    category: "Security Logging and Monitoring Failures"
+    rank: 9
+    previous_name: "Insufficient Logging & Monitoring"
+    incidence_rate: "6.51%"
+    average_weighted_exploit: 6.87
+    average_weighted_impact: 4.99
+    total_cwes: 4
+    description: "Without logging and monitoring, breaches cannot be detected. Insufficient logging, detection, monitoring, and active response allows attackers to further attack systems, maintain persistence, pivot, and extract data."
+    notable_cwes:
+      - "CWE-117: Improper Output Neutralization for Logs"
+      - "CWE-223: Omission of Security-relevant Information"
+      - "CWE-532: Insertion of Sensitive Information into Log File"
+      - "CWE-778: Insufficient Logging"
+    common_failures:
+      - "Login, failed login, high-value transactions not logged"
+      - "Warnings and errors generate no, inadequate, or unclear logs"
+      - "Logs not monitored for suspicious activity"
+      - "Logs stored locally only"
+      - "Missing alerting thresholds and escalation"
+      - "Penetration testing and DAST scans don't trigger alerts"
+      - "Application can't detect, escalate, or alert for active attacks"
+      - "Visible to users or attackers (information leakage)"
+    what_to_log:
+      - "Login, failed login, and logout events"
+      - "High-value transactions"
+      - "Access control failures"
+      - "Input validation failures (SQL injection attempts)"
+      - "Authentication failures"
+      - "Session management failures"
+      - "Application errors and system events"
+      - "Crypto module failures"
+      - "TLS failures"
+      - "Notification features failures"
+    prevention_techniques:
+      - "Ensure logs contain sufficient user context"
+      - "Ensure log entries are properly formatted"
+      - "Log data is encoded correctly to prevent injection"
+      - "Ensure high-value transactions have audit trail with integrity controls"
+      - "Establish effective monitoring and alerting"
+      - "Establish or adopt incident response and recovery plan (NIST 800-61)"
+      - "Commercial and open source protection frameworks (RASP)"
+    
+  - id: "A10"
+    category: "Server-Side Request Forgery (SSRF)"
+    rank: 10
+    new_category: true
+    incidence_rate: "2.72%"
+    average_weighted_exploit: 8.28
+    average_weighted_impact: 6.72
+    total_cwes: 1
+    description: "Occurs when web application fetches remote resource without validating user-supplied URL. Allows attacker to coerce application to send crafted request to unexpected destination, even when protected by firewall, VPN, or network ACL."
+    notable_cwes:
+      - "CWE-918: Server-Side Request Forgery"
+    common_scenarios:
+      - "Accessing cloud metadata endpoints (169.254.169.254)"
+      - "Port scanning internal networks"
+      - "Accessing internal services (databases, Redis, Memcached)"
+      - "Reading local files (file://)"
+      - "Bypassing authentication via localhost"
+      - "Exploiting internal services without authentication"
+    attack_vectors:
+      cloud_metadata:
+        - "AWS: http://169.254.169.254/latest/meta-data/"
+        - "Azure: http://169.254.169.254/metadata/instance?api-version=2021-02-01"
+        - "GCP: http://metadata.google.internal/computeMetadata/v1/"
+      protocols:
+        - "file:// - Local file access"
+        - "gopher:// - Internal service exploitation"
+        - "dict:// - Dictionary server attacks"
+        - "ftp:// - FTP server interaction"
+        - "ldap:// - LDAP server queries"
+    prevention_techniques:
+      network_layer:
+        - "Segment remote resource access functionality in separate networks"
+        - "Enforce firewall policies and network ACLs"
+        - "Block traffic to cloud metadata services"
+      application_layer:
+        - "Sanitize and validate all client-supplied input data"
+        - "Enforce URL schema, port, destination with positive allow list"
+        - "Do not send raw responses to clients"
+        - "Disable HTTP redirections"
+        - "Be aware of URL consistency to avoid DNS rebinding"
+      additional_measures:
+        - "Don't deploy security-relevant services on frontend systems"
+        - "Use network encryption (VPN) for independent systems"
+
+# OWASP Community Vulnerabilities (Complete List)
+community_vulnerabilities:
+  - name: "Allowing Domains or Accounts to Expire"
+    category: "Configuration"
+    description: "Failure to renew critical domains or accounts"
+    
+  - name: "Buffer Overflow"
+    category: "Memory Safety"
+    cwes: ["CWE-119", "CWE-120", "CWE-787"]
+    
+  - name: "Business Logic Vulnerability"
+    category: "Application Logic"
+    description: "Flaws in business workflow and validation"
+    
+  - name: "CRLF Injection"
+    category: "Injection"
+    cwes: ["CWE-93"]
+    
+  - name: "CSV Injection"
+    category: "Injection"
+    contributors: ["Timo Goosen", "Albinowax"]
+    
+  - name: "Deserialization of Untrusted Data"
+    category: "Component Interaction"
+    cwes: ["CWE-502"]
+    severity: "Critical"
+    
+  - name: "Directory Restriction Error"
+    category: "File Handling"
+    
+  - name: "Expression Language Injection"
+    category: "Injection"
+    cwes: ["CWE-917"]
+    platforms: ["Java", ".NET"]
+    
+  - name: "Heartbleed Bug"
+    category: "Memory Safety"
+    cve: "CVE-2014-0160"
+    severity: "Critical"
+    
+  - name: "Improper Data Validation"
+    category: "Input Validation"
+    cwes: ["CWE-20"]
+    
+  - name: "Injection Problem"
+    category: "Injection"
+    types: ["SQL", "Command", "LDAP", "XPath"]
+    
+  - name: "Insecure Deserialization"
+    category: "Data Integrity"
+    contributor: "Vaibhav Malik"
+    
+  - name: "Insecure Randomness"
+    category: "Randomness"
+    cwes: ["CWE-330", "CWE-338"]
+    
+  - name: "Insecure Temporary File"
+    category: "File Handling"
+    cwes: ["CWE-377"]
+    
+  - name: "Insecure Transport"
+    category: "Cryptographic Failures"
+    cwes: ["CWE-319"]
+    
+  - name: "Insufficient Session ID Length"
+    category: "Authentication"
+    contributor: "Jake Karnes"
+    
+  - name: "Memory Leak"
+    category: "Memory Safety"
+    cwes: ["CWE-401"]
+    
+  - name: "Missing XML Validation"
+    category: "Input Validation"
+    cwes: ["CWE-112"]
+    
+  - name: "Null Dereference"
+    category: "Memory Safety"
+    cwes: ["CWE-476"]
+    
+  - name: "PHP File Inclusion"
+    category: "File Handling"
+    types: ["LFI", "RFI"]
+    
+  - name: "PHP Object Injection"
+    category: "Injection"
+    contributor: "Egidio Romano"
+    cwes: ["CWE-502"]
+    
+  - name: "Password Plaintext Storage"
+    category: "Cryptographic Failures"
+    cwes: ["CWE-256", "CWE-312"]
+    
+  - name: "Poor Logging Practice"
+    category: "Logging"
+    contributor: "Weilin Zhong"
+    cwes: ["CWE-778"]
+    
+  - name: "Privacy Violation"
+    category: "Sensitive Information"
+    cwes: ["CWE-359"]
+    
+  - name: "Session Variable Overloading"
+    category: "Session Management"
+    
+  - name: "Unrestricted File Upload"
+    category: "File Handling"
+    cwes: ["CWE-434"]
+    severity: "High"
+    
+  - name: "Unsafe use of Reflection"
+    category: "Code Quality"
+    cwes: ["CWE-470"]
+    
+  - name: "Using a broken or risky cryptographic algorithm"
+    category: "Cryptographic Failures"
+    cwes: ["CWE-327"]
+    
+  - name: "XML External Entity (XXE) Processing"
+    category: "Injection"
+    cwes: ["CWE-611"]
+    severity: "High"
+    
+  - name: "The Follina Vulnerability"
+    category: "Microsoft Office"
+    contributor: "Tholkappiar"
+    cve: "CVE-2022-30190"
+    severity: "Critical"
+
+# OWASP CheatSheet Series (Key Categories)
+cheatsheets:
+  authentication:
+    - "Authentication Cheat Sheet"
+    - "Password Storage Cheat Sheet"
+    - "Forgot Password Cheat Sheet"
+    - "Session Management Cheat Sheet"
+    - "Multi-Factor Authentication Cheat Sheet"
+    
+  authorization:
+    - "Authorization Cheat Sheet"
+    - "Authorization Testing Automation Cheat Sheet"
+    - "Transaction Authorization Cheat Sheet"
+    - "Insecure Direct Object Reference Prevention"
+    
+  injection_prevention:
+    - "SQL Injection Prevention Cheat Sheet"
+    - "XSS Prevention Cheat Sheet"
+    - "DOM XSS Prevention Cheat Sheet"
+    - "OS Command Injection Defense Cheat Sheet"
+    - "LDAP Injection Prevention Cheat Sheet"
+    - "Injection Prevention Cheat Sheet"
+    
+  cryptography:
+    - "Cryptographic Storage Cheat Sheet"
+    - "Key Management Cheat Sheet"
+    - "TLS Cipher String Cheat Sheet"
+    - "HSTS Cheat Sheet"
+    
+  web_security:
+    - "Cross-Site Request Forgery Prevention"
+    - "Clickjacking Defense"
+    - "Content Security Policy"
+    - "HTTP Security Response Headers"
+    - "Secure Headers"
+    
+  data_validation:
+    - "Input Validation Cheat Sheet"
+    - "Bean Validation Cheat Sheet"
+    - "Deserialization Cheat Sheet"
+    - "File Upload Cheat Sheet"
+    
+  api_security:
+    - "REST Security Cheat Sheet"
+    - "GraphQL Cheat Sheet"
+    - "Web Service Security"
+    
+  mobile:
+    - "Mobile Application Security"
+    - "iOS Security Testing"
+    - "Android Security Testing"
+
+# Security Testing Resources
+testing_resources:
+  owasp_wstg:
+    name: "OWASP Web Security Testing Guide"
+    version: "4.2"
+    categories:
+      - "Information Gathering"
+      - "Configuration and Deployment Management Testing"
+      - "Identity Management Testing"
+      - "Authentication Testing"
+      - "Authorization Testing"
+      - "Session Management Testing"
+      - "Input Validation Testing"
+      - "Error Handling Testing"
+      - "Cryptography Testing"
+      - "Business Logic Testing"
+      - "Client-side Testing"
+      - "API Testing"
+    
+  owasp_asvs:
+    name: "Application Security Verification Standard"
+    version: "4.0.3"
+    levels:
+      - "Level 1: First Steps, Automated, or Whole of Portfolio View"
+      - "Level 2: Most Applications"
+      - "Level 3: High Value, High Assurance, or High Safety"
+    
+  owasp_masvs:
+    name: "Mobile Application Security Verification Standard"
+    version: "2.1.0"
+    platforms: ["iOS", "Android"]
+
+references:
+  - url: "https://owasp.org/Top10/2021/"
+    title: "OWASP Top 10 2021"
+  - url: "https://owasp.org/www-community/vulnerabilities/"
+    title: "OWASP Community Vulnerabilities"
+  - url: "https://cheatsheetseries.owasp.org/"
+    title: "OWASP Cheat Sheet Series"
+  - url: "https://github.com/OWASP/CheatSheetSeries"
+    title: "OWASP CheatSheet Series GitHub"
+    stars: "31.3k"
+    contributors: 592

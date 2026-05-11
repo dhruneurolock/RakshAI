@@ -1,0 +1,545 @@
+# GAP 4: Baseline vs Attack Comparison Schema
+# Proof of behavior change for strong PoCs
+
+metadata_type: "Response Comparison Schema"
+version: "1.0"
+last_updated: "2026-02-02"
+description: "Stores baseline responses, attack responses, and diff analysis for vulnerability proof"
+
+# Schema Definition
+response_schema:
+  baseline_request:
+    description: "Legitimate request without attack payload"
+    fields:
+      request_id: "uuid"
+      timestamp: "ISO 8601"
+      method: "GET | POST | PUT | DELETE | PATCH"
+      url: "string"
+      headers: "object"
+      body: "string | null"
+      cookies: "object"
+      query_params: "object"
+  
+  baseline_response:
+    description: "Response to legitimate request"
+    fields:
+      response_id: "uuid"
+      timestamp: "ISO 8601"
+      status_code: "integer"
+      status_text: "string"
+      headers: "object"
+      body: "string"
+      content_length: "integer"
+      response_time_ms: "integer"
+      redirect_chain: "array[string]"
+      cookies_set: "object"
+  
+  attack_request:
+    description: "Request with attack payload"
+    fields:
+      request_id: "uuid"
+      timestamp: "ISO 8601"
+      method: "GET | POST | PUT | DELETE | PATCH"
+      url: "string"
+      headers: "object"
+      body: "string | null"
+      cookies: "object"
+      query_params: "object"
+      payload_id: "string"
+      payload_value: "string"
+      injection_point: "string"
+      test_case_id: "string"
+  
+  attack_response:
+    description: "Response to attack request"
+    fields:
+      response_id: "uuid"
+      timestamp: "ISO 8601"
+      status_code: "integer"
+      status_text: "string"
+      headers: "object"
+      body: "string"
+      content_length: "integer"
+      response_time_ms: "integer"
+      redirect_chain: "array[string]"
+      cookies_set: "object"
+  
+  diff_analysis:
+    description: "Computed differences between baseline and attack"
+    fields:
+      diff_id: "uuid"
+      baseline_response_id: "uuid"
+      attack_response_id: "uuid"
+      diff_hash: "string (SHA256)"
+      status_code_changed: "boolean"
+      content_length_diff: "integer"
+      response_time_diff_ms: "integer"
+      headers_added: "array[string]"
+      headers_removed: "array[string]"
+      headers_modified: "array[string]"
+      cookies_added: "array[string]"
+      cookies_removed: "array[string]"
+      redirect_changed: "boolean"
+      body_diff_summary: "object"
+      behavioral_changes: "array[object]"
+      confidence_indicators: "array[object]"
+
+# Example: SQL Injection Detection
+sql_injection_example:
+  baseline_request:
+    request_id: "550e8400-e29b-41d4-a716-446655440000"
+    timestamp: "2026-02-02T10:30:00Z"
+    method: "POST"
+    url: "https://example.com/login"
+    headers:
+      Content-Type: "application/x-www-form-urlencoded"
+      User-Agent: "Mozilla/5.0"
+    body: "username=testuser&password=testpass"
+    cookies: {}
+    query_params: {}
+  
+  baseline_response:
+    response_id: "550e8400-e29b-41d4-a716-446655440001"
+    timestamp: "2026-02-02T10:30:00.123Z"
+    status_code: 401
+    status_text: "Unauthorized"
+    headers:
+      Content-Type: "text/html"
+      Content-Length: "1234"
+      Set-Cookie: null
+    body: "<html><body><h1>Login Failed</h1><p>Invalid credentials</p></body></html>"
+    content_length: 1234
+    response_time_ms: 145
+    redirect_chain: []
+    cookies_set: {}
+  
+  attack_request:
+    request_id: "550e8400-e29b-41d4-a716-446655440002"
+    timestamp: "2026-02-02T10:30:05Z"
+    method: "POST"
+    url: "https://example.com/login"
+    headers:
+      Content-Type: "application/x-www-form-urlencoded"
+      User-Agent: "Mozilla/5.0"
+    body: "username=admin' OR '1'='1'--&password=anything"
+    cookies: {}
+    query_params: {}
+    payload_id: "sqli_auth_basic_1"
+    payload_value: "admin' OR '1'='1'--"
+    injection_point: "username parameter"
+    test_case_id: "SQLI-001"
+  
+  attack_response:
+    response_id: "550e8400-e29b-41d4-a716-446655440003"
+    timestamp: "2026-02-02T10:30:05.167Z"
+    status_code: 200
+    status_text: "OK"
+    headers:
+      Content-Type: "text/html"
+      Content-Length: "5678"
+      Set-Cookie: "session=abc123def456; HttpOnly; Secure"
+      Location: "/dashboard"
+    body: "<html><body><h1>Welcome, Admin!</h1><p>Login successful</p></body></html>"
+    content_length: 5678
+    response_time_ms: 167
+    redirect_chain: ["/dashboard"]
+    cookies_set:
+      session: "abc123def456"
+  
+  diff_analysis:
+    diff_id: "550e8400-e29b-41d4-a716-446655440004"
+    baseline_response_id: "550e8400-e29b-41d4-a716-446655440001"
+    attack_response_id: "550e8400-e29b-41d4-a716-446655440003"
+    diff_hash: "a1b2c3d4e5f6..."
+    
+    status_code_changed: true
+    status_code_diff:
+      baseline: 401
+      attack: 200
+      significance: "CRITICAL - Unauthorized → Authorized"
+    
+    content_length_diff: 4444
+    content_length_analysis:
+      baseline: 1234
+      attack: 5678
+      diff: +4444
+      percentage: +360%
+      significance: "Major content change"
+    
+    response_time_diff_ms: 22
+    response_time_analysis:
+      baseline: 145
+      attack: 167
+      diff: +22
+      significance: "Minimal - within normal variance"
+    
+    headers_added:
+      - header: "Set-Cookie"
+        value: "session=abc123def456"
+        significance: "CRITICAL - Session token issued"
+      - header: "Location"
+        value: "/dashboard"
+        significance: "HIGH - Redirect to authenticated area"
+    
+    headers_removed: []
+    headers_modified: []
+    
+    cookies_added:
+      - name: "session"
+        value: "abc123def456"
+        flags: ["HttpOnly", "Secure"]
+        significance: "CRITICAL - Valid session cookie"
+    
+    cookies_removed: []
+    redirect_changed: true
+    redirect_analysis:
+      baseline_redirect: null
+      attack_redirect: "/dashboard"
+      significance: "HIGH - Redirected to protected area"
+    
+    body_diff_summary:
+      lines_added: 50
+      lines_removed: 10
+      similarity_score: 0.15
+      key_differences:
+        - type: "text_change"
+          baseline: "Login Failed"
+          attack: "Welcome, Admin!"
+          significance: "CRITICAL - Success message"
+        - type: "text_change"
+          baseline: "Invalid credentials"
+          attack: "Login successful"
+          significance: "CRITICAL - Authentication bypassed"
+    
+    behavioral_changes:
+      - change_type: "authentication_bypass"
+        description: "Unauthenticated request gained authenticated access"
+        evidence:
+          - "Status 401 → 200"
+          - "Session token issued"
+          - "Redirect to /dashboard"
+          - "Welcome message"
+        confidence_impact: +0.40
+      
+      - change_type: "privilege_escalation"
+        description: "Gained admin role without valid credentials"
+        evidence:
+          - "Response contains 'Welcome, Admin!'"
+        confidence_impact: +0.20
+    
+    confidence_indicators:
+      - indicator: "status_code_change"
+        value: true
+        confidence_modifier: +0.10
+      - indicator: "session_token_issued"
+        value: true
+        confidence_modifier: +0.20
+      - indicator: "redirect_to_protected_area"
+        value: true
+        confidence_modifier: +0.15
+      - indicator: "success_message_detected"
+        value: true
+        confidence_modifier: +0.15
+    
+    vulnerability_confirmed: true
+    confidence_score: 0.95
+    classification: "CONFIRMED VULNERABILITY"
+
+# Example: XSS Detection
+xss_example:
+  baseline_request:
+    request_id: "650e8400-e29b-41d4-a716-446655440000"
+    timestamp: "2026-02-02T11:00:00Z"
+    method: "GET"
+    url: "https://example.com/search"
+    query_params:
+      q: "legitimate search term"
+  
+  baseline_response:
+    response_id: "650e8400-e29b-41d4-a716-446655440001"
+    timestamp: "2026-02-02T11:00:00.089Z"
+    status_code: 200
+    body: "<html><body><h1>Search Results for: legitimate search term</h1></body></html>"
+    content_length: 2500
+    response_time_ms: 89
+  
+  attack_request:
+    request_id: "650e8400-e29b-41d4-a716-446655440002"
+    timestamp: "2026-02-02T11:00:05Z"
+    method: "GET"
+    url: "https://example.com/search"
+    query_params:
+      q: "<script>alert(1)</script>"
+    payload_id: "xss_basic_alert_1"
+    payload_value: "<script>alert(1)</script>"
+    injection_point: "q parameter"
+    test_case_id: "XSS-001"
+  
+  attack_response:
+    response_id: "650e8400-e29b-41d4-a716-446655440003"
+    timestamp: "2026-02-02T11:00:05.092Z"
+    status_code: 200
+    body: "<html><body><h1>Search Results for: <script>alert(1)</script></h1></body></html>"
+    content_length: 2520
+    response_time_ms: 92
+  
+  diff_analysis:
+    diff_id: "650e8400-e29b-41d4-a716-446655440004"
+    diff_hash: "x1y2z3a4b5c6..."
+    
+    status_code_changed: false
+    content_length_diff: 20
+    
+    payload_reflection:
+      reflected: true
+      encoding: "none"
+      context: "HTML body - inside <h1> tag"
+      executable: true
+      significance: "CRITICAL - Unencoded script tag in HTML"
+    
+    body_diff_summary:
+      key_differences:
+        - type: "payload_reflected_unencoded"
+          baseline: "legitimate search term"
+          attack: "<script>alert(1)</script>"
+          context: "Inside <h1> tag"
+          significance: "CRITICAL - XSS vulnerability"
+    
+    behavioral_changes:
+      - change_type: "xss_injection"
+        description: "Malicious script injected into page"
+        evidence:
+          - "Payload reflected without encoding"
+          - "Script tag in executable context"
+        confidence_impact: +0.45
+    
+    headless_browser_verification:
+      executed: true
+      alert_triggered: true
+      screenshot_path: "/evidence/xss-001-screenshot.png"
+      confidence_impact: +0.15
+    
+    vulnerability_confirmed: true
+    confidence_score: 0.90
+    classification: "CONFIRMED VULNERABILITY"
+
+# Example: False Positive (WAF Block)
+false_positive_example:
+  baseline_request:
+    request_id: "750e8400-e29b-41d4-a716-446655440000"
+    timestamp: "2026-02-02T12:00:00Z"
+    method: "GET"
+    url: "https://protected.com/search"
+    query_params:
+      q: "normal query"
+  
+  baseline_response:
+    response_id: "750e8400-e29b-41d4-a716-446655440001"
+    status_code: 200
+    body: "<html><body>Search results for: normal query</body></html>"
+  
+  attack_request:
+    request_id: "750e8400-e29b-41d4-a716-446655440002"
+    timestamp: "2026-02-02T12:00:05Z"
+    method: "GET"
+    url: "https://protected.com/search"
+    query_params:
+      q: "<script>alert(1)</script>"
+    payload_id: "xss_basic_alert_1"
+    test_case_id: "XSS-001"
+  
+  attack_response:
+    response_id: "750e8400-e29b-41d4-a716-446655440003"
+    status_code: 403
+    body: "<html><body><h1>Access Denied</h1><p>Your request has been blocked by our Web Application Firewall.</p></body></html>"
+  
+  diff_analysis:
+    diff_id: "750e8400-e29b-41d4-a716-446655440004"
+    diff_hash: "m9n8o7p6q5r4..."
+    
+    status_code_changed: true
+    status_code_diff:
+      baseline: 200
+      attack: 403
+      significance: "WAF block detected"
+    
+    waf_detected:
+      detected: true
+      indicators:
+        - "403 Forbidden"
+        - "Body contains 'Web Application Firewall'"
+        - "Generic block page"
+      confidence_impact: -0.25
+    
+    payload_reflection:
+      reflected: false
+      significance: "Payload blocked, not reflected"
+    
+    vulnerability_confirmed: false
+    confidence_score: 0.10
+    classification: "FALSE POSITIVE - WAF BLOCKED"
+
+# Diff Hash Calculation
+diff_hash_calculation:
+  algorithm: "SHA256"
+  inputs:
+    - "status_code"
+    - "content_length"
+    - "response_body (normalized)"
+    - "headers (sorted, normalized)"
+    - "cookies (sorted)"
+    - "redirect_chain"
+  
+  normalization_rules:
+    - "Remove timestamps"
+    - "Remove dynamic tokens (CSRF, nonces)"
+    - "Remove session IDs"
+    - "Normalize whitespace"
+    - "Sort arrays"
+  
+  usage:
+    identical_responses: "diff_hash_baseline == diff_hash_attack"
+    different_responses: "diff_hash_baseline != diff_hash_attack"
+    confidence_impact: "Identical = -0.30, Different = +0.10"
+
+# Response Storage Schema
+storage_schema:
+  database_table: "response_comparisons"
+  fields:
+    - id: "uuid PRIMARY KEY"
+    - test_run_id: "uuid FOREIGN KEY"
+    - test_case_id: "varchar(50)"
+    - payload_id: "varchar(50)"
+    - baseline_request: "jsonb"
+    - baseline_response: "jsonb"
+    - attack_request: "jsonb"
+    - attack_response: "jsonb"
+    - diff_analysis: "jsonb"
+    - diff_hash: "char(64)"
+    - vulnerability_confirmed: "boolean"
+    - confidence_score: "decimal(3,2)"
+    - created_at: "timestamp"
+    - verified_by: "varchar(100) NULL"
+    - verification_notes: "text NULL"
+  
+  indexes:
+    - "idx_test_run_id"
+    - "idx_test_case_id"
+    - "idx_diff_hash"
+    - "idx_confidence_score"
+    - "idx_vulnerability_confirmed"
+
+# Behavioral Change Detection
+behavioral_changes:
+  authentication:
+    indicators:
+      - "Status 401/403 → 200"
+      - "Session token issued"
+      - "Redirect to authenticated area"
+      - "Welcome message in response"
+      - "User data visible"
+    confidence_boost: 0.40
+  
+  authorization:
+    indicators:
+      - "Access to admin panel"
+      - "Privileged operation succeeds"
+      - "Role change in response"
+    confidence_boost: 0.35
+  
+  data_leakage:
+    indicators:
+      - "Database error with schema info"
+      - "User credentials in response"
+      - "Internal IP addresses"
+      - "Stack trace"
+      - "Version disclosure"
+    confidence_boost: 0.30
+  
+  code_execution:
+    indicators:
+      - "Command output in response"
+      - "File contents retrieved"
+      - "External callback received"
+    confidence_boost: 0.50
+  
+  denial_of_service:
+    indicators:
+      - "Response time > 10x baseline"
+      - "Server timeout"
+      - "Resource exhaustion"
+    confidence_boost: 0.25
+
+# Proof of Concept Generation
+poc_generation:
+  required_evidence:
+    - baseline_request_curl: "curl command for baseline"
+    - attack_request_curl: "curl command with payload"
+    - baseline_response_snippet: "First 500 chars"
+    - attack_response_snippet: "First 500 chars"
+    - diff_summary: "Key differences"
+    - screenshot: "Optional - for XSS/visual proof"
+    - video: "Optional - for complex flows"
+  
+  poc_template: |
+    # Vulnerability: [TYPE]
+    ## Test Case: [ID]
+    
+    ### Baseline Request
+    ```bash
+    curl -X POST 'https://example.com/login' \
+      -H 'Content-Type: application/x-www-form-urlencoded' \
+      -d 'username=testuser&password=testpass'
+    ```
+    
+    **Baseline Response:**
+    - Status: 401 Unauthorized
+    - Body: "Login Failed - Invalid credentials"
+    
+    ### Attack Request
+    ```bash
+    curl -X POST 'https://example.com/login' \
+      -H 'Content-Type: application/x-www-form-urlencoded' \
+      -d 'username=admin%27+OR+%271%27%3D%271%27--&password=anything'
+    ```
+    
+    **Attack Response:**
+    - Status: 200 OK
+    - Set-Cookie: session=abc123def456
+    - Body: "Welcome, Admin!"
+    
+    ### Behavior Change
+    - Unauthenticated → Authenticated (Session token issued)
+    - 401 → 200 (Access granted)
+    - Error message → Success message
+    
+    **Confidence:** 0.95 (CONFIRMED)
+    **Impact:** Authentication bypass, full access as admin
+  
+  curl_generation:
+    include_headers: true
+    include_cookies: true
+    include_body: true
+    url_encode: true
+    format: "readable"
+
+# Time-Series Analysis
+time_series_storage:
+  purpose: "Track vulnerability over multiple scans"
+  schema:
+    - scan_id: "uuid"
+    - test_case_id: "varchar(50)"
+    - timestamp: "timestamp"
+    - vulnerability_status: "confirmed | not_vulnerable | inconclusive"
+    - confidence_score: "decimal(3,2)"
+    - diff_hash: "char(64)"
+  
+  analysis:
+    regression_detection: "Was not vulnerable, now vulnerable"
+    fix_verification: "Was vulnerable, now not vulnerable"
+    consistency_check: "Vulnerable across 3+ scans = HIGH confidence"
+
+references:
+  - "OWASP: Proof of Concept Development"
+  - "Burp Suite: Response Diffing Techniques"
+  - "Git Diff Algorithms for HTTP Responses"

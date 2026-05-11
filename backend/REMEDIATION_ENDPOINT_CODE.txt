@@ -1,0 +1,81 @@
+"""  
+REMEDIATION ENDPOINT - Add this to vulnerabilities.py
+
+Place this code after the create_poc endpoint and before @router.get("/stats/by-severity")
+"""
+
+import logging
+
+# --- ADD TO IMPORTS AT TOP ---
+# logger = logging.getLogger(__name__)
+
+@router.post("/{vuln_id}/generate-remediation")
+async def generate_remediation(
+    vuln_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate instant LLM-based remediation solution for vulnerability
+    
+    This endpoint generates comprehensive, actionable remediation guidance
+    including code examples for immediate patching.
+    """
+    try:
+        # Get vulnerability
+        vuln = db.query(Vulnerability).filter(Vulnerability.id == vuln_id).first()
+        if not vuln:
+            raise HTTPException(status_code=404, detail="Vulnerability not found")
+        
+        # Import RemediationAgent
+        from app.agents.remediation_agent import RemediationAgent
+        
+        logger.info(f"Generating remediation for vulnerability {vuln_id} ({vuln.vulnerability_type})")
+        
+        # Initialize and run remediation agent
+        agent = RemediationAgent(f"remediation_agent_{vuln_id}")
+        await agent.initialize()
+        
+        # Serialize vulnerability data
+        vuln_data = {
+            'id': vuln.id,
+            'type': vuln.vulnerability_type,
+            'title': vuln.title,
+            'description': vuln.description,
+            'severity': vuln.severity.value if hasattr(vuln.severity, 'value') else str(vuln.severity),
+            'owasp_category': vuln.owasp_category,
+            'cwe_id': vuln.cwe_id,
+            'endpoint': vuln.endpoint.url if vuln.endpoint else '',
+            'method': vuln.endpoint.method if vuln.endpoint else '',
+            'evidence': vuln.response_evidence or '',
+            'affected_parameter': vuln.affected_parameter or '',
+        }
+        
+        # Generate remediation with agent
+        result = await agent.run(
+            scan_id=str(vuln.scan_id),
+            vulnerability_id=vuln_id,
+            vulnerability_data=vuln_data
+        )
+        
+        if result.get('status') == 'success':
+            return {
+                "message": "Remediation generated successfully",
+                "vulnerability_id": vuln_id,
+                "vulnerability_type": result.get('vulnerability_type'),
+                "severity": result.get('severity'),
+                "technology": result.get('technology'),
+                "remediation_solution": result.get('remediation'),
+                "generated_at": result.get('generated_at')
+            }
+        else:
+            logger.error(f"Remediation generation failed: {result.get('message')}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Remediation generation failed: {result.get('message', 'Unknown error')}"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to generate remediation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to generate remediation: {str(e)}")

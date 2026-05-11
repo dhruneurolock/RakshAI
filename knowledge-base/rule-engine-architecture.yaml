@@ -1,0 +1,651 @@
+# RakshAI Rule Engine Architecture
+# Enterprise-Grade, Deterministic, Explainable Attack Planning System
+
+document_type: "architecture_specification"
+version: "1.0"
+date: "2026-02-02"
+engine_type: "rule_based_decision_engine"
+description: "NOT ML - Pure YAML-driven rule-based attack planning"
+
+# ===== ARCHITECTURE OVERVIEW =====
+
+architecture_overview:
+  high_level_design:
+    description: "Orchestrated components processing discovery input into safe attack plans"
+    data_flow:
+      - step: 1
+        component: "Discovery Agent"
+        output: "endpoint, method, params, auth, content_type, role"
+      
+      - step: 2
+        component: "Rule Engine Orchestrator"
+        subcomponents:
+          - "Context Normalizer"
+          - "OWASP Mapper"
+          - "Test Case Evaluator"
+          - "Payload Binder"
+          - "Safety Enforcer"
+          - "Validator Selector"
+          - "Attack Plan Generator"
+          - "Explainability Logger"
+      
+      - step: 3
+        component: "Attack Plan Output"
+        output: "test_case, payloads, validators, safety_level, explanation"
+  
+  core_principles:
+    deterministic: "Same input always produces same output"
+    rule_based: "No ML, only YAML-defined logic"
+    explainable: "Every decision logged with reasoning"
+    safe: "Production-ready safety enforcement"
+    testable: "Every component unit-testable"
+    async_ready: "Designed for async/await from day 1"
+
+# ===== SYSTEM COMPONENTS =====
+
+system_components:
+  context_normalizer:
+    purpose: "Transform Discovery Agent output into standardized internal format"
+    
+    input_example:
+      endpoint: "/api/orders/{id}"
+      method: "GET"
+      params: ["id"]
+      auth_required: true
+      content_type: "application/json"
+      role: "user"
+    
+    output_example:
+      endpoint: "/api/orders/{id}"
+      method: "GET"
+      parameters: ["id"]
+      parameter_types:
+        id: "path"
+      authentication_required: true
+      content_type: "application/json"
+      user_role: "user"
+      has_dynamic_params: true
+      is_api_endpoint: true
+      framework_hints: ["REST"]
+    
+    responsibilities:
+      - "Parse endpoint patterns"
+      - "Identify parameter types (path, query, body, header)"
+      - "Detect authentication mechanisms"
+      - "Extract framework hints"
+      - "Classify endpoint type (API, form, file upload, etc.)"
+
+  owasp_mapper:
+    purpose: "Map normalized context to OWASP Top 10:2025 categories"
+    
+    mapping_rules:
+      - condition: "Path parameters + Authentication"
+        owasp_category: "A01"
+        reason: "Dynamic path parameter with auth → IDOR risk"
+      
+      - condition: "Input parameters exist"
+        owasp_category: "A05"
+        reason: "User-controlled input → Injection risk"
+      
+      - condition: "Authentication endpoint (login/auth in path)"
+        owasp_category: "A07"
+        reason: "Authentication endpoint → Auth bypass risk"
+      
+      - condition: "Admin endpoint"
+        owasp_category: "A01"
+        reason: "Admin endpoint → Authorization bypass risk"
+      
+      - condition: "File upload endpoint"
+        owasp_category: "A08"
+        reason: "File upload → Integrity/malware risk"
+      
+      - condition: "State-changing methods (POST/PUT/DELETE)"
+        owasp_category: "A08"
+        reason: "State-changing operation → Data integrity risk"
+    
+    output_example:
+      - ["A01", "Dynamic path parameter with auth → IDOR risk"]
+      - ["A05", "User-controlled input → Injection risk"]
+
+  test_case_evaluator:
+    purpose: "Select applicable test cases from YAML based on context + OWASP mapping"
+    
+    scoring_rules:
+      - rule: "OWASP category match"
+        points: 10
+        description: "Test case OWASP category in applicable categories"
+      
+      - rule: "HTTP method match"
+        points: 5
+        description: "Context HTTP method in test case methods"
+      
+      - rule: "Parameter type match"
+        points: 5
+        description: "Dynamic parameters present when required"
+      
+      - rule: "Authentication match"
+        points: 3
+        description: "Auth requirement matches context"
+      
+      - rule: "Endpoint pattern match"
+        points: 7
+        description: "Endpoint matches test case patterns"
+      
+      - rule: "Content type match"
+        points: 2
+        description: "Content-Type matches test case requirement"
+    
+    threshold: 10
+    description: "Only include test cases with score >= 10"
+    
+    output_example:
+      - test_case_id: "IDOR-001"
+        score: 30
+        reasons:
+          - "OWASP A01 match"
+          - "HTTP GET match"
+          - "Dynamic parameters present"
+          - "Auth requirement matches"
+          - "Endpoint pattern matches"
+      
+      - test_case_id: "SQLI-002"
+        score: 18
+        reasons:
+          - "OWASP A05 match"
+          - "HTTP GET match"
+          - "Dynamic parameters present"
+
+  payload_binder:
+    purpose: "Select safe, relevant payloads from test-payload-binding.yaml"
+    
+    selection_logic:
+      step_1:
+        action: "Load test-payload-binding.yaml"
+        check: "test_case_id exists in bindings"
+      
+      step_2:
+        action: "Environment compatibility check"
+        check: "environment in binding.environment"
+      
+      step_3:
+        action: "Get allowed payload IDs"
+        source: "binding.allowed_payloads"
+      
+      step_4:
+        action: "Load payload safety metadata"
+        source: "metadata/payload-safety.yaml"
+      
+      step_5:
+        action: "Safety filtering"
+        rules:
+          - "Skip if destructive == true"
+          - "Skip if environment not in payload.environment"
+          - "Skip if prod and safety not in [safe, low_risk]"
+          - "Skip if prod and risk_level > 1"
+          - "Skip if staging and risk_level > 3"
+      
+      step_6:
+        action: "Apply max_payloads limit"
+        strategy: "Prefer safe payloads, then by historical success rate"
+    
+    output_example:
+      payloads:
+        - id: "idor_increment"
+          value: "{original_id + 1}"
+          safety: "safe"
+          risk_level: 0
+        - id: "idor_decrement"
+          value: "{original_id - 1}"
+          safety: "safe"
+          risk_level: 0
+      execution_order: "sequential"
+      stop_on_success: true
+      reason: "Selected 2 safe payloads"
+
+  safety_enforcer:
+    purpose: "Final safety check before attack plan generation"
+    
+    production_rules:
+      payload_safety_level:
+        condition: "payload.safety in [safe, low_risk]"
+        violation: "Payload {id} safety level {safety} not allowed in prod"
+      
+      risk_level_cap:
+        condition: "payload.risk_level <= 1"
+        violation: "Payload {id} risk level {risk_level} > 1"
+      
+      destructive_payloads:
+        condition: "payload.destructive == false"
+        violation: "Destructive payload {id} blocked"
+      
+      time_based_payloads:
+        condition: "SLEEP/WAITFOR not in payload.value"
+        violation: "Time-based payload {id} blocked (performance impact)"
+      
+      external_callbacks:
+        condition: "payload.external_callback == false"
+        violation: "External callback payload {id} blocked (data exfiltration)"
+      
+      max_requests:
+        condition: "len(payloads) <= 10"
+        violation: "Too many requests: {count} > 10"
+      
+      state_changing_methods:
+        condition: "method not in [DELETE, PUT] or requires_approval"
+        violation: "DELETE/PUT methods require manual approval"
+    
+    staging_rules:
+      destructive_payloads:
+        condition: "payload.destructive == false"
+        violation: "Destructive payload {id} blocked"
+      
+      risk_level_cap:
+        condition: "payload.risk_level <= 3"
+        violation: "Payload {id} risk level {risk_level} > 3"
+      
+      max_requests:
+        condition: "len(payloads) <= 50"
+        violation: "Too many requests: {count} > 50"
+    
+    dev_rules:
+      max_requests:
+        condition: "len(payloads) <= 100"
+        violation: "Too many requests: {count} > 100"
+
+  validator_selector:
+    purpose: "Select appropriate validators based on test case and payload type"
+    
+    selection_rules:
+      rule_1:
+        source: "test_case.default_validators"
+        action: "Include default validators"
+      
+      rule_2:
+        condition: "payload.type"
+        mappings:
+          sql_injection: ["sql_errors", "status-codes", "response-diff"]
+          xss: ["xss_reflections", "status-codes"]
+          idor: ["status-codes", "response-diff", "data-leak"]
+          nosql_injection: ["error-patterns", "status-codes"]
+          xxe: ["error-patterns", "data-leak"]
+          ssrf: ["status-codes", "data-leak", "error-patterns"]
+      
+      rule_3:
+        condition: "context.authentication_required"
+        validators: ["auth_indicators"]
+      
+      rule_4:
+        condition: "context.is_api_endpoint"
+        validators: ["error-patterns"]
+      
+      rule_5:
+        always_include: ["response-comparison"]
+        reason: "Baseline comparison for all tests"
+    
+    deduplication: true
+
+  attack_plan_generator:
+    purpose: "Combine all components into final attack plan"
+    
+    execution_flow:
+      - step: 1
+        action: "Normalize context"
+        component: "ContextNormalizer"
+      
+      - step: 2
+        action: "Map to OWASP"
+        component: "OWASPMapper"
+      
+      - step: 3
+        action: "Evaluate test cases"
+        component: "TestCaseEvaluator"
+        decision: "Skip if no applicable tests"
+      
+      - step: 4
+        action: "Select top test case"
+        strategy: "Highest score"
+      
+      - step: 5
+        action: "Bind payloads"
+        component: "PayloadBinder"
+        decision: "Skip if no safe payloads"
+      
+      - step: 6
+        action: "Select validators"
+        component: "ValidatorSelector"
+      
+      - step: 7
+        action: "Build attack plan"
+        fields:
+          - "endpoint"
+          - "method"
+          - "test_case_id"
+          - "test_case_name"
+          - "owasp_category"
+          - "payloads"
+          - "validators"
+          - "execution_order"
+          - "stop_on_success"
+          - "max_requests"
+          - "safety_level"
+          - "risk_level"
+      
+      - step: 8
+        action: "Safety enforcement"
+        component: "SafetyEnforcer"
+        decision: "Block if violations detected"
+      
+      - step: 9
+        action: "Attach explanation"
+        component: "ExplanationLog"
+        status: "READY"
+
+# ===== FOLDER STRUCTURE =====
+
+folder_structure:
+  neuropen_web:
+    rule_engine:
+      - "__init__.py"
+      - "orchestrator.py - Main RuleEngine class"
+      
+      components:
+        - "context_normalizer.py"
+        - "owasp_mapper.py"
+        - "test_case_evaluator.py"
+        - "payload_binder.py"
+        - "safety_enforcer.py"
+        - "validator_selector.py"
+        - "attack_plan_generator.py"
+      
+      loaders:
+        - "yaml_loader.py"
+        - "test_case_loader.py"
+        - "payload_loader.py"
+        - "validator_loader.py"
+        - "metadata_loader.py"
+      
+      models:
+        - "context.py - NormalizedContext dataclass"
+        - "test_case.py - TestCase dataclass"
+        - "payload.py - Payload dataclass"
+        - "validator.py - Validator dataclass"
+        - "attack_plan.py - AttackPlan dataclass"
+      
+      rules:
+        - "owasp_rules.py - OWASP mapping rules"
+        - "test_case_rules.py - Test case selection rules"
+        - "payload_rules.py - Payload selection rules"
+        - "safety_rules.py - Safety enforcement rules"
+        - "validator_rules.py - Validator selection rules"
+      
+      utils:
+        - "explainability.py - ExplanationLog class"
+        - "pattern_matcher.py - Endpoint pattern matching"
+        - "scoring.py - Test case scoring logic"
+      
+      config:
+        - "settings.py - Environment configs"
+    
+    knowledge_base:
+      description: "READ-ONLY YAML files"
+      folders:
+        - "test-cases/"
+        - "payloads/"
+        - "validators/"
+        - "metadata/"
+
+# ===== ATTACK PLAN EXAMPLES =====
+
+attack_plan_examples:
+  idor_attack_plan:
+    status: "READY"
+    endpoint: "/api/orders/123"
+    method: "GET"
+    test_case_id: "IDOR-001"
+    test_case_name: "Insecure Direct Object Reference"
+    owasp_category: "A01"
+    cwe: "CWE-639"
+    severity: "HIGH"
+    
+    payloads:
+      - id: "idor_increment"
+        value: "124"
+        safety: "safe"
+        risk_level: 0
+        description: "Increment ID by 1"
+      
+      - id: "idor_decrement"
+        value: "122"
+        safety: "safe"
+        risk_level: 0
+        description: "Decrement ID by 1"
+    
+    validators:
+      - "status-codes"
+      - "response-diff"
+      - "data-leak"
+      - "auth_indicators"
+      - "response-comparison"
+    
+    execution_order: "sequential"
+    stop_on_success: true
+    max_requests: 2
+    safety_level: "safe"
+    risk_level: 0
+    
+    explanation:
+      steps:
+        - step: "Context normalized"
+          data:
+            endpoint: "/api/orders/123"
+            method: "GET"
+            has_dynamic_params: true
+            auth_required: true
+        
+        - step: "OWASP categories mapped"
+          data:
+            - ["A01", "Dynamic path parameter with auth → IDOR risk"]
+            - ["A05", "User-controlled input → Injection risk"]
+        
+        - step: "Test case selected"
+          data:
+            id: "IDOR-001"
+            score: 30
+            reasons:
+              - "OWASP A01 match"
+              - "HTTP GET match"
+              - "Dynamic parameters present"
+              - "Auth requirement matches"
+              - "Endpoint pattern matches"
+        
+        - step: "Safety check"
+          data:
+            safe: true
+            violations: []
+
+  sql_injection_attack_plan:
+    status: "READY"
+    endpoint: "/api/search"
+    method: "GET"
+    test_case_id: "SQLI-001"
+    test_case_name: "SQL Injection - Error Based"
+    owasp_category: "A05"
+    cwe: "CWE-89"
+    severity: "CRITICAL"
+    
+    payloads:
+      - id: "sqli_basic_quote"
+        value: "'"
+        safety: "safe"
+        risk_level: 0
+        description: "Single quote to trigger SQL error"
+      
+      - id: "sqli_boolean_true"
+        value: "' OR '1'='1"
+        safety: "safe"
+        risk_level: 0
+        description: "Boolean-based detection"
+      
+      - id: "sqli_union_null"
+        value: "' UNION SELECT NULL--"
+        safety: "low_risk"
+        risk_level: 1
+        description: "UNION-based column detection"
+    
+    validators:
+      - "sql_errors"
+      - "status-codes"
+      - "response-diff"
+      - "error-patterns"
+      - "response-comparison"
+    
+    execution_order: "sequential"
+    stop_on_success: true
+    max_requests: 3
+    safety_level: "low_risk"
+    risk_level: 1
+
+  blocked_attack_plan:
+    status: "BLOCKED"
+    endpoint: "/api/admin/users"
+    method: "DELETE"
+    environment: "prod"
+    reason: "Safety violations detected"
+    
+    violations:
+      - "Payload authz_delete_other_user risk level 3 > 1 (prod max)"
+      - "DELETE method on production environment requires manual approval"
+    
+    recommendation: "Run this test in staging environment or request manual approval"
+    
+    explanation:
+      steps:
+        - step: "Context normalized"
+          data:
+            endpoint: "/api/admin/users"
+            method: "DELETE"
+            environment: "prod"
+        
+        - step: "Safety check"
+          data:
+            safe: false
+            violations:
+              - "Payload authz_delete_other_user risk level 3 > 1"
+              - "DELETE method requires approval"
+            action: "BLOCK"
+
+# ===== EXPLAINABILITY =====
+
+explainability:
+  explanation_log_structure:
+    execution_timestamp: "ISO 8601 timestamp"
+    total_steps: "Number of execution steps"
+    
+    steps:
+      - step: "Step name (e.g., 'Context normalized')"
+        timestamp: "ISO 8601 timestamp"
+        data: "Step-specific data object"
+  
+  human_readable_format:
+    header: "Rule Engine Execution at {timestamp}"
+    separator: "============================================================"
+    
+    step_format: |
+      Step {number}: {step_name}
+        Timestamp: {timestamp}
+        Data: {json_data}
+
+# ===== PRODUCTION SAFETY GUARANTEES =====
+
+production_safety:
+  guarantees:
+    - "No destructive payloads in prod"
+    - "Max risk_level = 1 in prod"
+    - "Max 10 requests per endpoint in prod"
+    - "No time-based delays in prod"
+    - "No external callbacks in prod"
+    - "State-changing methods require approval"
+    - "All decisions logged and auditable"
+  
+  environment_limits:
+    prod:
+      max_risk_level: 1
+      max_requests: 10
+      allowed_safety_levels: ["safe", "low_risk"]
+      allow_destructive: false
+      allow_time_based: false
+      allow_external_callbacks: false
+    
+    staging:
+      max_risk_level: 3
+      max_requests: 50
+      allow_destructive: false
+    
+    dev:
+      max_risk_level: 4
+      max_requests: 100
+      allow_destructive: true
+
+# ===== IMPLEMENTATION CHECKLIST =====
+
+implementation_steps:
+  - id: 1
+    task: "Implement ContextNormalizer with pattern matching"
+    priority: "high"
+  
+  - id: 2
+    task: "Implement OWASPMapper with rule engine"
+    priority: "high"
+  
+  - id: 3
+    task: "Implement TestCaseEvaluator with scoring logic"
+    priority: "high"
+  
+  - id: 4
+    task: "Implement PayloadBinder with safety filtering"
+    priority: "high"
+  
+  - id: 5
+    task: "Implement SafetyEnforcer with environment rules"
+    priority: "critical"
+  
+  - id: 6
+    task: "Implement ValidatorSelector with test-based selection"
+    priority: "medium"
+  
+  - id: 7
+    task: "Implement AttackPlanGenerator orchestration"
+    priority: "high"
+  
+  - id: 8
+    task: "Add comprehensive unit tests for each component"
+    priority: "high"
+  
+  - id: 9
+    task: "Add integration tests for complete flows"
+    priority: "medium"
+  
+  - id: 10
+    task: "Add performance benchmarks"
+    priority: "low"
+
+# ===== SUMMARY =====
+
+summary:
+  architecture_type: "Rule-Based Decision Engine"
+  no_ml: true
+  deterministic: true
+  explainable: true
+  production_safe: true
+  
+  key_features:
+    - "100% transparent decisions"
+    - "YAML-driven rules"
+    - "Environment-aware safety"
+    - "Complete audit trail"
+    - "Unit testable components"
+    - "Async-capable design"
+  
+  component_count: 7
+  safety_rules: "Environment-specific"
+  knowledge_base: "READ-ONLY YAML files"
