@@ -35,15 +35,15 @@ async def run_test_scan():
     
     scan_id = str(uuid.uuid4())
     
-    print("╔" + "═"*62 + "╗")
-    print("║     RakshAI Agentic Pipeline — Live Scan Test              ║")
-    print("╚" + "═"*62 + "╝")
-    print(f"\n🎯 Target:  {TARGET_URL}")
-    print(f"🔑 Scan ID: {scan_id}")
-    print(f"{'─'*64}")
+    print("+" + "-"*62 + "+")
+    print("|     RakshAI Agentic Pipeline — Live Scan Test              |")
+    print("+" + "-"*62 + "+")
+    print(f"\n[Target] Target:  {TARGET_URL}")
+    print(f"[Key] Scan ID: {scan_id}")
+    print(f"{'-'*64}")
     
-    # ── Step 1: Create scan record in database ──
-    print("\n📋 STEP 1: Creating scan record in database...")
+    # -- Step 1: Create scan record in database --
+    print("\n[Step] STEP 1: Creating scan record in database...")
     try:
         from app.core.database import SessionLocal
         from app.models.models import Scan, ScanStatus
@@ -59,13 +59,13 @@ async def run_test_scan():
         db.commit()
         db_scan_id = scan.id  # Get the auto-generated DB primary key
         db.close()
-        print(f"   ✅ Scan record created (DB ID: {db_scan_id})")
+        print(f"   [OK] Scan record created (DB ID: {db_scan_id})")
     except Exception as e:
         print(f"   ❌ Failed to create scan: {e}")
         return
     
-    # ── Step 2: Test PostgreSQL attack graph creation ──
-    print("\n🕸️  STEP 2: Creating attack graph in PostgreSQL...")
+    # -- Step 2: Test PostgreSQL attack graph creation --
+    print("\n[Graph]️  STEP 2: Creating attack graph in PostgreSQL...")
     try:
         from app.core.graph_db import get_graph_db
         graph = await get_graph_db()
@@ -76,18 +76,18 @@ async def run_test_scan():
                 "status": "INITIALIZING",
                 "scan_type": "full"
             })
-            print(f"   ✅ Scan node created in PostgreSQL")
+            print(f"   [OK] Scan node created in PostgreSQL")
             
             # Verify it was created
             stats = await graph.get_scan_statistics(scan_id)
-            print(f"   ✅ Graph stats: {stats}")
+            print(f"   [OK] Graph stats: {stats}")
         else:
             print(f"   ⚠️  PostgreSQL not connected, skipping graph")
     except Exception as e:
         print(f"   ❌ PostgreSQL error: {e}")
     
-    # ── Step 3: Test LLM strategy generation ──
-    print("\n🧠 STEP 3: Asking LLM to generate attack strategy...")
+    # -- Step 3: Test LLM strategy generation --
+    print("\n[LLM] STEP 3: Asking LLM to generate attack strategy...")
     try:
         import requests
         
@@ -120,15 +120,15 @@ Return JSON with:
         
         if resp.status_code == 200:
             llm_response = resp.json().get("response", "")
-            print(f"   ✅ LLM responded in {elapsed:.1f}s")
-            print(f"   📝 Strategy preview: {llm_response[:200]}...")
+            print(f"   [OK] LLM responded in {elapsed:.1f}s")
+            print(f"   [Memo] Strategy preview: {llm_response[:200]}...")
         else:
             print(f"   ❌ LLM returned HTTP {resp.status_code}")
     except Exception as e:
         print(f"   ❌ LLM error: {e}")
     
-    # ── Step 4: Test CoordinatorAgent initialization ──
-    print("\n🤖 STEP 4: Initializing CoordinatorAgent...")
+    # -- Step 4: Test CoordinatorAgent initialization --
+    print("\n[Agent] STEP 4: Initializing CoordinatorAgent...")
     try:
         from app.agents.coordinator import CoordinatorAgent
         
@@ -139,18 +139,18 @@ Return JSON with:
         llm_ok = coordinator.llm_service is not None
         redis_ok = coordinator.redis_client is not None
         
-        print(f"   {'✅' if postgresql_ok else '❌'} PostgreSQL: {'Connected' if postgresql_ok else 'NOT Connected'}")
-        print(f"   {'✅' if llm_ok else '❌'} LLM:   {'Loaded' if llm_ok else 'NOT Loaded'}")
-        print(f"   {'✅' if redis_ok else '⚠️ '} Redis: {'Connected' if redis_ok else 'Not available'}")
+        print(f"   {'[OK]' if postgresql_ok else '❌'} PostgreSQL: {'Connected' if postgresql_ok else 'NOT Connected'}")
+        print(f"   {'[OK]' if llm_ok else '❌'} LLM:   {'Loaded' if llm_ok else 'NOT Loaded'}")
+        print(f"   {'[OK]' if redis_ok else '⚠️ '} Redis: {'Connected' if redis_ok else 'Not available'}")
         
         await coordinator.cleanup()
     except Exception as e:
         print(f"   ❌ Coordinator error: {e}")
     
-    # ── Step 5: Run the Orchestrator pipeline ──
-    print("\n🚀 STEP 5: Launching full OrchestratorService pipeline...")
+    # -- Step 5: Run the Orchestrator pipeline --
+    print("\n[Launch] STEP 5: Launching full OrchestratorService pipeline...")
     print(f"   (This will run the actual scan against {TARGET_URL})")
-    print(f"   ⏳ Please wait — this may take 2-5 minutes...\n")
+    print(f"   [Wait] Please wait — this may take 2-5 minutes...\n")
     
     try:
         from app.services.orchestrator import OrchestratorService
@@ -164,12 +164,12 @@ Return JSON with:
             policy=None
         )
         
-        print(f"\n   📊 Orchestrator result: {result}")
+        print(f"\n   [Result] Orchestrator result: {result}")
         
         if result.get("success"):
-            print(f"   ✅ Scan launched successfully!")
-            print(f"   ℹ️  The scan is running in a background thread.")
-            print(f"   ⏳ Waiting 60 seconds for initial results...\n")
+            print(f"   [OK] Scan launched successfully!")
+            print(f"   [Info]️  The scan is running in a background thread.")
+            print(f"   [Wait] Waiting 60 seconds for initial results...\n")
             
             # Wait and check for results
             await asyncio.sleep(60)
@@ -180,9 +180,9 @@ Return JSON with:
                 from app.models.models import Vulnerability
                 scan = db.query(Scan).filter(Scan.scan_id == scan_id).first()
                 if scan:
-                    print(f"   📋 Scan Status: {scan.status}")
+                    print(f"   [Step] Scan Status: {scan.status}")
                     vulns = db.query(Vulnerability).filter(Vulnerability.scan_id == scan.id).all()
-                    print(f"   🔍 Vulnerabilities found: {len(vulns)}")
+                    print(f"   [Search] Vulnerabilities found: {len(vulns)}")
                     for v in vulns[:10]:
                         print(f"      • [{v.severity.value if hasattr(v.severity, 'value') else v.severity}] {v.title}")
             finally:
@@ -192,7 +192,7 @@ Return JSON with:
             graph = await get_graph_db()
             if graph.is_connected:
                 stats = await graph.get_scan_statistics(scan_id)
-                print(f"   🕸️  PostgreSQL Graph: {stats}")
+                print(f"   [Graph]️  PostgreSQL Graph: {stats}")
         else:
             print(f"   ❌ Scan failed: {result.get('error')} - {result.get('message')}")
         
@@ -201,9 +201,9 @@ Return JSON with:
         import traceback
         traceback.print_exc()
     
-    print(f"\n{'═'*64}")
+    print(f"\n{'-'*64}")
     print("SCAN TEST COMPLETE")
-    print(f"{'═'*64}\n")
+    print(f"{'-'*64}\n")
 
 
 if __name__ == "__main__":
