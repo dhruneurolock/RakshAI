@@ -11,7 +11,7 @@
 - ✅ Python 3.10+ (already installed)
 - ⬜ PostgreSQL 14+
 - ⬜ Redis 7+
-- ⬜ Neo4j 5+
+- ⬜ PostgreSQL 5+
 - ⬜ Node.js 18+
 - ⬜ Ollama (LLM runtime)
 
@@ -81,30 +81,30 @@ redis-cli ping
 
 ---
 
-### Step 3: Install Neo4j (Windows)
+### Step 3: Install PostgreSQL (Windows)
 
 **Download & Install:**
 ```powershell
-# Download from: https://neo4j.com/download/
+# Download from: https://postgresql.com/download/
 # Or use Windows installer
 
-# 1. Install Java 17+ (required for Neo4j)
+# 1. Install Java 17+ (required for PostgreSQL)
 winget install Oracle.JDK.17
 
-# 2. Download Neo4j Community Edition
-# Extract to: C:\neo4j
+# 2. Download PostgreSQL Community Edition
+# Extract to: C:\postgresql
 
 # 3. Set initial password
-C:\neo4j\bin\neo4j-admin.bat set-initial-password neuropent_graph_pass
+C:\postgresql\bin\postgresql-admin.bat set-initial-password neuropent_graph_pass
 
-# 4. Start Neo4j
-C:\neo4j\bin\neo4j.bat start
+# 4. Start PostgreSQL
+C:\postgresql\bin\postgresql.bat start
 ```
 
 **Verify:**
 ```powershell
 # Open browser: http://localhost:7474
-# Login: neo4j / neuropent_graph_pass
+# Login: postgresql / neuropent_graph_pass
 ```
 
 ---
@@ -224,10 +224,10 @@ DATABASE_URL=postgresql://rakshaiuser:rakshaidb_secure_pass@localhost:5432/raksh
 # Redis
 REDIS_URL=redis://localhost:6379/0
 
-# Neo4j
-NEO4J_URI=bolt://localhost:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=neuropent_graph_pass
+# PostgreSQL
+POSTGRESQL_URI=bolt://localhost:7687
+POSTGRESQL_USER=postgresql
+POSTGRESQL_PASSWORD=neuropent_graph_pass
 
 # Ollama
 OLLAMA_BASE_URL=http://localhost:11434
@@ -371,13 +371,13 @@ try {
     Write-Host "  ✗ Redis: Not running" -ForegroundColor Red
 }
 
-# Neo4j
-Write-Host "Checking Neo4j..." -ForegroundColor White
+# PostgreSQL
+Write-Host "Checking PostgreSQL..." -ForegroundColor White
 try {
-    $neo4jResult = Invoke-WebRequest -Uri "http://localhost:7474" -UseBasicParsing -TimeoutSec 2 2>$null
-    Write-Host "  ✓ Neo4j: Running on port 7474" -ForegroundColor Green
+    $postgresqlResult = Invoke-WebRequest -Uri "http://localhost:7474" -UseBasicParsing -TimeoutSec 2 2>$null
+    Write-Host "  ✓ PostgreSQL: Running on port 7474" -ForegroundColor Green
 } catch {
-    Write-Host "  ✗ Neo4j: Not running" -ForegroundColor Red
+    Write-Host "  ✗ PostgreSQL: Not running" -ForegroundColor Red
 }
 
 # Ollama
@@ -422,7 +422,7 @@ Write-Host "`n========================================`n" -ForegroundColor Cyan
 ### Core Services
 - [ ] PostgreSQL installed and running (port 5432)
 - [ ] Redis installed and running (port 6379)
-- [ ] Neo4j installed and running (ports 7474, 7687)
+- [ ] PostgreSQL installed and running (ports 7474, 7687)
 - [ ] Node.js installed (v18+)
 - [ ] Ollama installed and running (port 11434)
 
@@ -465,9 +465,9 @@ Start-Service postgresql-x64-14
 Write-Host "Starting Redis..." -ForegroundColor White
 Start-Service Memurai
 
-# Start Neo4j
-Write-Host "Starting Neo4j..." -ForegroundColor White
-& "C:\neo4j\bin\neo4j.bat" start
+# Start PostgreSQL
+Write-Host "Starting PostgreSQL..." -ForegroundColor White
+& "C:\postgresql\bin\postgresql.bat" start
 
 # Start Ollama (should auto-start)
 Write-Host "Checking Ollama..." -ForegroundColor White
@@ -498,7 +498,7 @@ Write-Host "========================================" -ForegroundColor Green
 Write-Host "`nAccess Points:" -ForegroundColor Cyan
 Write-Host "  Frontend:  http://localhost:5173" -ForegroundColor White
 Write-Host "  Backend:   http://localhost:8000/docs" -ForegroundColor White
-Write-Host "  Neo4j:     http://localhost:7474" -ForegroundColor White
+Write-Host "  PostgreSQL:     http://localhost:7474" -ForegroundColor White
 Write-Host "`n" -ForegroundColor White
 ```
 
@@ -527,15 +527,15 @@ Set-Service -Name Memurai -StartupType Automatic
 Start-Service Memurai
 ```
 
-### Run Neo4j as Windows Service
+### Run PostgreSQL as Windows Service
 
 ```powershell
 # Install as service
-C:\neo4j\bin\neo4j.bat install-service
+C:\postgresql\bin\postgresql.bat install-service
 
 # Set to start automatically
-Set-Service -Name neo4j -StartupType Automatic
-Start-Service neo4j
+Set-Service -Name postgresql -StartupType Automatic
+Start-Service postgresql
 ```
 
 ---
@@ -568,7 +568,7 @@ Start-Service neo4j
 # Stop database services (optional)
 Stop-Service postgresql-x64-14
 Stop-Service Memurai
-Stop-Service neo4j
+Stop-Service postgresql
 ```
 
 ---
@@ -579,7 +579,7 @@ Stop-Service neo4j
 |---------|-----|-----|------|
 | PostgreSQL | ~200 MB | 1-5% | 1 GB |
 | Redis | ~50 MB | 0-2% | 100 MB |
-| Neo4j | ~500 MB | 2-10% | 500 MB |
+| PostgreSQL | ~500 MB | 2-10% | 500 MB |
 | Ollama (w/ models) | ~8 GB | 5-80% | 10 GB |
 | Backend (Python) | ~500 MB | 5-20% | - |
 | Frontend (Node) | ~300 MB | 2-10% | - |
@@ -620,17 +620,17 @@ wsl -d Ubuntu -- service redis-server status
 redis-cli ping
 ```
 
-### Neo4j Won't Start
+### PostgreSQL Won't Start
 
 ```powershell
 # Check Java installation
 java -version  # Should be 17+
 
 # Check logs
-Get-Content C:\neo4j\logs\neo4j.log -Tail 50
+Get-Content C:\postgresql\logs\postgresql.log -Tail 50
 
 # Restart service
-Restart-Service neo4j
+Restart-Service postgresql
 ```
 
 ### Ollama Models Not Loading

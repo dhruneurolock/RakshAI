@@ -10,31 +10,37 @@ from typing import Optional, Any
 from app.core.config import settings
 
 
-_redis_client: Optional[Any] = None
+_redis_clients: dict = {}
 
 
 async def get_redis() -> Optional[Any]:
     """
-    Get or create Redis client instance
-    Returns singleton Redis connection
+    Get or create Redis client instance per event loop
     """
-    global _redis_client
+    import asyncio
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return None
+        
+    # Completely fresh instance every time to avoid cross-loop/memory-address bugs
+    client = aioredis.Redis.from_url(
+        settings.REDIS_URL,
+        encoding="utf-8",
+        decode_responses=True,
+        single_connection_client=True
+    )
     
-    if _redis_client is None:
-        _redis_client = await aioredis.from_url(
-            settings.REDIS_URL,
-            encoding="utf-8",
-            decode_responses=True,
-            max_connections=10
-        )
-    
-    return _redis_client
+    return client
 
 
 async def close_redis():
     """Close Redis connection"""
-    global _redis_client
-    
-    if _redis_client:
-        await _redis_client.close()
-        _redis_client = None
+    import asyncio
+    try:
+        loop = asyncio.get_running_loop()
+        client = _redis_clients.pop(loop, None)
+        if client:
+            await client.close()
+    except RuntimeError:
+        pass

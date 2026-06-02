@@ -11,9 +11,12 @@ from typing import Dict, Any, List, Optional
 from pathlib import Path
 
 try:
-    from langchain_community.llms import Ollama
+    from langchain_ollama import OllamaLLM as Ollama
 except ImportError:
-    Ollama = None
+    try:
+        from langchain_community.llms import Ollama
+    except ImportError:
+        Ollama = None
 try:
     from langchain_community.vectorstores import Chroma
 except ImportError:
@@ -32,7 +35,7 @@ except ImportError:
     LLMChain = None
 try:
     from langchain_text_splitters import RecursiveCharacterTextSplitter
-except ImportError:
+except Exception:
     RecursiveCharacterTextSplitter = None
 try:
     import chromadb  # type: ignore
@@ -124,10 +127,18 @@ class LLMService:
     async def initialize_knowledge_base(self):
         """Load knowledge base YAML files into vector database"""
         try:
-            kb_path = Path("/app/knowledge-base")
+            # Resolve KB path: settings → env var → relative to backend dir → Docker fallback
+            import os
+            backend_dir = Path(__file__).resolve().parents[2]  # .../backend
+            candidates = [
+                backend_dir / os.getenv("KNOWLEDGE_BASE_PATH", "./knowledge-base"),
+                backend_dir / "knowledge-base",
+                Path("/app/knowledge-base"),  # Docker fallback
+            ]
+            kb_path = next((p for p in candidates if p.exists()), None)
             
-            if not kb_path.exists():
-                logger.warning(f"Knowledge base not found at {kb_path}")
+            if kb_path is None:
+                logger.warning(f"Knowledge base not found in any of: {[str(c) for c in candidates]}")
                 return
             
             # Load all YAML files from knowledge base
@@ -212,7 +223,7 @@ class LLMService:
             else:
                 # Direct HTTP fallback
                 import requests
-                model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:latest")
+                model_name = os.getenv("OLLAMA_MODEL", "llama3.2:1b")
                 ollama_url = f"{self.ollama_base_url}/api/generate"
                 logger.info(f"LangChain strategic model missing. Trying direct Ollama API to {ollama_url} with {model_name}")
                 
@@ -223,7 +234,10 @@ class LLMService:
                     "options": {"temperature": 0.3, "num_predict": 2048}
                 }
                 
-                resp = requests.post(ollama_url, json=req_data, timeout=60)
+                if response_format == "json":
+                    req_data["format"] = "json"
+                
+                resp = requests.post(ollama_url, json=req_data, timeout=None)
                 if resp.status_code == 200:
                     response = resp.json().get("response", "")
                 else:
@@ -334,7 +348,7 @@ Format in Markdown.
         if self.llm_analysis:
             return await self.llm_analysis.apredict(prompt)
         else:
-            return self._mock_poc_explanation(vulnerability)
+            raise RuntimeError("LLM analysis model not available — cannot generate PoC explanation")
     
     async def reprioritize(
         self,
@@ -485,7 +499,7 @@ Make steps CLEAR, SPECIFIC, and ACTIONABLE for developers.
             # Fallback to direct HTTP request to Ollama
             import requests
             try:
-                model_name = os.getenv("OLLAMA_MODEL", "qwen2.5:latest")
+                model_name = os.getenv("OLLAMA_MODEL", "llama3.2:1b")
                 ollama_url = f"{self.ollama_base_url}/api/generate"
                 logger.info(f"LangChain analysis model missing. Trying direct Ollama API to {ollama_url} with {model_name}")
                 
@@ -496,7 +510,7 @@ Make steps CLEAR, SPECIFIC, and ACTIONABLE for developers.
                     "options": {"temperature": 0.5, "num_predict": 4096}
                 }
                 
-                resp = requests.post(ollama_url, json=req_data, timeout=60)
+                resp = requests.post(ollama_url, json=req_data, timeout=None)
                 if resp.status_code == 200:
                     response = resp.json().get("response", "")
                     logger.info("Direct Ollama API generation successful")
@@ -591,130 +605,6 @@ Make steps CLEAR, SPECIFIC, and ACTIONABLE for developers.
         
         return sections
 
-    def _mock_response(self, prompt: str, response_format: str) -> str:
-        """Mock response for development without Ollama"""
-
-        if response_format == "json":
-            if "attack plan" in prompt.lower():
-                return json.dumps({
-                    "high_priority": [
-                        {
-                            "attack_id": "mock_001",
-                            "type": "IDOR",
-                            "target": "/api/orders/{id}",
-                            "rationale": "Mock: Common access control issue",
-                            "priority_score": 95,
-                            "tool": "custom_idor_tester",
-                            "estimated_time": "30"
-                        }
-                    ],
-                    "medium_priority": [],
-                    "low_priority": []
-                })
-            if "strategy" in prompt.lower():
-                return json.dumps({
-                    "app_type": "web_application",
-                    "likely_auth": "JWT or session cookies",
-                    "priority_categories": [
-                        "A01-Broken-Access-Control",
-                        "A03-Injection",
-                        "A07-XSS"
-                    ],
-                    "recon_tools": ["httpx", "katana", "nuclei"],
-                    "estimated_endpoints": 50,
-                    "risk_level": "MEDIUM"
-                })
-            return json.dumps({"mock": True, "message": "Development mode"})
-
-        return "Mock LLM response - Ollama not available"
-
-    def _mock_poc_explanation(self, vulnerability: Dict[str, Any]) -> str:
-        """Mock PoC explanation"""
-        return f"""
-# Proof of Concept: {vulnerability.get('type')}
-
-## Executive Summary
-A {vulnerability.get('severity')} severity {vulnerability.get('type')} vulnerability was discovered at {vulnerability.get('endpoint')}.
-
-## Technical Description
-[Mock PoC - Ollama not available in development mode]
-
-## Exploitation Steps
-1. Access endpoint: {vulnerability.get('endpoint')}
-2. [Additional steps would be generated by LLM]
-
-## Remediation
-[Remediation recommendations would be generated by LLM]
-"""
-
-    def _mock_remediation_solution(
-        self,
-        vulnerability: Dict[str, Any],
-        target_technology: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """Generate mock remediation solution for development"""
-        vuln_type = vulnerability.get('type', '').upper()
-
-        solutions = {
-            'MISSING_CSRF_TOKEN': {
-                'executive_summary': 'The application lacks CSRF token protection on POST forms, allowing attackers to perform unauthorized actions on behalf of authenticated users.',
-                'root_cause': 'Forms do not implement synchronized token pattern or SameSite cookie protection.',
-                'remediation_steps': [
-                    'Generate unique CSRF token per session using secure random bytes',
-                    'Embed token in all forms as hidden input field',
-                    'Validate token on form submission (POST/PUT/DELETE)',
-                    'Regenerate token after successful validation',
-                    'Set SameSite=Strict on session cookies',
-                    'Use HTTPS only with Secure flag'
-                ],
-                'code_example': """<?php
-session_start();
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (empty($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
-        http_response_code(403);
-        die('CSRF token validation failed');
-    }
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-?>""",
-                'best_practices': [
-                    'Use framework CSRF middleware',
-                    'Implement token rotation on sensitive operations',
-                    'Log CSRF token validation failures',
-                    'Test with OWASP ZAP or Burp Suite',
-                    'Document CSRF policy in security guidelines'
-                ],
-                'testing_instructions': [
-                    'Submit form with invalid token and verify rejection',
-                    'Confirm response returns 403 Forbidden',
-                    'Test cross-site request behavior',
-                    'Verify SameSite cookie behavior'
-                ],
-                'timeline': '2-4 hours implementation, 1 hour testing',
-                'business_impact': 'CRITICAL - Attackers can perform unauthorized actions'
-            }
-        }
-
-        solution = solutions.get(vuln_type, {
-            'executive_summary': f'The {vuln_type} vulnerability requires immediate remediation.',
-            'root_cause': 'Insecure coding practices or missing security controls.',
-            'remediation_steps': ['Review affected code', 'Apply security best practices', 'Implement proper controls', 'Test remediation thoroughly'],
-            'code_example': 'See OWASP guidelines for this vulnerability type',
-            'best_practices': ['Follow OWASP Top 10 guidelines', 'Implement code review process', 'Use static analysis tools (SAST)', 'Conduct penetration testing'],
-            'testing_instructions': ['Verify fix implementation', 'Retest vulnerability', 'Scan with automated tools'],
-            'timeline': '2-4 hours estimated',
-            'business_impact': 'Assess risk based on vulnerability severity'
-        })
-
-        return {
-            'status': 'success',
-            'vulnerability_type': vuln_type,
-            **solution,
-            'mode': 'mock_development'
-        }
 
 # Singleton instance
 _llm_service = None

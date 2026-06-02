@@ -4,7 +4,7 @@ Attack Strategy Agent
 Responsibilities:
 1. Analyze discovered endpoints with LLM
 2. Prioritize attack vectors (IDOR, XSS, SQLi, etc.)
-3. Create AttackNode relationships in Neo4j
+3. Create AttackNode relationships in PostgreSQL
 4. Consider authentication requirements
 5. Generate attack sequences based on OWASP Top 10
 """
@@ -23,7 +23,7 @@ class AttackStrategyAgent(BaseAgent):
         super().__init__(agent_id)
         self.attack_nodes = []
     
-    async def run(self, scan_id: str) -> Dict[str, Any]:
+    async def run(self, scan_id: str, **kwargs) -> Dict[str, Any]:
         """
         Execute attack strategy planning
         
@@ -69,7 +69,7 @@ class AttackStrategyAgent(BaseAgent):
             })
             auth_strategy = await self._analyze_authentication(endpoints)
             
-            # Phase 5: Create attack nodes in Neo4j
+            # Phase 5: Create attack nodes in PostgreSQL
             await self.emit_progress(scan_id, "strategy", "graph_update", {
                 "message": "Creating attack plan in graph database"
             })
@@ -103,9 +103,9 @@ class AttackStrategyAgent(BaseAgent):
             raise
     
     async def _get_discovered_endpoints(self, scan_id: str) -> List[Dict[str, Any]]:
-        """Get discovered endpoints from Neo4j"""
+        """Get discovered endpoints from PostgreSQL"""
         try:
-            # Query Neo4j for endpoints
+            # Query PostgreSQL for endpoints
             endpoints = await self.graph_db.get_scan_endpoints(scan_id)
             return endpoints
             
@@ -280,19 +280,31 @@ Return a JSON threat model with:
         }
     
     async def _create_attack_nodes(self, scan_id: str, attacks: List[Dict[str, Any]]) -> None:
-        """Create attack nodes in Neo4j"""
+        """Create attack nodes in PostgreSQL"""
         try:
             for i, attack in enumerate(attacks):
+                # Resolve target URL from either a dict or string
+                target = attack.get("target", {})
+                if isinstance(target, dict):
+                    target_url = target.get("url", "")
+                elif isinstance(target, str):
+                    target_url = target
+                else:
+                    target_url = str(target)
+                
+                if not target_url:
+                    continue  # skip attacks without a valid target
+                
                 attack_node = await self.graph_db.create_attack_node(
                     scan_id=scan_id,
-                    attack_data={
+                    attack={
                         "attack_id": f"{scan_id}_attack_{i}",
                         "type": attack["type"],
-                        "priority": attack["priority"],
-                        "tools": attack["tools"],
-                        "sequence": attack["sequence"],
+                        "priority": attack.get("priority", 50),
+                        "tools": attack.get("tools", []),
+                        "sequence": attack.get("sequence", 0),
                         "status": "PLANNED",
-                        "target_url": attack["target"].get("url")
+                        "target": target_url
                     }
                 )
                 self.attack_nodes.append(attack_node)

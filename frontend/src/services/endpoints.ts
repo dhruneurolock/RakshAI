@@ -17,6 +17,8 @@ import type {
   AuditStats,
   ScanPolicy,
   TargetValidation,
+  ScheduledScan,
+  ScheduledScanCreate,
 } from '@/types'
 
 // Scans API
@@ -333,5 +335,45 @@ export const governanceAPI = {
     await api.patch(`/governance/correlations/${correlationId}/review`, null, {
       params: { reviewed_by: reviewedBy },
     })
+  },
+}
+
+// ────────────────────────────────────────────────────────
+// Scheduled Scans API
+// ────────────────────────────────────────────────────────
+
+export const scheduledScansAPI = {
+  list: async (): Promise<ScheduledScan[]> => {
+    const { data } = await api.get('/scheduled-scans/')
+    return data
+  },
+
+  get: async (scheduleId: string): Promise<ScheduledScan> => {
+    const { data } = await api.get(`/scheduled-scans/${scheduleId}`)
+    return data
+  },
+
+  create: async (input: ScheduledScanCreate): Promise<ScheduledScan> => {
+    const { data } = await api.post('/scheduled-scans/', input)
+    return data
+  },
+
+  update: async (scheduleId: string, updates: Partial<ScheduledScanCreate> & { is_active?: boolean }): Promise<ScheduledScan> => {
+    const { data } = await api.patch(`/scheduled-scans/${scheduleId}`, updates)
+    return data
+  },
+
+  delete: async (scheduleId: string): Promise<void> => {
+    await api.delete(`/scheduled-scans/${scheduleId}`)
+  },
+
+  toggle: async (scheduleId: string): Promise<ScheduledScan> => {
+    const { data } = await api.post(`/scheduled-scans/${scheduleId}/toggle`)
+    return data
+  },
+
+  trigger: async (scheduleId: string): Promise<ScheduledScan> => {
+    const { data } = await api.post(`/scheduled-scans/${scheduleId}/trigger`)
+    return data
   },
 }

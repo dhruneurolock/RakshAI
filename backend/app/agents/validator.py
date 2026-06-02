@@ -30,7 +30,7 @@ class ValidationAgent(BaseAgent):
         super().__init__(agent_id)
         self.validation_results = []
     
-    async def run(self, scan_id: str, finding_id: Optional[str] = None) -> Dict[str, Any]:
+    async def run(self, scan_id: str, finding_id: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """
         Execute validation workflow
         
@@ -345,20 +345,7 @@ Return only the explanation (2-3 sentences).
         except Exception as e:
             return f"Unable to analyze: {str(e)}"
     
-    async def _get_unvalidated_findings(self, scan_id: str) -> List[Dict[str, Any]]:
-        """Get all unvalidated findings for a scan"""
-        # Query database for findings with status = 'UNVALIDATED'
-        # This is a mock - production would query PostgreSQL
-        return []
-    
-    async def _get_finding(self, scan_id: str, finding_id: str) -> Dict[str, Any]:
-        """Get specific finding"""
-        # Query database for specific finding
-        return {
-            "finding_id": finding_id,
-            "type": "SQL_INJECTION",
-            "url": "http://example.com/api/test"
-        }
+
     
     async def _update_finding_validation(
         self, 

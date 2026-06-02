@@ -123,85 +123,7 @@ def _check_llm_inference(base_url: str, model: str) -> Dict[str, Any]:
     return result
 
 
-def _check_neo4j() -> Dict[str, Any]:
-    """Check Neo4j connectivity, trying multiple common passwords and auto-fix."""
-    settings = get_settings()
-    neo4j_uri = getattr(settings, "NEO4J_URI", "bolt://localhost:7687")
-    result: Dict[str, Any] = {
-        "status": "offline",
-        "uri": neo4j_uri,
-        "authenticated_with": None,
-        "error": None,
-    }
-
-    if not _check_tcp_port("localhost", 7687, timeout=3):
-        result["error"] = "Port 7687 not reachable — Start Neo4j from Neo4j Desktop"
-        return result
-
-    try:
-        from neo4j import GraphDatabase
-    except ImportError:
-        result["error"] = "neo4j Python driver not installed (pip install neo4j)"
-        return result
-
-    neo4j_user = getattr(settings, "NEO4J_USER", "neo4j")
-    configured_pass = getattr(settings, "NEO4J_PASSWORD", "")
-
-    # Try passwords in priority order: configured → common defaults
-    passwords_to_try = []
-    if configured_pass:
-        passwords_to_try.append(configured_pass)
-    for default_pw in ["RakshAI123", "neo4j", "root", "password", "neuropent_graph_pass", "admin"]:
-        if default_pw not in passwords_to_try:
-            passwords_to_try.append(default_pw)
-
-    last_error = None
-    for pwd in passwords_to_try:
-        try:
-            driver = GraphDatabase.driver(neo4j_uri, auth=(neo4j_user, pwd))
-            with driver.session() as session:
-                record = session.run("RETURN 1 AS ok").single()
-                if record and record["ok"] == 1:
-                    result["status"] = "online"
-                    result["authenticated_with"] = f"{neo4j_user}/{'*' * len(pwd)}"
-                    if pwd != configured_pass:
-                        result["password_hint"] = (
-                            f"Connected with password '{pwd}' — update NEO4J_PASSWORD "
-                            f"in .env to match"
-                        )
-            driver.close()
-            if result["status"] == "online":
-                return result
-        except Exception as e:
-            last_error = str(e)
-            if "Unauthorized" in last_error or "authentication" in last_error.lower():
-                continue
-            else:
-                result["error"] = last_error
-                return result
-
-    # Try without auth (if user disabled auth in neo4j.conf)
-    try:
-        driver = GraphDatabase.driver(neo4j_uri)
-        with driver.session() as session:
-            record = session.run("RETURN 1 AS ok").single()
-            if record and record["ok"] == 1:
-                result["status"] = "online"
-                result["authenticated_with"] = "No Authentication (Disabled)"
-                result["password_hint"] = "Connected without password (auth_enabled=false)"
-        driver.close()
-        if result["status"] == "online":
-            return result
-    except Exception as e:
-        last_error = str(e)
-
-    # All passwords failed — give clear fix instructions
-    result["error"] = (
-        f"Authentication failed for user '{neo4j_user}'. "
-        f"Open Neo4j Browser at http://localhost:7474, login with your current password, "
-        f"then run: ALTER CURRENT USER SET PASSWORD FROM 'your_current_pw' TO 'neuropent_graph_pass'"
-    )
-    return result
+# Removed _check_postgresql
 
 
 def _check_redis() -> Dict[str, Any]:
@@ -280,7 +202,7 @@ def _check_agents() -> List[Dict[str, Any]]:
                 "Technology detection",
                 "Nuclei template scanning",
                 "Form discovery (Playwright)",
-                "Neo4j endpoint storage",
+                "PostgreSQL endpoint storage",
                 "MinIO raw output upload",
             ],
         },
@@ -294,7 +216,7 @@ def _check_agents() -> List[Dict[str, Any]]:
                 "IDOR/XSS/SQLi/AuthBypass prioritization",
                 "OWASP Top 10 attack sequencing",
                 "Authentication analysis",
-                "Neo4j AttackNode creation",
+                "PostgreSQL AttackNode creation",
             ],
         },
         {
@@ -309,7 +231,7 @@ def _check_agents() -> List[Dict[str, Any]]:
                 "Auth bypass testing",
                 "Session management",
                 "Parameter fuzzing",
-                "Finding node creation in Neo4j",
+                "Finding node creation in PostgreSQL",
             ],
         },
         {
@@ -441,7 +363,7 @@ async def run_system_diagnostics(db: Session = Depends(get_db)):
     Checks:
     - All 7 agents (import, instantiation, methods)
     - LLM service (Ollama connectivity + model availability + inference test)
-    - Infrastructure (Neo4j, Redis, Database)
+    - Infrastructure (PostgreSQL, Redis, Database)
     - Orchestrator pipeline readiness
     """
     start_time = time.time()
@@ -450,13 +372,12 @@ async def run_system_diagnostics(db: Session = Depends(get_db)):
     ollama_model = getattr(settings, "OLLAMA_MODEL", "") or os.getenv("OLLAMA_MODEL", "")
     # Fallback: if settings returns empty, try common model name
     if not ollama_model:
-        ollama_model = "qwen2.5:latest"
+        ollama_model = "llama3.2:1b"
 
     # Run all checks
     agents_result = _check_agents()
     ollama_result = _check_ollama_service(ollama_base_url, ollama_model)
     llm_inference_result = _check_llm_inference(ollama_base_url, ollama_model)
-    neo4j_result = _check_neo4j()
     redis_result = _check_redis()
     database_result = _check_database(db)
     orchestrator_result = _check_orchestrator_pipeline()
@@ -471,7 +392,6 @@ async def run_system_diagnostics(db: Session = Depends(get_db)):
         "ollama_service": ollama_result["status"] == "online",
         "ollama_model": ollama_result.get("model_available", False),
         "llm_inference": llm_inference_result["status"] == "working",
-        "neo4j": neo4j_result["status"] == "online",
         "redis": redis_result["status"] == "online",
         "agents": ready_agents == total_agents,
         "orchestrator": orchestrator_result["status"] == "ready",
@@ -508,7 +428,6 @@ async def run_system_diagnostics(db: Session = Depends(get_db)):
         },
         "infrastructure": {
             "database": database_result,
-            "neo4j": neo4j_result,
             "redis": redis_result,
         },
         "orchestrator": orchestrator_result,

@@ -26,7 +26,7 @@ The backend uses **70+ Python packages** including:
 - Sentence-Transformers 2.3.1
 
 **Graph Database:**
-- Neo4j 5.17.0
+- PostgreSQL 5.17.0
 - Py2neo 2021.2.4
 
 **Object Storage:**
@@ -130,7 +130,7 @@ npm list --depth=0
 
 **Services started:**
 1. **PostgreSQL** - Main database (port 5432)
-2. **Neo4j** - Graph database (ports 7474, 7687)
+2. **PostgreSQL** - Graph database (ports 7474, 7687)
 3. **Redis** - Message queue + cache (port 6379)
 4. **MinIO** - Object storage (ports 9000, 9001)
 5. **ChromaDB** - Vector database (port 8001)
@@ -384,7 +384,7 @@ Once all steps are complete, you'll have:
 
 - ✅ **Backend:** FastAPI running with 7 agents + 4 services
 - ✅ **Frontend:** React dashboard with real-time updates
-- ✅ **Databases:** PostgreSQL, Neo4j, Redis, ChromaDB, MinIO
+- ✅ **Databases:** PostgreSQL, PostgreSQL, Redis, ChromaDB, MinIO
 - ✅ **LLM:** Ollama with 3 models (llama3.1, mistral, embeddings)
 - ✅ **Security Tools:** 39 penetration testing tools ready
 - ✅ **Reports:** PDF, Word, Excel generation working

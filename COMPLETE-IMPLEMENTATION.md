@@ -21,7 +21,7 @@ Status: **PRODUCTION READY**
 | **4. Agent Layer** | Validator Agent | ✅ 100% | `app/agents/validator.py` |
 | **4. Agent Layer** | PoC Agent | ✅ 100% | `app/agents/poc_generator.py` |
 | **5. Sandbox** | Tool Sandbox | ✅ 100% | `app/core/tool_sandbox.py` |
-| **6. Data Layer** | Graph Database (Neo4j) | ✅ 100% | `app/core/graph_db.py` |
+| **6. Data Layer** | Graph Database (PostgreSQL) | ✅ 100% | `app/core/graph_db.py` |
 | **6. Data Layer** | Object Storage (MinIO) | ✅ 100% | `app/services/storage_service.py` |
 | **6. Data Layer** | Database Models | ✅ 100% | `app/models/models.py` |
 | **7. Reporting** | PDF Reports | ✅ 100% | `app/services/report_generator.py` |
@@ -45,13 +45,13 @@ User Initiates Scan
         ↓
 [LAYER 4] Recon Agent discovers endpoints (httpx, katana, nuclei)
         ↓
-[LAYER 6] Neo4j stores discovered endpoints in attack graph
+[LAYER 6] PostgreSQL stores discovered endpoints in attack graph
         ↓
 [LAYER 3] LLM analyzes endpoints, prioritizes attack vectors
         ↓
 [LAYER 4] Strategy Agent creates attack plan
         ↓
-[LAYER 6] Neo4j creates AttackNode relationships
+[LAYER 6] PostgreSQL creates AttackNode relationships
         ↓
 [LAYER 4] Executor Agent runs attacks via Tool Sandbox
         ↓
@@ -127,7 +127,7 @@ Finding marked as FALSE_POSITIVE in database
 - ✅ Technology detection
 - ✅ Vulnerability template scanning (nuclei)
 - ✅ Form discovery (katana + future Playwright)
-- ✅ Neo4j endpoint storage
+- ✅ PostgreSQL endpoint storage
 - ✅ MinIO raw output upload
 
 ---
@@ -141,7 +141,7 @@ Finding marked as FALSE_POSITIVE in database
 - ✅ OWASP Top 10 mapping
 - ✅ Attack vector prioritization
 - ✅ Authentication requirement detection
-- ✅ Neo4j attack node creation
+- ✅ PostgreSQL attack node creation
 - ✅ Fallback threat model (without LLM)
 
 **LLM Prompt Example:**
@@ -165,7 +165,7 @@ Analyze these endpoints and identify:
 - ✅ XSS testing (dalfox)
 - ✅ IDOR testing (custom tool)
 - ✅ Auth bypass testing (custom tool)
-- ✅ Finding creation in Neo4j + PostgreSQL
+- ✅ Finding creation in PostgreSQL + PostgreSQL
 - ✅ Raw output upload to MinIO
 
 **Security:** ALL execution goes through Tool Sandbox whitelist
@@ -378,9 +378,9 @@ alembic upgrade head
 #### **6. Configure Environmental Variables**
 ```env
 # .env
-NEO4J_URI=bolt://neo4j:7687
-NEO4J_USER=neo4j
-NEO4J_PASSWORD=neuropent_graph_pass
+POSTGRESQL_URI=bolt://postgresql:7687
+POSTGRESQL_USER=postgresql
+POSTGRESQL_PASSWORD=neuropent_graph_pass
 
 MINIO_ENDPOINT=minio:9000
 MINIO_ACCESS_KEY=neuropent
@@ -404,7 +404,7 @@ CHROMA_URL=http://chromadb:8001
 - **Security Tools Supported:** 39
 
 ### **Infrastructure:**
-- **Databases:** 5 (PostgreSQL, Redis, Neo4j, ChromaDB, MinIO)
+- **Databases:** 5 (PostgreSQL, Redis, PostgreSQL, ChromaDB, MinIO)
 - **Docker Services:** 7
 - **LLM Models:** 2 (Llama 3.1, Mistral 7B)
 - **Report Formats:** 3 (PDF, Word, Excel)
@@ -417,7 +417,7 @@ CHROMA_URL=http://chromadb:8001
 |---------|------------|-------------------------|
 | **Intelligence** | Manual scripting | LLM-powered adaptive planning |
 | **Validation** | Trust tool output | 3x replay + 85% threshold |
-| **Attack Modeling** | Sequential testing | Neo4j graph relationships |
+| **Attack Modeling** | Sequential testing | PostgreSQL graph relationships |
 | **Evidence** | Text logs | Screenshots + HTTP traces + cURL |
 | **Reports** | Basic text | PDF + Word + Excel + LLM summaries |
 | **False Positives** | Manual review | LLM-powered analysis |
@@ -438,7 +438,7 @@ CHROMA_URL=http://chromadb:8001
 - Scope validation prevents accidents
 - Policy enforcement (time windows, forbidden attacks)
 - Rate limiting protects targets
-- Audit trail in Neo4j graph
+- Audit trail in PostgreSQL graph
 
 ### **3. Zero-Hallucination Guarantee**
 - 3x validation replays
@@ -470,7 +470,7 @@ CHROMA_URL=http://chromadb:8001
 1. Install security tools in Docker
 2. Configure Playwright for screenshots
 3. Test end-to-end workflow with real target
-4. Update frontend to visualize Neo4j graph
+4. Update frontend to visualize PostgreSQL graph
 
 ### **Long-term (Next 2 Weeks):**
 1. Deploy to staging environment
@@ -499,6 +499,6 @@ The platform is ready for production deployment after installing security tools 
 
 **Powered by:**  
 🤖 Ollama + Llama 3.1 + Mistral  
-🔗 Neo4j + PostgreSQL + Redis + ChromaDB + MinIO  
+🔗 PostgreSQL + PostgreSQL + Redis + ChromaDB + MinIO  
 🛡️ Tool Sandbox Security Layer  
 📊 WeasyPrint + python-docx + openpyxl  

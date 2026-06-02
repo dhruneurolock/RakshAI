@@ -214,3 +214,21 @@ finding_catalog:
     title_template: "Outdated Component detected at {endpoint}"
     owasp_category: "A06"
     severity: "MEDIUM"
+
+  POTENTIAL_SSRF:
+    label: "Potential Server-Side Request Forgery"
+    title_template: "Potential SSRF detected at {endpoint}"
+    owasp_category: "A01"
+    severity: "CRITICAL"
+
+  NOSQL_INJECTION:
+    label: "NoSQL Injection"
+    title_template: "NoSQL Injection detected at {endpoint}"
+    owasp_category: "A03"
+    severity: "CRITICAL"
+
+  XXE_INJECTION:
+    label: "XML External Entity Injection"
+    title_template: "XXE Injection detected at {endpoint}"
+    owasp_category: "A05"
+    severity: "CRITICAL"

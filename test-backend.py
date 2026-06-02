@@ -43,7 +43,6 @@ if all_ok:
     print("  - PostgreSQL: localhost:5432")
     print("  - Redis: localhost:6379")
     print("\nMissing services (will use graceful degradation):")
-    print("  - Neo4j: bolt://localhost:7687")
     print("  - Ollama: http://localhost:11434")
     print("  - MinIO: http://localhost:9000")
 else:

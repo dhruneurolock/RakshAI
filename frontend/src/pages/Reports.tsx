@@ -85,7 +85,7 @@ export default function Reports() {
     enabled: !!selectedScan,
   })
 
-  const { data: totalVulns = [], isLoading: vulnsLoading } = useQuery({
+  const { isLoading: vulnsLoading } = useQuery({
     queryKey: ['reports-vulnerabilities', selectedScan?.id],
     queryFn: () => (selectedScan ? vulnerabilitiesAPI.list({ scan_id: selectedScan.id }) : Promise.resolve([])),
     enabled: !!selectedScan,

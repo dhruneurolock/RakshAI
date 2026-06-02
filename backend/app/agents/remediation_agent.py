@@ -39,7 +39,8 @@ class RemediationAgent(BaseAgent):
         self,
         scan_id: str,
         vulnerability_id: Optional[int] = None,
-        vulnerability_data: Optional[Dict[str, Any]] = None
+        vulnerability_data: Optional[Dict[str, Any]] = None,
+        **kwargs
     ) -> Dict[str, Any]:
         """
         Generate remediation solution for a vulnerability

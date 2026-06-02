@@ -12,8 +12,6 @@ Write-Host ""
 $services = @(
     @{ Name = "PostgreSQL"; Port = 5432; URL = $null },
     @{ Name = "Redis"; Port = 6379; URL = $null },
-    @{ Name = "Neo4j"; Port = 7687; URL = $null },
-    @{ Name = "Neo4j Browser"; Port = 7474; URL = "http://localhost:7474" },
     @{ Name = "Ollama"; Port = 11434; URL = "http://localhost:11434/api/tags" },
     @{ Name = "MinIO"; Port = 9000; URL = "http://localhost:9000" },
 )
@@ -61,7 +59,6 @@ if ($allRunning) {
     Write-Host "To start missing services:" -ForegroundColor Yellow
     Write-Host "  - PostgreSQL: start PostgreSQL service" -ForegroundColor Gray
     Write-Host "  - Redis: redis-server (or Memurai service for Windows)" -ForegroundColor Gray
-    Write-Host "  - Neo4j: neo4j start" -ForegroundColor Gray
     Write-Host "  - Ollama: ollama serve" -ForegroundColor Gray
     Write-Host "  - MinIO: minio server ./storage" -ForegroundColor Gray
 }

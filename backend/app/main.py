@@ -13,6 +13,7 @@ from app.core.config import settings
 from app.core.database import engine, Base, ensure_sqlite_schema
 from app.api.v1 import api_router
 from app.core.websocket_manager import websocket_manager
+from app.services.scheduler_service import start_scheduler, stop_scheduler
 
 
 def configure_runtime_logging() -> None:
@@ -96,11 +97,13 @@ async def startup_event():
     Base.metadata.create_all(bind=engine)
     ensure_sqlite_schema()
     logger.info("Database tables created")
+    start_scheduler()
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
+    stop_scheduler()
     logger.info("Shutting down RakshAI backend")
 
 

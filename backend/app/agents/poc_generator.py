@@ -27,7 +27,7 @@ class PoCAgent(BaseAgent):
         super().__init__(agent_id)
         self.poc_data = []
     
-    async def run(self, scan_id: str, finding_id: Optional[str] = None) -> Dict[str, Any]:
+    async def run(self, scan_id: str, finding_id: Optional[str] = None, **kwargs) -> Dict[str, Any]:
         """
         Execute PoC generation workflow
         
@@ -89,7 +89,10 @@ class PoCAgent(BaseAgent):
     
     async def generate_poc(self, scan_id: str, finding: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Generate comprehensive PoC for a validated finding
+        Generate comprehensive PoC for a validated finding.
+        
+        Now includes structured step-by-step reproduction with per-step
+        Playwright screenshots stored in the ``poc_steps`` JSON column.
         
         Returns:
             Dict with PoC URLs and LLM-generated content
@@ -104,11 +107,18 @@ class PoCAgent(BaseAgent):
         })
         
         try:
-            # Step 1: Capture screenshot
+            # Step 1: Capture full-page screenshot
             await self.emit_progress(scan_id, "poc", "screenshot", {
                 "finding_id": finding_id
             })
             screenshot_url = await self._capture_screenshot(scan_id, finding_id, url, finding)
+            
+            # Step 1.5: Generate structured PoC steps with per-step screenshots
+            await self.emit_progress(scan_id, "poc", "poc_steps", {
+                "finding_id": finding_id,
+                "message": "Generating step-by-step reproduction with screenshots"
+            })
+            poc_steps = await self._generate_poc_steps(scan_id, finding_id, finding)
             
             # Step 2: Record HTTP trace
             await self.emit_progress(scan_id, "poc", "http_trace", {
@@ -141,6 +151,7 @@ class PoCAgent(BaseAgent):
                 "poc_curl_command": curl_command,
                 "llm_business_impact": business_impact,
                 "llm_remediation": remediation,
+                "poc_steps": poc_steps,
                 "poc_generated_at": datetime.utcnow().isoformat()
             }
             
@@ -155,7 +166,8 @@ class PoCAgent(BaseAgent):
             await self.log_action(scan_id, "poc_generated", {
                 "finding_id": finding_id,
                 "has_screenshot": bool(screenshot_url),
-                "has_trace": bool(trace_url)
+                "has_trace": bool(trace_url),
+                "poc_steps_count": len(poc_steps) if poc_steps else 0
             })
             
             return result
@@ -214,10 +226,250 @@ class PoCAgent(BaseAgent):
             return None
     
     def _create_placeholder_screenshot(self, finding: Dict[str, Any]) -> bytes:
-        """Create a placeholder image (in production, use real screenshot)"""
-        # This would be replaced with actual Playwright screenshot
-        # For now, return empty bytes
-        return b"PNG_SCREENSHOT_PLACEHOLDER"
+        """Create a valid minimal PNG placeholder (1×1 orange pixel).
+
+        Uses raw PNG encoding (no PIL required) so the browser can
+        display something meaningful even when Playwright is unavailable.
+        """
+        import struct
+        import zlib
+
+        def _chunk(chunk_type: bytes, data: bytes) -> bytes:
+            raw = chunk_type + data
+            return struct.pack(">I", len(data)) + raw + struct.pack(">I", zlib.crc32(raw) & 0xFFFFFFFF)
+
+        # 1×1 RGBA pixel (orange: #FF8C00, fully opaque)
+        width, height = 1, 1
+        raw_row = b"\x00" + b"\xff\x8c\x00\xff"  # filter-byte + RGBA
+        ihdr_data = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+        return (
+            b"\x89PNG\r\n\x1a\n"
+            + _chunk(b"IHDR", ihdr_data)
+            + _chunk(b"IDAT", zlib.compress(raw_row))
+            + _chunk(b"IEND", b"")
+        )
+    
+    async def _generate_poc_steps(
+        self,
+        scan_id: str,
+        finding_id: str,
+        finding: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate structured step-by-step PoC reproduction instructions.
+        
+        Flow:
+        1. Ask the LLM to decompose the vulnerability into discrete
+           reproduction steps (JSON array).
+        2. For each step, use Playwright to execute the action and
+           capture a screenshot of the resulting page state.
+        3. Upload each screenshot to MinIO/local storage.
+        4. Return the enriched steps array with screenshot URLs.
+        """
+        steps: List[Dict[str, Any]] = []
+        
+        # ── 1. Ask LLM for structured steps ────────────────────────────
+        try:
+            raw_steps = await self._llm_generate_steps(finding)
+        except Exception as e:
+            await self.log_action(scan_id, "poc_steps_llm_error", {
+                "finding_id": finding_id,
+                "error": str(e)
+            })
+            # Fallback: single step from the existing description
+            raw_steps = [{
+                "step_number": 1,
+                "title": "Reproduce the vulnerability",
+                "description": finding.get("description", "Navigate to the affected endpoint and observe the vulnerability."),
+                "action_url": finding.get("url", ""),
+                "action_type": "navigate"
+            }]
+        
+        # ── 2. Capture a screenshot per step ────────────────────────────
+        for i, step in enumerate(raw_steps, 1):
+            step_num = step.get("step_number", i)
+            step_title = step.get("title", f"Step {step_num}")
+            step_desc = step.get("description", "")
+            action_url = step.get("action_url", finding.get("url", ""))
+            
+            # Capture screenshot for this step
+            screenshot_url = await self._capture_step_screenshot(
+                scan_id=scan_id,
+                finding_id=finding_id,
+                step_number=step_num,
+                url=action_url,
+                finding=finding
+            )
+            
+            steps.append({
+                "step_number": step_num,
+                "title": step_title,
+                "description": step_desc,
+                "screenshot_url": screenshot_url
+            })
+            
+            await self.log_action(scan_id, "poc_step_captured", {
+                "finding_id": finding_id,
+                "step_number": step_num,
+                "has_screenshot": bool(screenshot_url)
+            })
+        
+        return steps
+    
+    async def _llm_generate_steps(self, finding: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Use the LLM to break a vulnerability into discrete reproduction steps.
+        
+        Returns a list of dicts, each containing:
+            step_number, title, description, action_url, action_type
+        """
+        finding_type = finding.get("type", "UNKNOWN")
+        url = finding.get("url", "")
+        method = finding.get("method", "GET")
+        description = finding.get("description", "")
+        evidence = finding.get("evidence", "")
+        payload = finding.get("payload", "")
+        
+        prompt = f"""You are a penetration testing expert. Break down the following 
+vulnerability into clear, sequential reproduction steps.
+
+VULNERABILITY DETAILS:
+- Type: {finding_type}
+- URL: {url}
+- HTTP Method: {method}
+- Description: {description}
+- Evidence: {evidence}
+- Payload: {payload}
+
+Return a JSON array of steps. Each step MUST have:
+- "step_number": integer starting at 1
+- "title": short title (e.g. "Navigate to target endpoint")
+- "description": detailed instruction for this step
+- "action_url": the URL to visit/request for this step (use "{url}" if same)
+- "action_type": one of "navigate", "inject_payload", "submit_form", "observe_response", "compare_baseline"
+
+Generate 3-5 steps. Example format:
+[
+  {{"step_number": 1, "title": "Navigate to target", "description": "Open the target endpoint at {url}", "action_url": "{url}", "action_type": "navigate"}},
+  {{"step_number": 2, "title": "Inject test payload", "description": "Send the payload ...", "action_url": "{url}", "action_type": "inject_payload"}}
+]
+
+Return ONLY the JSON array, no extra text.
+"""
+        
+        if self.llm_service:
+            import json as _json
+            response = await self.llm_service.analyze(
+                prompt=prompt,
+                response_format="text",
+                use_knowledge_base=False
+            )
+            # Parse the JSON array from the response
+            response = response.strip()
+            # Find the array boundaries
+            arr_start = response.find("[")
+            arr_end = response.rfind("]") + 1
+            if arr_start != -1 and arr_end > arr_start:
+                parsed = _json.loads(response[arr_start:arr_end])
+                if isinstance(parsed, list) and len(parsed) > 0:
+                    return parsed
+        
+        # Fallback: generate sensible default steps based on finding type
+        return self._generate_fallback_steps(finding)
+    
+    def _generate_fallback_steps(self, finding: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Generate deterministic fallback steps when LLM is unavailable."""
+        url = finding.get("url", "http://target-application/")
+        finding_type = finding.get("type", "UNKNOWN")
+        method = finding.get("method", "GET")
+        payload = finding.get("payload", "")
+        
+        steps = [
+            {
+                "step_number": 1,
+                "title": f"Prerequisites: Recreate the same endpoint context",
+                "description": f"Navigate to the target endpoint at {url}",
+                "action_url": url,
+                "action_type": "navigate"
+            },
+            {
+                "step_number": 2,
+                "title": "Send the original probe or payload",
+                "description": f"Send a {method} request to {url}" + (f" with payload: {payload}" if payload else ""),
+                "action_url": url,
+                "action_type": "inject_payload"
+            },
+            {
+                "step_number": 3,
+                "title": "Compare the response against the observed evidence",
+                "description": f"Observe the response for signs of {finding_type}. Look for anomalous content, error messages, or data disclosure in the response.",
+                "action_url": url,
+                "action_type": "observe_response"
+            },
+            {
+                "step_number": 4,
+                "title": "Repeat the request to confirm the behavior is stable",
+                "description": "Re-send the same request 2-3 times to verify consistent exploitability and rule out intermittent false positives.",
+                "action_url": url,
+                "action_type": "compare_baseline"
+            },
+            {
+                "step_number": 5,
+                "title": "Patch the endpoint and re-run the same request",
+                "description": "After applying the fix, re-run the exact same request to verify the issue no longer reproduces. The patched response should differ from the vulnerable baseline.",
+                "action_url": url,
+                "action_type": "compare_baseline"
+            }
+        ]
+        return steps
+    
+    async def _capture_step_screenshot(
+        self,
+        scan_id: str,
+        finding_id: str,
+        step_number: int,
+        url: str,
+        finding: Dict[str, Any]
+    ) -> Optional[str]:
+        """
+        Capture a screenshot for a specific PoC step using Playwright.
+        
+        Falls back to a placeholder if Playwright is unavailable.
+        """
+        filename = f"poc_step_{step_number}.png"
+        
+        try:
+            # Try real Playwright screenshot
+            try:
+                from playwright.async_api import async_playwright
+                
+                async with async_playwright() as p:
+                    browser = await p.chromium.launch(headless=True)
+                    page = await browser.new_page()
+                    await page.goto(url, timeout=15000, wait_until="domcontentloaded")
+                    screenshot_bytes = await page.screenshot(full_page=True)
+                    await browser.close()
+                
+            except (ImportError, Exception):
+                # Playwright not available — create placeholder
+                screenshot_bytes = self._create_placeholder_screenshot(finding)
+            
+            # Upload to storage (MinIO or local)
+            if self.storage_service:
+                presigned_url = await self.storage_service.upload_screenshot(
+                    scan_id, finding_id, screenshot_bytes, filename=filename
+                )
+                return presigned_url
+            
+            return None
+            
+        except Exception as e:
+            await self.log_action(scan_id, "step_screenshot_error", {
+                "finding_id": finding_id,
+                "step_number": step_number,
+                "error": str(e)
+            })
+            return None
     
     async def _record_http_trace(
         self,
@@ -360,21 +612,7 @@ Be specific to the technology stack and vulnerability type.
         except Exception as e:
             return f"Remediation guidance unavailable: {str(e)}"
     
-    async def _get_validated_findings(self, scan_id: str) -> List[Dict[str, Any]]:
-        """Get all validated findings for a scan"""
-        # Query database for findings with status = 'VALIDATED'
-        # This is a mock - production would query PostgreSQL
-        return []
-    
-    async def _get_finding(self, scan_id: str, finding_id: str) -> Dict[str, Any]:
-        """Get specific finding"""
-        return {
-            "finding_id": finding_id,
-            "type": "SQL_INJECTION",
-            "severity": "HIGH",
-            "url": "http://example.com/api/test",
-            "method": "GET"
-        }
+
     
     async def _update_finding_poc(
         self,

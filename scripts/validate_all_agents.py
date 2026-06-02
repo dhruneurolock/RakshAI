@@ -118,7 +118,7 @@ class AgentValidator:
             print("🎉 ALL AGENTS ARE FULLY FUNCTIONAL!")
             print("")
             print("Next steps:")
-            print("  1. Run: docker-compose up -d neo4j minio ollama")
+            print("  1. Run: docker-compose up -d minio ollama")
             print("  2. Start backend: python backend/app/main.py")
             print("  3. Start frontend: npm run dev --prefix frontend")
             print("  4. Create a scan: POST /api/v1/scans/")

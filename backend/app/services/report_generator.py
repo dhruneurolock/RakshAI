@@ -167,38 +167,37 @@ class ReportGeneratorService:
         scan_data: Dict[str, Any],
         findings: List[Dict[str, Any]]
     ) -> str:
-        """Use LLM to generate executive summary"""
-        
+        """Generate deterministic executive summary (LLM skipped for speed)."""
         try:
-            # Prepare findings summary
-            findings_summary = self._summarize_findings(findings)
-            
-            prompt = f"""Generate an executive summary for this security assessment:
+            total = len(findings)
+            severity_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "INFO": 0}
+            for f in findings:
+                sev = str(f.get("severity", "LOW")).upper()
+                severity_counts[sev] = severity_counts.get(sev, 0) + 1
 
-Target: {scan_data.get('target_url')}
-Scan Type: {scan_data.get('scan_type')}
-Duration: {scan_data.get('duration', 'N/A')}
+            target = scan_data.get('target_url', 'the target application')
+            scan_type = scan_data.get('scan_type', 'full')
 
-Findings Summary:
-{findings_summary}
+            risk = "LOW"
+            if severity_counts["CRITICAL"] > 0:
+                risk = "CRITICAL"
+            elif severity_counts["HIGH"] > 0:
+                risk = "HIGH"
+            elif severity_counts["MEDIUM"] > 0:
+                risk = "MEDIUM"
 
-Generate a professional executive summary (3-4 paragraphs) suitable for C-level executives covering:
-1. Overall security posture
-2. Critical findings and business impact
-3. Risk level assessment
-4. High-level recommendations
-
-Use business language, not technical jargon.
-"""
-            
-            summary = await self.llm_service.analyze(
-                prompt=prompt,
-                response_format="text",
-                use_strategy_model=False
+            summary = (
+                f"A {scan_type} security assessment was conducted against {target}. "
+                f"The assessment identified {total} validated findings across the application surface. "
+                f"The overall risk level is assessed as {risk}.\n\n"
+                f"Severity breakdown: {severity_counts['CRITICAL']} Critical, "
+                f"{severity_counts['HIGH']} High, {severity_counts['MEDIUM']} Medium, "
+                f"{severity_counts['LOW']} Low, {severity_counts['INFO']} Informational.\n\n"
+                f"Immediate remediation is recommended for all Critical and High severity findings "
+                f"to reduce the organization's attack surface and protect business-critical operations."
             )
-            
-            return summary.strip()
-            
+            return summary
+
         except Exception as e:
             logger.error(f"Executive summary generation error: {e}")
             return "Executive summary unavailable."

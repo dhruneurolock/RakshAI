@@ -71,7 +71,7 @@ The entire process is **deterministic, rule-based, and audit-logged** for compli
          │  │  Phase 5: Validation & Analysis   ──┤  │ │
          │  │  Phase 6: Report Generation       ──┘  │ │
          │  │                                          │ │
-         │  └──── LLM (Ollama) + Neo4j + PostgreSQL ─┘ │
+         │  └──── LLM (Ollama) + PostgreSQL + PostgreSQL ─┘ │
          │                                                │
          └────────────────────────────────────────────────┘
                               │
@@ -739,7 +739,7 @@ Est. Time Remaining: ~45 seconds
 | **LLM** | Ollama (llama3.2:1b) | Strategy, validation, analysis | 11434 | ✅ Running |
 | **Database** | PostgreSQL 14 | Scan storage, findings, audit logs | 5432 | ✅ Running |
 | **Cache** | Redis 7 | Scan state, session management | 6379 | ✅ Running |
-| **Graph DB** | Neo4j 2026 | Attack graphs, vulnerability chains | 7687 | ✅ Running |
+| **Graph DB** | PostgreSQL 2026 | Attack graphs, vulnerability chains | 7687 | ✅ Running |
 | **Storage** | MinIO (S3-compatible) | PoC payloads, reports, evidence | 9000 | ✅ Running |
 
 ---
@@ -952,7 +952,7 @@ curl http://localhost:8000/api/v1/scans/550e8400-e29b-41d4-a716-446655440000/vul
           │         │         │         │
           │         │         │         │
     ┌─────▼──┐┌────▼────┐┌────▼────┐┌──▼──────┐┌────▼────┐
-    │Ollama  ││Postgre- ││Redis    ││Neo4j   ││MinIO    │
+    │Ollama  ││Postgre- ││Redis    ││PostgreSQL   ││MinIO    │
     │LLM     ││SQL DB   ││Cache    ││Graph   ││Storage  │
     │11436   ││5432     ││6379     ││7687    ││9000     │
     └────────┘└─────────┘└─────────┘└────────┘└─────────┘

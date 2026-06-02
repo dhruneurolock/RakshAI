@@ -10,6 +10,7 @@ from app.models.models import (
     CorrelationGroup,
     AuditLog,
     ScanPolicy,
+    ScheduledScan,
     ScanStatus,
     VulnerabilitySeverity
 )
@@ -25,6 +26,8 @@ __all__ = [
     "CorrelationGroup",
     "AuditLog",
     "ScanPolicy",
+    "ScheduledScan",
     "ScanStatus",
     "VulnerabilitySeverity"
 ]
+

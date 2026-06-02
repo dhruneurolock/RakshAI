@@ -45,9 +45,6 @@ Write-Host "`n====== RakshAI Services Status ======`n" -ForegroundColor Cyan
 
 $pgUp = Test-TcpPort -Port 5432
 $redisUp = Test-TcpPort -Port 6379
-$neo4jHttp = Get-HttpStatus -Url "http://localhost:7474"
-$neo4jBolt = Test-TcpPort -Port 7687
-$neo4jUp = $neo4jBolt -or ($neo4jHttp -in @(200, 401))
 $ollamaUp = (Get-HttpStatus -Url "http://localhost:11434/api/tags") -eq 200
 $backendUp = (Get-HttpStatus -Url "http://localhost:8000/health") -eq 200
 $frontendUp = (Get-HttpStatus -Url "http://localhost:5173") -eq 200
@@ -61,7 +58,6 @@ $minioUp = $minioApi -or ($minioHttp -in @(200, 403))
 $critical = @(
     @{ Name = "PostgreSQL"; Up = $pgUp },
     @{ Name = "Redis"; Up = $redisUp },
-    @{ Name = "Neo4j"; Up = $neo4jUp },
     @{ Name = "Ollama"; Up = $ollamaUp },
     @{ Name = "Backend API"; Up = $backendUp },
     @{ Name = "Frontend"; Up = $frontendUp }

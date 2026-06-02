@@ -4,7 +4,6 @@ Test Enterprise Architecture Components
 This script verifies all new components are working:
 1. LLM Service (Ollama + LangChain)
 2. Tool Sandbox
-3. Graph Database (Neo4j)
 4. Storage Service (MinIO)
 5. Coordinator Agent
 """
@@ -68,7 +67,6 @@ async def test_tool_sandbox():
 
 
 async def test_graph_db():
-    """Test Neo4j Graph Database"""
     print("📊 Testing Graph Database...")
     try:
         graph = await get_graph_db()
@@ -94,7 +92,6 @@ async def test_graph_db():
         return True
     except Exception as e:
         print(f"   ❌ Graph DB Error: {e}")
-        print(f"   Make sure Neo4j is running: docker-compose up -d neo4j")
         return False
 
 
@@ -199,7 +196,6 @@ async def main():
         print("")
         print("Common issues:")
         print("  • LLM: Run 'docker exec neuropent_ollama ollama pull llama3.1:8b'")
-        print("  • Graph: Run 'docker-compose up -d neo4j'")
         print("  • Storage: Run 'docker-compose up -d minio'")
         print("  • Tools: Install security tools (see ENTERPRISE-IMPLEMENTATION.md)")
     

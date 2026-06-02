@@ -46,34 +46,6 @@ class AdvancedDiscoveryEngine:
         "/CHANGELOG.md", "/VERSION", "/readme.html",
     ]
 
-    PATH_TRAVERSAL_PAYLOADS = [
-        "../../../etc/passwd",
-        "..\\..\\..\\windows\\win.ini",
-        "....//....//....//etc/passwd",
-        "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",
-    ]
-
-    SQL_ERROR_SIGNATURES = [
-        "sql syntax", "mysql", "warning: mysql", "unclosed quotation mark",
-        "quoted string not properly terminated", "pg_query", "postgresql",
-        "sqlite error", "odbc sql", "oracle error", "sqlstate",
-        "microsoft ole db", "ora-00933", "ora-01756",
-    ]
-
-    SQLI_PAYLOADS = [
-        "' OR '1'='1",
-        "' OR '1'='1' --",
-        "1' AND '1'='1",
-        "' UNION SELECT NULL--",
-        "1; SELECT 1--",
-    ]
-
-    SQLI_TIME_PAYLOADS = [
-        ("' OR SLEEP(3)-- ", 3),
-        ("'; WAITFOR DELAY '00:00:03'-- ", 3),
-        ("' OR pg_sleep(3)-- ", 3),
-    ]
-
     OPEN_REDIRECT_PARAMS = ["url", "redirect", "next", "return", "returnUrl",
                             "redirect_uri", "continue", "dest", "destination", "go", "out"]
 
@@ -83,7 +55,57 @@ class AdvancedDiscoveryEngine:
         self.session.verify = False
         self.fingerprint_db = _load_yaml("reconnaissance/fingerprinting.yaml")
         self.xss_payloads_db = _load_yaml("payloads/injection/xss.yaml")
+        # Load KB metadata for confidence scoring
+        self._confidence_scoring = _load_yaml("metadata/confidence-scoring.yaml")
+        self._payload_safety = _load_yaml("metadata/payload-safety.yaml")
+        self._cors_csrf = _load_yaml("payloads/misc/cors-csrf.yaml")
+        # Wire ValidatorEngine for KB-driven detection patterns
+        from app.services.validator_engine import get_validator_engine
+        self._validator = get_validator_engine()
+        # Wire PayloadEngine for KB-driven payloads (no hardcoded fallbacks)
+        from app.services.payload_engine import get_payload_engine
+        self._payload_engine = get_payload_engine()
+        # Load payloads from KB
+        self._sqli_payloads = self._payload_engine.get_sqli_payloads(limit=10)
+        self._path_traversal_payloads = self._payload_engine.get_path_traversal_payloads(limit=10)
+        self._sqli_time_payloads = self._build_time_payloads()
         self.findings: List[Dict[str, Any]] = []
+        self.discovered_forms: List[Dict[str, Any]] = []
+        self.discovered_form_signatures = set()
+
+    def _build_time_payloads(self) -> List[tuple]:
+        """Build time-based blind SQLi payloads from KB or empty list if KB unavailable."""
+        # Use KB sqli payloads that contain SLEEP/WAITFOR/pg_sleep patterns
+        time_payloads = []
+        for p in self._payload_engine.get_sqli_payloads(limit=30):
+            p_lower = p.lower()
+            if "sleep" in p_lower:
+                time_payloads.append((p, 3))
+            elif "waitfor" in p_lower:
+                time_payloads.append((p, 3))
+            elif "pg_sleep" in p_lower:
+                time_payloads.append((p, 3))
+        return time_payloads[:5]
+
+    def _normalize_url_value(self, value: Any) -> Optional[str]:
+        """Convert discovery values to safe URL strings or None."""
+        if value is None:
+            return None
+        if isinstance(value, slice):
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        try:
+            normalized = str(value).strip()
+        except Exception:
+            return None
+        return normalized or None
+
+    def _safe_add_url(self, url_set: Set[str], value: Any) -> None:
+        normalized = self._normalize_url_value(value)
+        if normalized:
+            url_set.add(normalized)
 
     # ─────────────────────────────────────────
     # PUBLIC API — called from orchestrator
@@ -95,28 +117,33 @@ class AdvancedDiscoveryEngine:
         base = f"{parsed.scheme}://{parsed.netloc}"
         crawled: Set[str] = set()
         discovered_urls: Set[str] = set()
-        discovered_urls.add(target_url)
+        self._safe_add_url(discovered_urls, target_url)
 
         # 1 — multi-depth BS4 crawl
-        self._bs4_crawl(target_url, base, parsed.netloc, crawled, discovered_urls, 0, max_depth)
-
-        # 2 — robots.txt / sitemap.xml parsing
-        self._parse_robots(base, parsed.netloc, discovered_urls)
-        self._parse_sitemap(base, parsed.netloc, discovered_urls)
-
-        # 3 — directory brute-force
-        dir_results = self._dir_bruteforce(base)
-        for r in dir_results:
-            discovered_urls.add(r["url"])
-
+        if max_depth > 0:
+            self._bs4_crawl(target_url, base, parsed.netloc, crawled, discovered_urls, 0, max_depth)
+            
+            # 2 — robots.txt / sitemap.xml parsing
+            self._parse_robots(base, parsed.netloc, discovered_urls)
+            self._parse_sitemap(base, parsed.netloc, discovered_urls)
+            
+            # 3 — directory brute-force
+            dir_results = self._dir_bruteforce(base)
+            for r in dir_results:
+                self._safe_add_url(discovered_urls, r.get("url"))
+        else:
+            dir_results = []
+            
         # 4 — technology fingerprinting (root page)
         tech_results = self._fingerprint_tech(target_url)
 
         return {
-            "discovered_urls": discovered_urls,
-            "crawled_pages": len(crawled),
+            "discovered_urls": list(discovered_urls),
+            "fingerprint": tech_results,
+            "forms": self.discovered_forms,
+            "findings": self.findings,
             "dir_brute_hits": dir_results,
-            "technologies": tech_results,
+            "crawled_pages": len(crawled)
         }
 
     def run_phase4_checks(self, target_url: str, discovered_urls: Set[str]) -> List[Dict[str, Any]]:
@@ -156,7 +183,8 @@ class AdvancedDiscoveryEngine:
     # ─────────────────────────────────────────
 
     def _bs4_crawl(self, url, base, netloc, crawled, discovered, depth, max_depth):
-        if depth > max_depth or url in crawled or len(crawled) > 80:
+        url = self._normalize_url_value(url)
+        if not url or depth > max_depth or url in crawled or len(crawled) > 80:
             return
         crawled.add(url)
         resp = self._safe_get(url)
@@ -167,7 +195,7 @@ class AdvancedDiscoveryEngine:
         except Exception:
             soup = BeautifulSoup(resp.text, "html.parser")
 
-        for tag, attr in [("a","href"),("script","src"),("link","href"),("img","src"),("form","action")]:
+        for tag, attr in [("a","href"),("script","src"),("link","href"),("img","src")]:
             for el in soup.find_all(tag):
                 val = el.get(attr)
                 if not val:
@@ -177,11 +205,48 @@ class AdvancedDiscoveryEngine:
                 if p.scheme in ("http","https") and p.netloc == netloc:
                     clean = f"{p.scheme}://{p.netloc}{p.path or '/'}"
                     if clean not in discovered:
-                        discovered.add(clean)
+                        self._safe_add_url(discovered, clean)
                         if tag == "a" and depth + 1 <= max_depth:
                             self._bs4_crawl(clean, base, netloc, crawled, discovered, depth+1, max_depth)
 
-        # meta/script fingerprint hints already handled in _fingerprint_tech
+        # Enhanced Form Extraction (POST Methods)
+        self._extract_forms(url, soup, discovered)
+
+    def _extract_forms(self, url, soup, discovered):
+        """Extracts HTML forms, their methods, and input field names."""
+        url = self._normalize_url_value(url)
+        if not url:
+            return
+        for form in soup.find_all("form"):
+            action = form.get("action", "")
+            method = form.get("method", "get").lower()
+            abs_action = self._normalize_url_value(urljoin(url, action))
+            if not abs_action:
+                continue
+            
+            # Extract inputs
+            inputs = []
+            for input_tag in form.find_all(["input", "textarea", "select"]):
+                name = input_tag.get("name")
+                if name:
+                    inputs.append(name)
+            
+            if not inputs:
+                continue
+
+            # Signature to avoid duplicates
+            sig = f"{method}:{abs_action}:{','.join(sorted(inputs))}"
+            if sig not in self.discovered_form_signatures:
+                self.discovered_form_signatures.add(sig)
+                form_obj = {
+                    "action": abs_action,
+                    "method": method,
+                    "inputs": inputs,
+                    "source_url": url
+                }
+                self.discovered_forms.append(form_obj)
+                # Also add action to discovered URLs for general scanning
+                self._safe_add_url(discovered, abs_action)
 
     def _parse_robots(self, base, netloc, discovered):
         resp = self._safe_get(f"{base}/robots.txt")
@@ -192,9 +257,9 @@ class AdvancedDiscoveryEngine:
             if line.lower().startswith(("allow:", "disallow:", "sitemap:")):
                 path = line.split(":", 1)[1].strip()
                 if path.startswith("/"):
-                    discovered.add(f"{base}{path}")
+                    self._safe_add_url(discovered, f"{base}{path}")
                 elif path.startswith("http"):
-                    discovered.add(path)
+                    self._safe_add_url(discovered, path)
 
     def _parse_sitemap(self, base, netloc, discovered):
         resp = self._safe_get(f"{base}/sitemap.xml")
@@ -203,7 +268,7 @@ class AdvancedDiscoveryEngine:
         for match in re.findall(r"<loc>(.*?)</loc>", resp.text, re.I):
             p = urlparse(match)
             if p.netloc == netloc:
-                discovered.add(match)
+                self._safe_add_url(discovered, match)
 
     def _dir_bruteforce(self, base) -> List[Dict[str, Any]]:
         hits = []
@@ -349,21 +414,27 @@ class AdvancedDiscoveryEngine:
             pass
 
     def _check_cors(self, url, resp):
-        # Only check once per url
-        try:
-            r = self.session.get(url, headers={"Origin": "https://evil-cors-test.com"}, timeout=8, allow_redirects=True)
-            acao = r.headers.get("access-control-allow-origin", "")
-            acac = r.headers.get("access-control-allow-credentials", "").lower()
-            if acao == "*" or "evil-cors-test.com" in acao:
-                sev = VulnerabilitySeverity.HIGH if acac == "true" else VulnerabilitySeverity.MEDIUM
-                self._add_finding(
-                    title=f"CORS Misconfiguration at {url}",
-                    desc=f"Origin reflected/wildcard ACAO={acao}, credentials={acac}.",
-                    sev=sev, owasp="A01", vtype="CORS_MISCONFIGURATION", conf=0.88,
-                    url=url, vector="cors",
-                    evidence=f"ACAO: {acao}, ACAC: {acac}")
-        except Exception:
-            pass
+        # KB-driven CORS testing using origins from payloads/misc/cors-csrf.yaml
+        test_origins = self._validator.get_cors_test_origins() if self._validator else ["https://evil-cors-test.com"]
+        if not test_origins:
+            test_origins = ["https://evil-cors-test.com"]
+        for test_origin in test_origins[:3]:  # Test up to 3 origins
+            try:
+                r = self.session.get(url, headers={"Origin": test_origin}, timeout=8, allow_redirects=True)
+                resp_headers = {k.lower(): v for k, v in r.headers.items()}
+                result = self._validator.check_cors_vulnerable(resp_headers, test_origin)
+                if result["vulnerable"]:
+                    sev = VulnerabilitySeverity.HIGH if result["confidence"] >= 0.9 else VulnerabilitySeverity.MEDIUM
+                    self._add_finding(
+                        title=f"CORS Misconfiguration at {url}",
+                        desc=f"CORS vulnerability: {result['issue']}. Tested with Origin: {test_origin}.",
+                        sev=sev, owasp="A01", vtype="CORS_MISCONFIGURATION",
+                        conf=result["confidence"],
+                        url=url, vector="cors",
+                        evidence=f"Origin: {test_origin} → ACAO: {resp_headers.get('access-control-allow-origin', 'N/A')}")
+                    break  # Stop on first confirmed CORS issue
+            except Exception:
+                pass
 
     def _check_clickjacking(self, url, resp):
         h = {k.lower(): v for k, v in resp.headers.items()}
@@ -486,8 +557,10 @@ class AdvancedDiscoveryEngine:
             ["file", "path", "page", "include", "doc", "template", "dir", "folder"])]
         if not file_params:
             return
+        if not self._path_traversal_payloads:
+            return
         for param in file_params[:1]:
-            for payload in self.PATH_TRAVERSAL_PAYLOADS[:2]:
+            for payload in self._path_traversal_payloads[:2]:
                 try:
                     r = self.session.get(url, params={param: payload}, timeout=8)
                     body = (r.text or "").lower()
@@ -514,7 +587,8 @@ class AdvancedDiscoveryEngine:
         fb = self.xss_payloads_db.get("filter_bypass", {})
         payloads += fb.get("no_script_tag", [])[:2]
         if not payloads:
-            payloads = ["<script>alert(1)</script>", "<img src=x onerror=alert(1)>"]
+            logger.debug(f"No XSS payloads available from KB for {url} — skipping XSS fuzz")
+            return
 
         for pname in list(params.keys())[:2]:
             for payload in payloads[:4]:
@@ -538,24 +612,29 @@ class AdvancedDiscoveryEngine:
     # ─────────────────────────────────────────
 
     def _check_sqli_error_based(self, url):
-        """Error-based SQL injection using multiple payloads."""
+        """Error-based SQL injection using multiple payloads + KB validator patterns."""
         parsed = urlparse(url)
         params = parse_qs(parsed.query)
         if not params:
             return
+        if not self._sqli_payloads:
+            return
         for pname in list(params.keys())[:2]:
-            for payload in self.SQLI_PAYLOADS[:3]:
+            for payload in self._sqli_payloads[:3]:
                 try:
                     r = self.session.get(url, params={pname: payload}, timeout=8)
-                    body = (r.text or "").lower()
-                    if any(sig in body for sig in self.SQL_ERROR_SIGNATURES):
+                    body = r.text or ""
+                    # Use KB-driven validator for SQL error detection
+                    matches = self._validator.check_sql_errors(body) if self._validator else []
+                    if matches:
+                        best = max(matches, key=lambda m: m.get("confidence", 0))
                         self._add_finding(
                             title=f"SQL Injection (Error-Based) via '{pname}' at {url}",
-                            desc=f"SQL error signature detected after injecting payload into '{pname}'.",
+                            desc=f"SQL error signature detected: {best.get('database', 'Unknown')} database. Pattern: {best.get('description', best.get('pattern', ''))}",
                             sev=VulnerabilitySeverity.CRITICAL, owasp="A03",
-                            vtype="SQL_INJECTION_ERROR", conf=0.88,
+                            vtype="SQL_INJECTION_ERROR", conf=best.get("confidence", 0.88),
                             url=url, vector="sqli_error_based",
-                            evidence="Database error signature in response",
+                            evidence=f"DB: {best.get('database', 'Unknown')}, pattern: {best.get('pattern', '')}",
                             payload=f"{pname}={payload}")
                         return
                 except Exception:
@@ -567,6 +646,8 @@ class AdvancedDiscoveryEngine:
         params = parse_qs(parsed.query)
         if not params:
             return
+        if not self._sqli_time_payloads:
+            return
         for pname in list(params.keys())[:1]:
             # Baseline timing
             try:
@@ -575,7 +656,7 @@ class AdvancedDiscoveryEngine:
                 baseline = time.time() - t0
             except Exception:
                 continue
-            for payload, delay in self.SQLI_TIME_PAYLOADS[:2]:
+            for payload, delay in self._sqli_time_payloads[:2]:
                 try:
                     t0 = time.time()
                     self.session.get(url, params={pname: payload}, timeout=delay + 8)
@@ -624,7 +705,8 @@ class AdvancedDiscoveryEngine:
 
     def _add_finding(self, *, title, desc, sev, owasp, vtype, conf, url, vector, evidence, payload=None):
         # Dedupe by (vtype, url)
-        key = (vtype, url)
+        normalized_url = self._normalize_url_value(url) or ""
+        key = (str(vtype), normalized_url)
         if any((f["vulnerability_type"], f["endpoint_url"]) == key for f in self.findings):
             return
         self.findings.append({
@@ -634,8 +716,18 @@ class AdvancedDiscoveryEngine:
             "owasp_category": owasp,
             "vulnerability_type": vtype,
             "confidence": conf,
-            "endpoint_url": url,
+            "endpoint_url": normalized_url,
             "attack_vector": vector,
             "response_evidence": evidence,
             "request_payload": payload,
         })
+
+    def _kb_confidence(self, vuln_type: str, detection_method: str, fallback: float = 0.70) -> float:
+        """Look up base confidence from KB confidence-scoring.yaml.
+
+        Falls back to the provided default if not found.
+        """
+        base_conf = self._confidence_scoring.get("base_confidence", {})
+        type_section = base_conf.get(vuln_type, {})
+        method_data = type_section.get(detection_method, {})
+        return float(method_data.get("base", fallback))

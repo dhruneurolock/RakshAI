@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { scansAPI, dashboardAPI } from '@/services/endpoints'
-import { Radio, Loader2, CheckCircle2, Circle, StopCircle, Clock, Activity, Bot, Server } from 'lucide-react'
+import { Radio, Loader2, CheckCircle2, Circle, StopCircle, Clock, Bot, Server } from 'lucide-react'
 
 type FlowState = 'pending' | 'running' | 'completed' | 'failed'
 

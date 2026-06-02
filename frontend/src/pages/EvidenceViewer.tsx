@@ -265,7 +265,7 @@ export default function EvidenceViewer() {
                 width: '2px', background: 'rgba(99, 102, 241, 0.3)',
               }} />
 
-              {chain.lineage.map((event, idx) => (
+              {chain.lineage.map((event) => (
                 <div key={event.lineage_id} style={{ position: 'relative', marginBottom: '1.5rem' }}>
                   {/* Dot */}
                   <div style={{

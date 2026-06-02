@@ -7,8 +7,6 @@ Write-Host "========================`n" -ForegroundColor Cyan
 $services = @(
     @{ Name = "PostgreSQL"; Port = 5432 },
     @{ Name = "Redis"; Port = 6379 },
-    @{ Name = "Neo4j (Bolt)"; Port = 7687 },
-    @{ Name = "Neo4j (HTTP)"; Port = 7474 },
     @{ Name = "Ollama"; Port = 11434 },
     @{ Name = "MinIO"; Port = 9000 }
 )

@@ -13,6 +13,7 @@ export interface Scan {
   created_at: string
   started_at: string | null
   completed_at: string | null
+  endpoints_discovered?: number
   total_findings: number
   critical_count: number
   high_count: number
@@ -44,6 +45,13 @@ export interface ScanLogResponse {
   note?: string
 }
 
+export interface PocStep {
+  step_number: number
+  title?: string
+  description: string
+  screenshot_url?: string | null
+}
+
 export interface Vulnerability {
   id: number
   scan_id: number
@@ -68,6 +76,7 @@ export interface Vulnerability {
   llm_remediation: string | null
   llm_evidence: string | null
   llm_poc: string | null
+  poc_steps: PocStep[] | null
   endpoint_url: string | null
   endpoint_method: string | null
   detected_at: string
@@ -107,7 +116,6 @@ export interface SystemStatus {
   }
   services: {
     redis_enabled: boolean
-    neo4j_enabled: boolean
     minio_enabled: boolean
   }
 }
@@ -290,3 +298,42 @@ export interface TargetValidation {
   authorized: boolean
   reason: string
 }
+
+// ────────────────────────────────────────────────────────
+// Scheduled Scan Types
+// ────────────────────────────────────────────────────────
+
+export interface ScheduledScan {
+  id: number
+  schedule_id: string
+  name: string
+  target_url: string
+  scan_type: string
+  frequency: string
+  cron_expression: string | null
+  hour: number | null
+  minute: number | null
+  day_of_week: number | null
+  day_of_month: number | null
+  is_active: boolean
+  scan_config: Record<string, any> | null
+  next_run_at: string
+  last_run_at: string | null
+  last_scan_id: string | null
+  total_runs: number
+  created_at: string
+}
+
+export interface ScheduledScanCreate {
+  name: string
+  target_url: string
+  scan_type?: string
+  frequency: string
+  cron_expression?: string
+  hour?: number
+  minute?: number
+  day_of_week?: number
+  day_of_month?: number
+  scan_config?: Record<string, any>
+}
+

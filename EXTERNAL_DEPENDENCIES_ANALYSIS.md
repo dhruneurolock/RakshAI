@@ -75,8 +75,8 @@ This document provides a comprehensive analysis of **all external dependencies**
 ### 7. Graph Database
 | Package | Version | Purpose | Status |
 |---------|---------|---------|--------|
-| `neo4j` | 5.17.0 | Graph database client | ✅ |
-| `py2neo` | 2021.2.4 | Python to Neo4j OGM | ✅ |
+| `postgresql` | 5.17.0 | Graph database client | ✅ |
+| `py2neo` | 2021.2.4 | Python to PostgreSQL OGM | ✅ |
 
 ### 8. Object Storage
 | Package | Version | Purpose | Status |
@@ -189,7 +189,7 @@ This document provides a comprehensive analysis of **all external dependencies**
 ```
 1. Ollama (LLM inference) - Port 11434
 2. ChromaDB (Vector Database) - Port 8001
-3. Neo4j (Graph Database) - Port 7687
+3. PostgreSQL (Graph Database) - Port 7687
 4. MinIO (Object Storage) - Ports 9000, 9001
 5. PostgreSQL (Optional) - Port 5432
 6. Redis (Optional) - Port 6379
@@ -750,7 +750,7 @@ vault:
 ### Database Support
 - **Primary**: PostgreSQL 13+
 - **Fallback**: SQLite (development)
-- **Optional**: Neo4j 5.0+
+- **Optional**: PostgreSQL 5.0+
 
 ### External Services
 - **LLM**: Ollama (any model)

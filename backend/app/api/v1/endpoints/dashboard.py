@@ -102,7 +102,7 @@ async def get_recent_activity(limit: int = 10, db: Session = Depends(get_db)):
             "data": {
                 "scan_id": scan.scan_id,
                 "target_url": scan.target_url,
-                "status": scan.status.value
+                "status": scan.status.value.lower() if hasattr(scan.status, "value") else str(scan.status).lower()
             }
         })
     
@@ -165,7 +165,7 @@ async def get_trends(days: int = 30, db: Session = Depends(get_db)):
 
 @router.get("/system-status")
 async def get_system_status():
-    """Get runtime system status for UI monitoring (LLM, Redis, Neo4j, MinIO flags + LLM health)."""
+    """Get runtime system status for UI monitoring (LLM, Redis, MinIO flags + LLM health)."""
     llm_status = {
         "enabled": settings.OLLAMA_ENABLED,
         "healthy": False,
@@ -194,7 +194,6 @@ async def get_system_status():
         "llm": llm_status,
         "services": {
             "redis_enabled": settings.REDIS_ENABLED,
-            "neo4j_enabled": settings.NEO4J_ENABLED,
             "minio_enabled": settings.MINIO_ENABLED,
         },
     }

@@ -295,7 +295,7 @@ Check that:
 | `LOG_LEVEL` | `DEBUG` | Logging verbosity |
 | `REDIS_ENABLED` | `false` | Disable Redis (uses in-memory fallback) |
 | `OLLAMA_ENABLED` | `false` | Disable Ollama (uses mock responses) |
-| `NEO4J_ENABLED` | `false` | Disable Neo4j (uses mock graph) |
+| `POSTGRESQL_ENABLED` | `false` | Disable PostgreSQL (uses mock graph) |
 | `MINIO_ENABLED` | `false` | Disable MinIO (uses local filesystem) |
 | `STORAGE_TYPE` | `local` | Use local filesystem for storage |
 | `CORS_ORIGINS` | `http://localhost:5173...` | Allowed frontend URLs |
@@ -312,7 +312,7 @@ Check that:
 
 ### Local Development Limitations
 
-When running without services (Redis, Neo4j, MinIO):
+When running without services (Redis, PostgreSQL, MinIO):
 
 1. **Cache**: Uses in-memory cache (per Python process)
    - Cache doesn't persist across server restarts

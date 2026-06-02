@@ -10,40 +10,18 @@ from app.core.database import Base
 
 class ScanStatus(str, enum.Enum):
     """
-    Scan status enumeration - Enterprise workflow states
-    Complete state machine from LAYER 2 orchestration
+    Scan status enumeration — matches PostgreSQL scanstatus type exactly.
+    
+    PostgreSQL has 5 values: PENDING, RUNNING, COMPLETED, FAILED, CANCELLED
+    
+    For detailed phase tracking (planning, discovering, testing, etc.),
+    use the Scan.current_phase column (VARCHAR) instead.
     """
-    # Initial states
-    QUEUED = "queued"
-    INITIALIZING = "initializing"
-    
-    # Discovery phase
-    DISCOVERING = "discovering"
-    
-    # Planning phase
-    PLANNING = "planning"
-    
-    # Testing phase
-    TESTING = "testing"
-    
-    # Validation phase
-    VALIDATING = "validating"
-    
-    # PoC generation
-    POC_GENERATION = "poc_generation"
-    
-    # Reporting phase
-    AGGREGATING = "aggregating"
-    REPORTING = "reporting"
-    
-    # Final states
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-    
-    # Legacy compatibility
-    PENDING = "pending"  # Maps to QUEUED
-    RUNNING = "running"  # Maps to TESTING
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 
 class VulnerabilitySeverity(str, enum.Enum):
@@ -63,7 +41,7 @@ class Scan(Base):
     scan_id = Column(String(100), unique=True, index=True, nullable=False)
     target_url = Column(String(500), nullable=False)
     scan_type = Column(String(50), default="full")  # full, quick, custom
-    status = Column(Enum(ScanStatus), default=ScanStatus.QUEUED, index=True)
+    status = Column(Enum(ScanStatus), default=ScanStatus.PENDING, index=True)
     
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -192,6 +170,10 @@ class Vulnerability(Base):
     llm_remediation = Column(Text, nullable=True)
     llm_evidence = Column(Text, nullable=True)
     llm_poc = Column(Text, nullable=True)
+    
+    # Structured PoC steps with screenshots
+    # JSON array: [{"step_number": 1, "description": "...", "screenshot_url": "..."}, ...]
+    poc_steps = Column(JSON, nullable=True)
     
     # Timestamps
     detected_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -476,5 +458,41 @@ class ScanPolicy(Base):
     authorized_roles = Column(JSON, nullable=True)   # Roles allowed
 
     # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class ScheduledScan(Base):
+    """
+    Recurring scan schedule. The background scheduler checks next_run_at
+    every 60 seconds and triggers scans via OrchestratorService.
+    """
+    __tablename__ = "scheduled_scans"
+
+    id = Column(Integer, primary_key=True, index=True)
+    schedule_id = Column(String(100), unique=True, index=True, nullable=False)
+
+    name = Column(String(200), nullable=False)
+    target_url = Column(String(500), nullable=False)
+    scan_type = Column(String(50), default="full")
+
+    # Schedule configuration
+    frequency = Column(String(20), nullable=False)  # hourly, daily, weekly, monthly, custom
+    cron_expression = Column(String(100), nullable=True)
+    hour = Column(Integer, nullable=True)        # 0-23
+    minute = Column(Integer, nullable=True)      # 0-59
+    day_of_week = Column(Integer, nullable=True) # 0=Mon .. 6=Sun
+    day_of_month = Column(Integer, nullable=True)
+
+    is_active = Column(Boolean, default=True)
+    scan_config = Column(JSON, nullable=True)
+
+    # Execution tracking
+    next_run_at = Column(DateTime(timezone=True), nullable=False)
+    last_run_at = Column(DateTime(timezone=True), nullable=True)
+    last_scan_id = Column(String(100), nullable=True)
+    total_runs = Column(Integer, default=0)
+
+    created_by = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

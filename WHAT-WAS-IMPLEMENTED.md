@@ -13,13 +13,13 @@ Added 4 new services to `docker-compose.yml`:
 
 | Service | Purpose | Port | Credentials |
 |---------|---------|------|-------------|
-| **Neo4j** | Attack graph database | 7474, 7687 | neo4j / neuropent_graph_pass |
+| **PostgreSQL** | Attack graph database | 7474, 7687 | postgresql / neuropent_graph_pass |
 | **MinIO** | Object storage (S3-compatible) | 9000, 9001 | neuropent / neuropent_minio_pass |
 | **ChromaDB** | Vector database (RAG) | 8001 | - |
 | **Ollama** | LLM runtime | 11434 | - |
 
 **What this enables:**
-- Complex attack chain visualization (Neo4j)
+- Complex attack chain visualization (PostgreSQL)
 - Screenshot/report storage with presigned URLs (MinIO)
 - Knowledge base semantic search (ChromaDB)
 - Local LLM inference without API costs (Ollama)
@@ -260,7 +260,7 @@ chromadb==0.4.22
 sentence-transformers==2.3.1
 
 # Graph Database
-neo4j==5.16.0
+postgresql==5.16.0
 py2neo==2021.2.3
 
 # Object Storage
@@ -281,7 +281,7 @@ openpyxl==3.1.2
 
 | Component | Before | After |
 |-----------|--------|-------|
-| **Databases** | 2 (PostgreSQL, Redis) | 5 (+ Neo4j, ChromaDB, MinIO) |
+| **Databases** | 2 (PostgreSQL, Redis) | 5 (+ PostgreSQL, ChromaDB, MinIO) |
 | **LLM Integration** | None | Ollama + LangChain + RAG |
 | **Security Tools** | None | 39 whitelisted tools |
 | **Tool Execution** | None | Sandboxed with limits |
@@ -290,7 +290,7 @@ openpyxl==3.1.2
 | **Validation** | None | 3x replay + 85% threshold |
 | **Evidence** | Basic logs | Screenshots, HTTP traces, cURL |
 | **Reporting** | Basic PDF | PDF + Word + Excel + LLM summaries |
-| **Attack Modeling** | None | Neo4j graph relationships |
+| **Attack Modeling** | None | PostgreSQL graph relationships |
 
 ---
 
@@ -304,7 +304,7 @@ openpyxl==3.1.2
 
 This will:
 1. ✅ Check Docker
-2. ✅ Start all services (PostgreSQL, Redis, Neo4j, MinIO, ChromaDB, Ollama)
+2. ✅ Start all services (PostgreSQL, Redis, PostgreSQL, MinIO, ChromaDB, Ollama)
 3. ✅ Pull LLM models (llama3.1:8b, mistral:7b)
 4. ✅ Create Python virtual environment
 5. ✅ Install dependencies
@@ -368,7 +368,7 @@ This tests:
 - Browser automation with Playwright
 - Form discovery
 - Technology detection
-- Create Endpoint nodes in Neo4j
+- Create Endpoint nodes in PostgreSQL
 
 **Integration:**
 ```python
@@ -387,7 +387,7 @@ endpoints = await graph_db.get_scan_endpoints(scan_id)
 **Responsibilities:**
 - Analyze discovered endpoints with LLM
 - Prioritize attack vectors (IDOR, XSS, SQLi, etc.)
-- Create AttackNode relationships in Neo4j
+- Create AttackNode relationships in PostgreSQL
 - Consider authentication requirements
 
 **Integration:**
@@ -410,7 +410,7 @@ attack_plan = await strategy_agent.run(scan_id)
 - Parameter fuzzing
 - Capture raw output
 - Upload results to MinIO
-- Create Finding nodes in Neo4j
+- Create Finding nodes in PostgreSQL
 
 **Integration:**
 ```python
@@ -558,7 +558,7 @@ poc.complete → aggregator.start
 
 **Features:**
 - Real-time progress visualization
-- Neo4j graph visualization (D3.js or vis.js)
+- PostgreSQL graph visualization (D3.js or vis.js)
 - PoC screenshot modal
 - Evidence download
 - Advanced filtering (status, severity, validated only)
@@ -617,7 +617,7 @@ poc.complete → aggregator.start
 ---
 
 ### **3. Graph Database for Attack Chains**
-**Why Neo4j:**
+**Why PostgreSQL:**
 - Penetration testing is graph-based (authenticate → enumerate → exploit)
 - SQL is bad at recursive relationships
 - Need to track "unexplored paths"
@@ -657,7 +657,7 @@ replay3 = test_idor()  # ❌ Failed (network timeout)
 |---------|-----|-------------|
 | **Backend API** | http://localhost:8000/api/v1/docs | - |
 | **Frontend** | http://localhost:5173 | - |
-| **Neo4j Browser** | http://localhost:7474 | neo4j / neuropent_graph_pass |
+| **PostgreSQL Browser** | http://localhost:7474 | postgresql / neuropent_graph_pass |
 | **MinIO Console** | http://localhost:9001 | neuropent / neuropent_minio_pass |
 | **ChromaDB** | http://localhost:8001 | - |
 | **Ollama API** | http://localhost:11434 | - |
@@ -689,7 +689,7 @@ replay3 = test_idor()  # ❌ Failed (network timeout)
 - ✅ All infrastructure services (6 total)
 - ✅ LLM Service (with RAG knowledge base)
 - ✅ Tool Sandbox (security layer)
-- ✅ Graph Database (Neo4j)
+- ✅ Graph Database (PostgreSQL)
 - ✅ Object Storage (MinIO)
 - ✅ Coordinator Agent (orchestration)
 - ✅ Database models (19 new fields)

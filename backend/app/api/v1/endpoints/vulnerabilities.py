@@ -1,4 +1,4 @@
-﻿"""
+"""
 Vulnerabilities API Endpoints
 """
 import json
@@ -298,3 +298,45 @@ async def get_category_stats(
     return category_counts
 
 
+@router.post("/{vuln_id}/regenerate-poc-steps")
+async def regenerate_poc_steps(vuln_id: int, db: Session = Depends(get_db)):
+    """Backfill / regenerate structured PoC steps for an existing finding.
+
+    Useful for findings that were created before the poc_steps feature
+    was deployed, or to refresh steps after a re-scan.
+    """
+    vuln = db.query(Vulnerability).filter(Vulnerability.id == vuln_id).first()
+    if not vuln:
+        raise HTTPException(status_code=404, detail="Vulnerability not found")
+
+    from app.models.models import Scan
+    scan = db.query(Scan).filter(Scan.id == vuln.scan_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Parent scan not found")
+
+    endpoint_url = scan.target_url
+    endpoint_method = "GET"
+    if vuln.endpoint is not None and vuln.endpoint.url:
+        endpoint_url = vuln.endpoint.url
+        endpoint_method = vuln.endpoint.method or "GET"
+
+    try:
+        from app.services.orchestrator import OrchestratorService
+        orch = OrchestratorService()
+        poc_steps = orch._build_poc_steps(
+            scan=scan,
+            vuln=vuln,
+            endpoint_url=endpoint_url,
+            endpoint_method=endpoint_method,
+        )
+        vuln.poc_steps = poc_steps
+        db.commit()
+
+        return {
+            "message": "PoC steps regenerated",
+            "vuln_id": vuln_id,
+            "steps_count": len(poc_steps),
+            "poc_steps": poc_steps,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to regenerate PoC steps: {str(e)}")

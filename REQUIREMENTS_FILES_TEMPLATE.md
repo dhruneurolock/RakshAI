@@ -57,7 +57,7 @@ sentence-transformers==2.3.1
 tiktoken==0.5.2
 
 # Graph Database
-neo4j==5.17.0
+postgresql==5.17.0
 py2neo==2021.2.4
 
 # Object Storage

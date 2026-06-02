@@ -1,8 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { scansAPI, vulnerabilitiesAPI } from '@/services/endpoints'
-import { ArrowLeft, Clock, CheckCircle, XCircle, Loader2, AlertTriangle, ShieldCheck } from 'lucide-react'
+import { scansAPI, vulnerabilitiesAPI, endpointsAPI } from '@/services/endpoints'
+import { ArrowLeft, Clock, CheckCircle, XCircle, Loader2, AlertTriangle, ShieldCheck, Globe } from 'lucide-react'
 import type { Vulnerability } from '@/types'
 
 function SeverityBadge({ severity }: { severity: string }) {
@@ -81,6 +81,15 @@ export default function ScanDetail() {
     queryKey: ['vulnerabilities', scan?.id],
     queryFn: () => vulnerabilitiesAPI.list({ scan_id: scan!.id }),
     enabled: !!scan?.id,
+  })
+
+  const { data: endpoints = [] } = useQuery({
+    queryKey: ['endpoints', scanId],
+    queryFn: () => endpointsAPI.list({ scan_id: scanId! }),
+    enabled: !!scanId,
+    refetchInterval: () => {
+      return scan?.status === 'running' || scan?.status === 'pending' ? 5000 : false
+    },
   })
 
   const { data: phaseSummary } = useQuery({
@@ -212,6 +221,67 @@ export default function ScanDetail() {
         </div>
       </div>
 
+      {/* Endpoints Discovered */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+          <Globe className="w-4 h-4 text-indigo-500" />
+          <h2 className="text-base font-semibold text-gray-900">Endpoints Discovered ({endpoints.length})</h2>
+        </div>
+        {endpoints.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <Globe className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+            <p className="text-sm">No endpoints discovered yet.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto max-h-64 overflow-y-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Discovery</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {endpoints.map((ep: any, idx: number) => (
+                  <tr key={ep.id ?? idx} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-2">
+                      <span className="text-xs font-mono text-gray-700 break-all">{ep.url}</span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                        ep.method === 'POST' ? 'bg-amber-100 text-amber-700' :
+                        ep.method === 'PUT' ? 'bg-purple-100 text-purple-700' :
+                        ep.method === 'DELETE' ? 'bg-red-100 text-red-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {ep.method}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className="text-xs text-gray-600 capitalize">{ep.endpoint_type ?? '—'}</span>
+                    </td>
+                    <td className="px-4 py-2">
+                      <span className="text-xs text-gray-500">{ep.discovery_method ?? '—'}</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Severity breakdown */}
+      <div className="grid grid-cols-5 gap-3">
+        <SeverityCard label="Critical" count={scan.critical_count} color="border-red-200 bg-red-50 text-red-700" />
+        <SeverityCard label="High"     count={scan.high_count}     color="border-orange-200 bg-orange-50 text-orange-700" />
+        <SeverityCard label="Medium"   count={scan.medium_count}   color="border-amber-200 bg-amber-50 text-amber-700" />
+        <SeverityCard label="Low"      count={scan.low_count}      color="border-green-200 bg-green-50 text-green-700" />
+        <SeverityCard label="Info"     count={scan.info_count}     color="border-blue-200 bg-blue-50 text-blue-700" />
+      </div>
+
       {/* Live Backend Logs */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
@@ -242,15 +312,6 @@ export default function ScanDetail() {
             )}
           </div>
         </div>
-      </div>
-
-      {/* Severity breakdown */}
-      <div className="grid grid-cols-5 gap-3">
-        <SeverityCard label="Critical" count={scan.critical_count} color="border-red-200 bg-red-50 text-red-700" />
-        <SeverityCard label="High"     count={scan.high_count}     color="border-orange-200 bg-orange-50 text-orange-700" />
-        <SeverityCard label="Medium"   count={scan.medium_count}   color="border-amber-200 bg-amber-50 text-amber-700" />
-        <SeverityCard label="Low"      count={scan.low_count}      color="border-green-200 bg-green-50 text-green-700" />
-        <SeverityCard label="Info"     count={scan.info_count}     color="border-blue-200 bg-blue-50 text-blue-700" />
       </div>
 
       {/* Findings table */}

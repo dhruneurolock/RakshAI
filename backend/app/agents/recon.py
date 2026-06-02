@@ -6,16 +6,22 @@ Responsibilities:
 2. Browser automation with Playwright
 3. Form discovery
 4. Technology detection
-5. Create Endpoint nodes in Neo4j
-6. Upload raw outputs to MinIO
+5. Create Endpoint nodes in PostgreSQL
+6. Persist endpoints to PostgreSQL
+7. Upload raw outputs to MinIO
 """
+
 
 from typing import Dict, Any, List, Optional
 import asyncio
 import json
+import logging
 from datetime import datetime
+from urllib.parse import urlparse
 
 from .base_agent import BaseAgent
+
+logger = logging.getLogger(__name__)
 
 
 class ReconAgent(BaseAgent):
@@ -26,7 +32,7 @@ class ReconAgent(BaseAgent):
         self.discovered_endpoints = []
         self.technologies = []
     
-    async def run(self, scan_id: str) -> Dict[str, Any]:
+    async def run(self, scan_id: str, **kwargs) -> Dict[str, Any]:
         """
         Execute reconnaissance workflow
         
@@ -75,7 +81,7 @@ class ReconAgent(BaseAgent):
             })
             form_results = await self._discover_forms(target_url)
             
-            # Phase 6: Store in Neo4j
+            # Phase 6: Store in PostgreSQL
             await self.emit_progress(scan_id, "recon", "graph_update", {
                 "message": "Storing results in graph database"
             })
@@ -87,7 +93,13 @@ class ReconAgent(BaseAgent):
                 "forms": form_results
             })
             
-            # Phase 7: Upload raw outputs to MinIO
+            # Phase 7: Persist endpoints to PostgreSQL (so UI can display them)
+            await self.emit_progress(scan_id, "recon", "db_persist", {
+                "message": "Persisting endpoints to database"
+            })
+            await self._persist_endpoints_to_db(scan_id, target_url, http_results, crawl_results, form_results)
+            
+            # Phase 8: Upload raw outputs to MinIO
             await self._upload_raw_outputs(scan_id, {
                 "http": http_results,
                 "crawl": crawl_results,
@@ -291,7 +303,7 @@ class ReconAgent(BaseAgent):
             return {"success": False, "error": str(e)}
     
     async def _store_in_graph(self, scan_id: str, results: Dict[str, Any]) -> None:
-        """Store discovered endpoints in Neo4j"""
+        """Store discovered endpoints in PostgreSQL"""
         try:
             # Add all discovered endpoints to graph
             for endpoint in self.discovered_endpoints:
@@ -303,6 +315,82 @@ class ReconAgent(BaseAgent):
         except Exception as e:
             await self.log_action(scan_id, "graph_storage_error", {"error": str(e)})
     
+    async def _persist_endpoints_to_db(
+        self,
+        scan_id: str,
+        target_url: str,
+        http_results: Dict[str, Any],
+        crawl_results: Dict[str, Any],
+        form_results: Dict[str, Any],
+    ) -> None:
+        """Persist discovered endpoints to PostgreSQL so the UI can display them."""
+        from app.models.models import Scan, Endpoint
+        from app.core.database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            # Resolve scan PK
+            scan = db.query(Scan).filter(Scan.scan_id == scan_id).first()
+            if not scan:
+                logger.warning(f"[recon] Scan {scan_id} not found in DB, cannot persist endpoints")
+                return
+
+            seen_urls: set = set()
+            created = 0
+
+            # Helper to add one endpoint
+            def _add(url: str, method: str = "GET", ep_type: str = "page",
+                     discovery: str = "crawl", params=None):
+                nonlocal created
+                key = f"{method}:{url}"
+                if key in seen_urls:
+                    return
+                seen_urls.add(key)
+                ep = Endpoint(
+                    scan_id=scan.id,
+                    url=url,
+                    method=method,
+                    endpoint_type=ep_type,
+                    discovery_method=discovery,
+                    parameters=params,
+                )
+                db.add(ep)
+                created += 1
+
+            # Always include the base target URL itself
+            _add(target_url, "GET", "page", "target")
+
+            # Add crawled endpoints
+            for ep in self.discovered_endpoints:
+                _add(
+                    ep.get("url", ""),
+                    ep.get("method", "GET"),
+                    "page",
+                    ep.get("source", "crawl"),
+                )
+
+            # Add form endpoints
+            for form in form_results.get("forms", []):
+                _add(
+                    form.get("url", target_url),
+                    form.get("method", "POST"),
+                    "form",
+                    "form_discovery",
+                    form.get("inputs"),
+                )
+
+            # Update scan-level counter
+            scan.endpoints_discovered = created
+
+            db.commit()
+            logger.info(f"[recon] Persisted {created} endpoints to PostgreSQL for scan {scan_id}")
+
+        except Exception as e:
+            db.rollback()
+            logger.error(f"[recon] Failed to persist endpoints: {e}")
+        finally:
+            db.close()
+
     async def _upload_raw_outputs(self, scan_id: str, results: Dict[str, Any]) -> None:
         """Upload raw tool outputs to MinIO"""
         try:
@@ -319,13 +407,3 @@ class ReconAgent(BaseAgent):
                     )
         except Exception as e:
             await self.log_action(scan_id, "storage_upload_error", {"error": str(e)})
-    
-    async def _get_scan_details(self, scan_id: str) -> Dict[str, Any]:
-        """Get scan details from database"""
-        # This would query the database
-        # For now, return mock data
-        return {
-            "scan_id": scan_id,
-            "target_url": "http://example.com",
-            "scan_type": "full"
-        }

@@ -46,7 +46,7 @@ NeuroPentWeb is an **AI-powered autonomous penetration testing platform** that c
 
 ✅ **100% Open-Source Stack** - No vendor lock-in  
 ✅ **LLM-Powered Intelligence** - Adapts strategy based on findings  
-✅ **Attack Graph Visualization** - Neo4j shows attack chains  
+✅ **Attack Graph Visualization** - PostgreSQL shows attack chains  
 ✅ **Knowledge Base RAG** - 96+ YAML files power decisions  
 ✅ **Tool Sandbox Security** - Prevents LLM exploitation  
 ✅ **Enterprise Compliance** - OWASP, PCI-DSS, GDPR mapping  
@@ -80,7 +80,7 @@ NeuroPentWeb is an **AI-powered autonomous penetration testing platform** that c
 ┌─────────────────────────────────────────────────────────┐
 │ LAYER 3: SHARED INTELLIGENCE                            │
 │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
-│ • Neo4j - Attack graph database (endpoints → attacks)   │
+│ • PostgreSQL - Attack graph database (endpoints → attacks)   │
 │ • Knowledge Base - 96+ YAML files (RAG)                 │
 │ • LLM Service - Ollama (Llama 3.1 + Mistral)            │
 │ • Session Store - Redis                                 │
@@ -122,7 +122,7 @@ NeuroPentWeb is an **AI-powered autonomous penetration testing platform** that c
 │ 5 Data Stores:                                          │
 │                                                          │
 │ 1. PostgreSQL  - Scans, findings, users                 │
-│ 2. Neo4j       - Attack graphs                          │
+│ 2. PostgreSQL       - Attack graphs                          │
 │ 3. MinIO       - Evidence storage (S3-compatible)       │
 │ 4. ChromaDB    - Vector embeddings (RAG)                │
 │ 5. Redis       - Message queue + caching                │
@@ -167,7 +167,7 @@ T+2s    PHASE 2: RECONNAISSANCE (30 seconds)
         ✓ Web crawling (katana)
         ✓ Technology detection
         ✓ Form discovery
-        ✓ Build attack graph (Neo4j)
+        ✓ Build attack graph (PostgreSQL)
         
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 T+32s   PHASE 3: STRATEGY PLANNING (15 seconds)
@@ -251,7 +251,7 @@ T+182s  SCAN COMPLETE
 │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
 │  Tools: httpx, katana, nuclei          │
 │  Output: 47 endpoints discovered       │
-│  Neo4j: CREATE (endpoint:Endpoint)     │
+│  PostgreSQL: CREATE (endpoint:Endpoint)     │
 │  → Trigger StrategyAgent               │
 └────────┬───────────────────────────────┘
          │
@@ -260,7 +260,7 @@ T+182s  SCAN COMPLETE
 │     STRATEGY AGENT                     │
 │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │
 │  LLM: "Prioritize attack vectors"      │
-│  Input: Neo4j endpoints                │
+│  Input: PostgreSQL endpoints                │
 │  Output: Prioritized attack list       │
 │  → Trigger ExecutorAgent               │
 └────────┬───────────────────────────────┘
@@ -400,7 +400,7 @@ llm_response = {
 }
 
 # Create Attack Graph
-neo4j.execute("""
+postgresql.execute("""
   CREATE (scan:Scan {
     id: 'scan_abc123',
     target: 'https://app.example.com',
@@ -411,7 +411,7 @@ neo4j.execute("""
 
 **Outputs:**
 - ✅ Scan created in PostgreSQL
-- ✅ Initial scan node in Neo4j
+- ✅ Initial scan node in PostgreSQL
 - ✅ LLM strategy cached in Redis
 - ✅ ReconAgent triggered
 
@@ -557,8 +557,8 @@ CREATE (scan)-[:DISCOVERED]->(ep2)
 #### 4.3.1 LLM Attack Analysis
 
 ```python
-# Strategy Agent queries Neo4j
-endpoints = neo4j.execute("""
+# Strategy Agent queries PostgreSQL
+endpoints = postgresql.execute("""
   MATCH (scan:Scan {id: 'scan_abc123'})-[:DISCOVERED]->(ep:Endpoint)
   RETURN ep
 """)
@@ -632,7 +632,7 @@ attack_plan = {
 #### 4.3.2 Create Attack Nodes
 
 ```cypher
-// Create attack nodes in Neo4j
+// Create attack nodes in PostgreSQL
 CREATE (atk1:AttackNode {
   id: 'atk_001',
   type: 'IDOR',
@@ -1536,7 +1536,7 @@ await email_service.send({
 │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
 │  ChromaDB ← Query knowledge base (RAG)               │
 │  Ollama → LLM generates strategy                     │
-│  Neo4j ← CREATE (scan:Scan)                          │
+│  PostgreSQL ← CREATE (scan:Scan)                          │
 │  Redis → PUBLISH 'queue:recon.start'                 │
 └──────────────┬───────────────────────────────────────┘
                │
@@ -1545,8 +1545,8 @@ await email_service.send({
 │  LAYER 4: Recon Agent                                │
 │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
 │  Tool Sandbox → Execute httpx, katana                │
-│  Neo4j ← CREATE (endpoint:Endpoint)                  │
-│  Neo4j ← CREATE (endpoint)-[:DISCOVERED]->(scan)     │
+│  PostgreSQL ← CREATE (endpoint:Endpoint)                  │
+│  PostgreSQL ← CREATE (endpoint)-[:DISCOVERED]->(scan)     │
 │  Redis → PUBLISH 'queue:strategy.analyze'            │
 └──────────────┬───────────────────────────────────────┘
                │
@@ -1554,10 +1554,10 @@ await email_service.send({
 ┌──────────────────────────────────────────────────────┐
 │  LAYER 4: Strategy Agent                             │
 │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
-│  Neo4j → MATCH (scan)-[:DISCOVERED]->(endpoints)     │
+│  PostgreSQL → MATCH (scan)-[:DISCOVERED]->(endpoints)     │
 │  ChromaDB → Query attack patterns                    │
 │  Ollama → LLM prioritizes attacks                    │
-│  Neo4j ← CREATE (attack:AttackNode)                  │
+│  PostgreSQL ← CREATE (attack:AttackNode)                  │
 │  Redis → PUBLISH 'queue:executor.attack'             │
 └──────────────┬───────────────────────────────────────┘
                │
@@ -1567,7 +1567,7 @@ await email_service.send({
 │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
 │  Tool Sandbox → Execute sqlmap, dalfox               │
 │  PostgreSQL ← INSERT INTO vulnerabilities (...)      │
-│  Neo4j ← CREATE (finding:Finding)                    │
+│  PostgreSQL ← CREATE (finding:Finding)                    │
 │  Redis → PUBLISH 'queue:validator.verify'            │
 └──────────────┬───────────────────────────────────────┘
                │
@@ -1597,7 +1597,7 @@ await email_service.send({
 │  LAYER 7: Report Generator                           │
 │  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ │
 │  PostgreSQL → SELECT * FROM vulnerabilities          │
-│  Neo4j → MATCH attack graph                          │
+│  PostgreSQL → MATCH attack graph                          │
 │  Ollama → LLM generates executive summary            │
 │  WeasyPrint → Generate PDF                           │
 │  python-docx → Generate Word                         │
@@ -1824,7 +1824,7 @@ class OrchestratorService:
 | Service | Purpose | Port | Credentials |
 |---------|---------|------|-------------|
 | **PostgreSQL** | Relational database | 5432 | neuropent / neuropent_secure_pass |
-| **Neo4j** | Graph database | 7474, 7687 | neo4j / neuropent_graph_pass |
+| **PostgreSQL** | Graph database | 7474, 7687 | postgresql / neuropent_graph_pass |
 | **Redis** | Message queue + cache | 6379 | No auth (internal) |
 | **MinIO** | Object storage (S3) | 9000, 9001 | neuropent / neuropent_minio_pass |
 | **ChromaDB** | Vector database (RAG) | 8001 | No auth (internal) |
@@ -2099,7 +2099,7 @@ After deployment, access:
 | **Frontend** | http://localhost:5173 | User dashboard |
 | **Backend API** | http://localhost:8000 | REST API |
 | **API Docs** | http://localhost:8000/docs | Swagger UI |
-| **Neo4j Browser** | http://localhost:7474 | Graph visualization |
+| **PostgreSQL Browser** | http://localhost:7474 | Graph visualization |
 | **MinIO Console** | http://localhost:9001 | Object storage |
 | **Ollama API** | http://localhost:11434 | LLM endpoint |
 

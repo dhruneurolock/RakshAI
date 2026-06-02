@@ -43,18 +43,26 @@ class ScanResponse(BaseModel):
     target_url: str
     scan_type: str
     status: ScanStatusEnum
-    progress_percentage: int
+
+    @validator('status', pre=True)
+    def normalize_status(cls, v):
+        if hasattr(v, 'value'):
+            return v.value.lower()
+        if isinstance(v, str):
+            return v.lower()
+        return v
+    progress_percentage: Optional[int] = 0
     current_phase: Optional[str]
     created_at: datetime
     started_at: Optional[datetime]
     completed_at: Optional[datetime]
     endpoints_discovered: Optional[int] = 0
-    total_findings: int
-    critical_count: int
-    high_count: int
-    medium_count: int
-    low_count: int
-    info_count: int
+    total_findings: Optional[int] = 0
+    critical_count: Optional[int] = 0
+    high_count: Optional[int] = 0
+    medium_count: Optional[int] = 0
+    low_count: Optional[int] = 0
+    info_count: Optional[int] = 0
     
     class Config:
         from_attributes = True
@@ -99,6 +107,7 @@ class VulnerabilityCreate(BaseModel):
     response_evidence: Optional[str] = None
     poc_code: Optional[str] = None
     remediation: Optional[str] = None
+    poc_steps: Optional[List[Dict[str, Any]]] = None
 
 
 class VulnerabilityResponse(BaseModel):
@@ -125,6 +134,7 @@ class VulnerabilityResponse(BaseModel):
     llm_remediation: Optional[str]
     llm_evidence: Optional[str]
     llm_poc: Optional[str]
+    poc_steps: Optional[List[Dict[str, Any]]] = None
     endpoint_url: Optional[str] = None
     endpoint_method: Optional[str] = None
     detected_at: datetime
@@ -406,3 +416,59 @@ class ScanPolicyResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ────────────────────────────────────────────────────────
+# Scheduled Scan Schemas
+# ────────────────────────────────────────────────────────
+
+class ScheduledScanCreate(BaseModel):
+    name: str
+    target_url: str
+    scan_type: str = "full"
+    frequency: str  # hourly, daily, weekly, monthly, custom
+    cron_expression: Optional[str] = None
+    hour: Optional[int] = None
+    minute: Optional[int] = None
+    day_of_week: Optional[int] = None
+    day_of_month: Optional[int] = None
+    scan_config: Optional[Dict[str, Any]] = None
+
+
+class ScheduledScanUpdate(BaseModel):
+    name: Optional[str] = None
+    target_url: Optional[str] = None
+    scan_type: Optional[str] = None
+    frequency: Optional[str] = None
+    cron_expression: Optional[str] = None
+    hour: Optional[int] = None
+    minute: Optional[int] = None
+    day_of_week: Optional[int] = None
+    day_of_month: Optional[int] = None
+    is_active: Optional[bool] = None
+    scan_config: Optional[Dict[str, Any]] = None
+
+
+class ScheduledScanResponse(BaseModel):
+    id: int
+    schedule_id: str
+    name: str
+    target_url: str
+    scan_type: str
+    frequency: str
+    cron_expression: Optional[str]
+    hour: Optional[int]
+    minute: Optional[int]
+    day_of_week: Optional[int]
+    day_of_month: Optional[int]
+    is_active: bool
+    scan_config: Optional[Dict[str, Any]]
+    next_run_at: datetime
+    last_run_at: Optional[datetime]
+    last_scan_id: Optional[str]
+    total_runs: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+

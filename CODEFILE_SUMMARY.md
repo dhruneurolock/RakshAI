@@ -45,7 +45,7 @@ Total code files summarized: **75**
 
 ## backend/app/agents/executor.py
 - Type: Python module
-- Purpose: Exploit Execution Agent Responsibilities: 1. Execute planned attacks via Tool Sandbox 2. Session management (cookies, tokens, headers) 3. Parameter fuzzing 4. Capture raw outputs 5. Upload results to MinIO 6. Create Finding nodes in Neo4j 7
+- Purpose: Exploit Execution Agent Responsibilities: 1. Execute planned attacks via Tool Sandbox 2. Session management (cookies, tokens, headers) 3. Parameter fuzzing 4. Capture raw outputs 5. Upload results to MinIO 6. Create Finding nodes in PostgreSQL 7
 - Imports: 5
 - Classes: ExploitExecutionAgent
 
@@ -57,13 +57,13 @@ Total code files summarized: **75**
 
 ## backend/app/agents/recon.py
 - Type: Python module
-- Purpose: Reconnaissance Agent Responsibilities: 1. Execute discovery tools (httpx, katana, nuclei, subfinder) 2. Browser automation with Playwright 3. Form discovery 4. Technology detection 5. Create Endpoint nodes in Neo4j 6. Upload raw outputs to 
+- Purpose: Reconnaissance Agent Responsibilities: 1. Execute discovery tools (httpx, katana, nuclei, subfinder) 2. Browser automation with Playwright 3. Form discovery 4. Technology detection 5. Create Endpoint nodes in PostgreSQL 6. Upload raw outputs to 
 - Imports: 5
 - Classes: ReconAgent
 
 ## backend/app/agents/strategy.py
 - Type: Python module
-- Purpose: Attack Strategy Agent Responsibilities: 1. Analyze discovered endpoints with LLM 2. Prioritize attack vectors (IDOR, XSS, SQLi, etc.) 3. Create AttackNode relationships in Neo4j 4. Consider authentication requirements 5. Generate attack seq
+- Purpose: Attack Strategy Agent Responsibilities: 1. Analyze discovered endpoints with LLM 2. Prioritize attack vectors (IDOR, XSS, SQLi, etc.) 3. Create AttackNode relationships in PostgreSQL 4. Consider authentication requirements 5. Generate attack seq
 - Imports: 4
 - Classes: AttackStrategyAgent
 
@@ -137,7 +137,7 @@ Total code files summarized: **75**
 
 ## backend/app/core/graph_db.py
 - Type: Python module
-- Purpose: Neo4j Graph Database Connection Manages attack graph relationships and complex queries
+- Purpose: PostgreSQL Graph Database Connection Manages attack graph relationships and complex queries
 - Imports: 3
 - Classes: GraphDatabase
 - Functions: get_graph_db (async)
@@ -424,7 +424,7 @@ Total code files summarized: **75**
 
 ## scripts/test_enterprise_components.py
 - Type: Python module
-- Purpose: Test Enterprise Architecture Components This script verifies all new components are working: 1. LLM Service (Ollama + LangChain) 2. Tool Sandbox 3. Graph Database (Neo4j) 4. Storage Service (MinIO) 5. Coordinator Agent
+- Purpose: Test Enterprise Architecture Components This script verifies all new components are working: 1. LLM Service (Ollama + LangChain) 2. Tool Sandbox 3. Graph Database (PostgreSQL) 4. Storage Service (MinIO) 5. Coordinator Agent
 - Imports: 8
 - Functions: test_llm_service (async), test_tool_sandbox (async), test_graph_db (async), test_storage_service (async), test_coordinator_agent (async), main (async)
 

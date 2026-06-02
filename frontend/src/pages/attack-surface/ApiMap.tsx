@@ -21,7 +21,7 @@ export default function ApiMap() {
           <div className="text-left">
             <p className="text-sm font-medium text-amber-800">Coming Soon</p>
             <p className="text-xs text-amber-700">
-              Interactive API graph visualization powered by the Neo4j attack graph is under development.
+              Interactive API graph visualization powered by the attack graph is under development.
             </p>
           </div>
         </div>

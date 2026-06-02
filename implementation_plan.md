@@ -2,7 +2,7 @@
 
 To enable true end-to-end LLM-driven scanning, we must implement the Docker Option. The security tools (`httpx`, `sqlmap`, `nuclei`, `katana`, etc.) required by the LLM pipeline are Linux-based and hardcoded to execute at `/usr/local/bin/...` natively by the `tool_sandbox.py`. 
 
-This plan will containerize **only your Python backend**, equipping it with all necessary cybersecurity tools, while leaving your databases (Postgres, Redis, Neo4j) and Ollama running natively on your Windows D: drive. The container will securely communicate back into your Windows host to utilize Ollama.
+This plan will containerize **only your Python backend**, equipping it with all necessary cybersecurity tools, while leaving your databases (Postgres, Redis, PostgreSQL) and Ollama running natively on your Windows D: drive. The container will securely communicate back into your Windows host to utilize Ollama.
 
 ## User Review Required
 
@@ -29,7 +29,7 @@ A Debian-based Python image that installs:
 #### [NEW] `docker-compose.yml` (in the root directory)
 A `docker-compose` setup specifically designed for Windows Local Development:
 - Service: `backend`.
-- **CRITICAL:** Replaces all `.env` `localhost` references with `host.docker.internal` so the container can escape out and talk to your native Windows Ollama, Postgres, Neo4j, and Redis ports without you needing to containerize them.
+- **CRITICAL:** Replaces all `.env` `localhost` references with `host.docker.internal` so the container can escape out and talk to your native Windows Ollama, Postgres, PostgreSQL, and Redis ports without you needing to containerize them.
 - Mounts the `D:\NeuroPentWeb\backend` folder live so you can still edit code natively.
 
 ---
@@ -48,7 +48,7 @@ A python script simulating an authentication bypass test.
 
 > [!IMPORTANT]
 > 1. Do you have **Docker Desktop** currently open and running in your Windows taskbar right now?
-> 2. Are you perfectly fine keeping Postgres, Neo4j, Redis, and Ollama running natively outside of Docker using your `start-local.ps1` script, and just running the backend itself in Docker?
+> 2. Are you perfectly fine keeping Postgres, PostgreSQL, Redis, and Ollama running natively outside of Docker using your `start-local.ps1` script, and just running the backend itself in Docker?
 
 ## Verification Plan
 

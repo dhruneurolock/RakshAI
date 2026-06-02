@@ -44,11 +44,6 @@ class LocalSettings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = ""
     
-    # Neo4j - Disabled
-    NEO4J_ENABLED: bool = False
-    NEO4J_URI: str = "bolt://localhost:7687"
-    NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "password"
     
     # MinIO - Disabled, use local storage
     MINIO_ENABLED: bool = False

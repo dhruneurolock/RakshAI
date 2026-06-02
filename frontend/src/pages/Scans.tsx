@@ -25,7 +25,7 @@ export default function Scans() {
   })
 
   // Get the most recent running scan
-  const activeScan = scans?.find(s => s.status === 'running')
+  const activeScan = scans?.find(s => s.status?.toLowerCase() === 'running')
   const trackedScan = activeScan ?? scans?.[0]
 
   const createMutation = useMutation({
@@ -112,7 +112,8 @@ export default function Scans() {
                 onChange={(e) => setScanType(e.target.value)}
                 className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="full">Full Scan - Complete vulnerability assessment</option>
+                <option value="full">Full Scan - Crawls entire application</option>
+                <option value="single_page">Single Page Mode - No crawling (Test exactly one URL)</option>
                 <option value="quick">Quick Scan - Essential checks only</option>
                 <option value="targeted">Targeted Scan - Specific vulnerabilities</option>
               </select>
@@ -323,7 +324,7 @@ export default function Scans() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {scan.status === 'running' && (
+                    {scan.status?.toLowerCase() === 'running' && (
                       <button
                         onClick={() => handleStopScan(scan.scan_id)}
                         disabled={stopMutation.isPending}
@@ -333,7 +334,7 @@ export default function Scans() {
                         <StopCircle className="w-5 h-5" />
                       </button>
                     )}
-                    {scan.status !== 'running' && (
+                    {scan.status?.toLowerCase() !== 'running' && (
                       <button
                         onClick={() => handleDeleteScan(scan.scan_id)}
                         disabled={deleteMutation.isPending}
@@ -381,7 +382,7 @@ function buildFlowStates(currentPhase?: string | null, scanStatus?: string): Arr
   }
 
   const stage = currentPhase ? (map[currentPhase] ?? 1) : 0
-  const failed = scanStatus === 'failed'
+  const failed = scanStatus?.toLowerCase() === 'failed'
 
   return agents.map((name, index) => {
     const position = index + 1
@@ -394,7 +395,7 @@ function buildFlowStates(currentPhase?: string | null, scanStatus?: string): Arr
     if (position < stage) {
       return { name, state: 'completed' as FlowState }
     }
-    if (position === stage && scanStatus === 'running') {
+    if (position === stage && scanStatus?.toLowerCase() === 'running') {
       return { name, state: 'running' as FlowState }
     }
     return { name, state: 'pending' as FlowState }
@@ -409,5 +410,5 @@ function getStatusColor(status: string): string {
     failed: 'text-red-600',
     cancelled: 'text-orange-600',
   }
-  return colors[status] || 'text-gray-600'
+  return colors[status?.toLowerCase()] || 'text-gray-600'
 }

@@ -57,8 +57,8 @@ REDIS_URL=redis://localhost:6379/0
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=llama3.2:1b
 
-# Neo4j (disabled for local - graph functions will be mocked)
-NEO4J_ENABLED=false
+# PostgreSQL (disabled for local - graph functions will be mocked)
+POSTGRESQL_ENABLED=false
 
 # MinIO (disabled - uses local file storage)
 MINIO_ENABLED=false
@@ -235,9 +235,9 @@ Example response:
 }
 ```
 
-### Graph Database (Neo4j)
+### Graph Database (PostgreSQL)
 
-When `NEO4J_ENABLED=false`, graph operations are logged but not stored.
+When `POSTGRESQL_ENABLED=false`, graph operations are logged but not stored.
 
 ### Storage (MinIO)
 

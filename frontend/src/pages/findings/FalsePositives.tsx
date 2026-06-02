@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { vulnerabilitiesAPI } from '@/services/endpoints'
-import { Ban, Search, AlertTriangle } from 'lucide-react'
+import { Ban } from 'lucide-react'
 import type { Vulnerability } from '@/types'
 
 export default function FalsePositives() {

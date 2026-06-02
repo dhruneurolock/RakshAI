@@ -22,16 +22,16 @@ lxml==5.1.0
 requests==2.31.0
 
 # LLM & AI
-langchain==0.1.6
-langchain-community==0.0.19
+langchain>=0.3
+langchain-community>=0.3
+langchain-ollama>=0.2
+langgraph>=1.2
 ollama==0.1.7
 chromadb==0.4.22
 sentence-transformers==2.3.1
 tiktoken==0.5.2
 
-# Graph Database
-neo4j==5.17.0
-py2neo==2021.2.4
+# Graph Database (Removed in favor of pure PostgreSQL)
 
 # Object Storage
 minio==7.2.3

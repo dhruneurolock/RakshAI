@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Activity, Bot, Brain, CheckCircle2, XCircle, AlertTriangle,
+  Activity, Bot, Brain, CheckCircle2, XCircle,
   Database, Server, Cpu, RefreshCw, Loader2, Zap, Shield,
   ChevronDown, ChevronRight,
 } from 'lucide-react'
@@ -39,7 +39,6 @@ interface DiagnosticResult {
   }
   infrastructure: {
     database: { status: string; error: string | null }
-    neo4j: { status: string; uri: string; authenticated_with: string | null; password_hint?: string; error: string | null }
     redis: { status: string; url: string; error: string | null }
   }
   orchestrator: {
@@ -176,7 +175,7 @@ export default function Diagnostics() {
           </div>
 
           {/* Infrastructure Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Database */}
             <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between mb-3">
@@ -189,25 +188,6 @@ export default function Diagnostics() {
               <p className="text-xs text-slate-500">PostgreSQL / SQLite</p>
               {result.infrastructure.database.error && (
                 <p className="text-xs text-red-500 mt-2 break-all">{result.infrastructure.database.error}</p>
-              )}
-            </div>
-            {/* Neo4j */}
-            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Server className="w-5 h-5 text-green-500" />
-                  <span className="font-semibold text-slate-800">Neo4j</span>
-                </div>
-                <StatusBadge ok={result.infrastructure.neo4j.status === 'online'} />
-              </div>
-              <p className="text-xs text-slate-500 truncate">{result.infrastructure.neo4j.uri}</p>
-              {(result.infrastructure.neo4j as any).password_hint && (
-                <p className="text-xs text-amber-600 mt-2 bg-amber-50 border border-amber-200 rounded-md px-2 py-1">
-                  💡 {(result.infrastructure.neo4j as any).password_hint}
-                </p>
-              )}
-              {result.infrastructure.neo4j.error && (
-                <p className="text-xs text-red-500 mt-2 break-all">{result.infrastructure.neo4j.error}</p>
               )}
             </div>
             {/* Redis */}

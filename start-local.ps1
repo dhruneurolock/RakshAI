@@ -88,52 +88,39 @@ if (-not (Test-Path $venvActivate)) {
     exit 1
 }
 
-# Start Neo4j if missing
-if (Test-TcpPort -Port 7687) {
-    Write-Host "[OK] Neo4j already running on 7687" -ForegroundColor Green
+if (Test-TcpPort -Port 7689) {
 } else {
-    $neo4jBat = $null
     $candidates = @(
-        "D:\neo4j\neo4j-enterprise-2026.01.4\bin\neo4j.bat",
-        "D:\neo4j\bin\neo4j.bat",
-        "C:\neo4j\bin\neo4j.bat"
     )
 
     foreach ($candidate in $candidates) {
         if (Test-Path $candidate) {
-            $neo4jBat = $candidate
             break
         }
     }
 
-    if (-not $neo4jBat) {
-        $found = Get-ChildItem -Path "D:\neo4j" -Filter "neo4j.bat" -Recurse -ErrorAction SilentlyContinue |
             Select-Object -First 1 -ExpandProperty FullName
         if ($found) {
-            $neo4jBat = $found
         }
     }
 
-    if (-not $neo4jBat) {
-        $found = Get-ChildItem -Path "C:\neo4j" -Filter "neo4j.bat" -Recurse -ErrorAction SilentlyContinue |
             Select-Object -First 1 -ExpandProperty FullName
         if ($found) {
-            $neo4jBat = $found
         }
     }
 
-    if ($neo4jBat) {
-        Write-Host "[INFO] Starting Neo4j (console mode): $neo4jBat" -ForegroundColor Yellow
-        $neo4jHome = Split-Path -Parent (Split-Path -Parent $neo4jBat)
-        Start-WindowCommand -Title "Neo4j Console" -Command "Set-Location '$neo4jHome'; & '$neo4jBat' console"
+        if (Test-Path $desktopDbmss) {
+                Select-Object -First 1 -ExpandProperty FullName
+            if ($found) {
+            }
+        }
+    }
 
-        if (Wait-ForPort -Port 7687 -MaxSeconds 35) {
-            Write-Host "[OK] Neo4j is up" -ForegroundColor Green
+
+        if (Wait-ForPort -Port 7689 -MaxSeconds 35) {
         } else {
-            Write-Host "[WARN] Neo4j did not become ready yet; check Neo4j Console window" -ForegroundColor Yellow
         }
     } else {
-        Write-Host "[WARN] Neo4j executable not found under D:\neo4j or C:\neo4j" -ForegroundColor Yellow
     }
 }
 

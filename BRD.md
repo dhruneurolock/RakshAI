@@ -174,7 +174,7 @@ The LLM used for generating explanations shall run locally (Ollama) to ensure se
 | FR-011 | The recon agent shall discover all accessible HTTP/HTTPS endpoints |
 | FR-012 | The system shall identify parameters (query, body, path, header) for each endpoint |
 | FR-013 | The system shall classify parameters by type (id, url, file, token, password, etc.) |
-| FR-014 | Discovered endpoints shall be stored in a Neo4j graph database as an attack graph |
+| FR-014 | Discovered endpoints shall be stored in a PostgreSQL graph database as an attack graph |
 
 ### 6.3 Rule Engine
 
@@ -313,7 +313,7 @@ The LLM used for generating explanations shall run locally (Ollama) to ensure se
 └─────────┬─────────────┬──────────────┬──────────────────┘
           │             │              │
    ┌──────▼──┐   ┌──────▼──┐   ┌──────▼──┐
-   │PostgreSQL│   │  Redis  │   │  Neo4j  │
+   │PostgreSQL│   │  Redis  │   │  PostgreSQL  │
    │(scan data)│  │(queue)  │   │(graph)  │
    └──────────┘   └─────────┘   └─────────┘
           │
@@ -329,7 +329,7 @@ The LLM used for generating explanations shall run locally (Ollama) to ensure se
 |-------|-----------|
 | Frontend | React 18, TypeScript 5, Vite, Tailwind CSS, TanStack Query |
 | Backend | Python 3.11, FastAPI, Celery, SQLAlchemy, Alembic |
-| Databases | PostgreSQL 15 (relational), Redis 7 (cache/queue), Neo4j (graph), ChromaDB (vector) |
+| Databases | PostgreSQL 15 (relational), Redis 7 (cache/queue), PostgreSQL (graph), ChromaDB (vector) |
 | LLM | Ollama (local, open-source models) |
 | Web Scraping | Scrapy, Playwright, httpx, BeautifulSoup |
 | Infrastructure | Docker, Docker Compose, Kubernetes, GitHub Actions |
@@ -402,7 +402,7 @@ The platform **must** cover all OWASP Top 10:2025 categories on every scan:
 | A-02 | Target web applications are accessible from the system running RakshAI |
 | A-03 | Ollama with a compatible LLM model is installed and running locally |
 | A-04 | Docker Desktop or Docker Engine is available for deployment |
-| A-05 | PostgreSQL, Redis, and Neo4j are available (via Docker Compose or external services) |
+| A-05 | PostgreSQL, Redis, and PostgreSQL are available (via Docker Compose or external services) |
 | A-06 | The YAML knowledge base is maintained and updated by the security team as new threats emerge |
 
 ### Constraints
@@ -426,7 +426,7 @@ The platform **must** cover all OWASP Top 10:2025 categories on every scan:
 | R-03 | YAML knowledge base becomes outdated | Medium | High | Modular YAML structure allows updates without code changes; establish regular review cycle |
 | R-04 | LLM (Ollama) produces inaccurate explanations | Medium | Medium | LLM is used for explanation only — never for attack logic; security team reviews reports |
 | R-05 | Concurrent scans overload target application | Medium | High | Rate limiting enforced per scan; configurable delays between requests |
-| R-06 | Neo4j or Redis failure disrupts scanning | Low | High | Service health checks; graceful degradation; scan state persisted in PostgreSQL |
+| R-06 | PostgreSQL or Redis failure disrupts scanning | Low | High | Service health checks; graceful degradation; scan state persisted in PostgreSQL |
 | R-07 | Sensitive finding data is exposed | Low | Critical | Authentication required for all API endpoints; data encrypted at rest and in transit |
 
 ---
@@ -451,7 +451,7 @@ The following items are explicitly **not** in scope for this project:
 | Term | Definition |
 |------|-----------|
 | **Agent** | An autonomous software component responsible for a specific phase of the penetration test lifecycle |
-| **Attack Graph** | A Neo4j graph database structure representing discovered endpoints, planned attacks, and their relationships |
+| **Attack Graph** | A PostgreSQL graph database structure representing discovered endpoints, planned attacks, and their relationships |
 | **Attack Plan** | The final executable test plan assembled by the Rule Engine's Attack Plan Generator |
 | **BRD** | Business Requirements Document |
 | **CVSS** | Common Vulnerability Scoring System — standardized vulnerability severity scoring |

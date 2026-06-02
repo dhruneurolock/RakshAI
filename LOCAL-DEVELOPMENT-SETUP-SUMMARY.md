@@ -84,7 +84,7 @@ This document summarizes all files created for running RakshAI locally *without 
   - `REDIS_ENABLED` (default: True)
   - `CELERY_ENABLED` (default: True)
   - `OLLAMA_ENABLED` (default: True)
-  - `NEO4J_ENABLED` (default: True)
+  - `POSTGRESQL_ENABLED` (default: True)
   - `MINIO_ENABLED` (default: True)
   
 - Added storage configuration:
@@ -162,7 +162,7 @@ When running locally, these services are disabled to avoid setup complexity:
 |---------|---------|-------------------|
 | PostgreSQL | Database | SQLite (file-based) |
 | Redis | Cache | In-memory dictionary |
-| Neo4j | Graph DB | Python dict/Mock |
+| PostgreSQL | Graph DB | Python dict/Mock |
 | MinIO | Object Storage | Local filesystem |
 | Ollama | LLM | Mock responses |
 | Celery | Task Queue | Synchronous execution |
@@ -172,7 +172,7 @@ When running locally, these services are disabled to avoid setup complexity:
 1. **Environment Variables** (`.env` file)
    ```
    REDIS_ENABLED=false
-   NEO4J_ENABLED=false
+   POSTGRESQL_ENABLED=false
    MINIO_ENABLED=false
    OLLAMA_ENABLED=false
    ```
@@ -421,7 +421,7 @@ These enterprise features require external services:
 - **Horizontal scaling**: Needs multiple workers + load balancer
 - **High availability**: Needs database replication + failover
 - **Advanced LLM**: Needs Ollama running (can mock responses)
-- **Threat intelligence**: Needs Neo4j graph DB (can disable)
+- **Threat intelligence**: Needs PostgreSQL graph DB (can disable)
 - **Advanced storage**: Needs MinIO (uses local filesystem instead)
 
 ---

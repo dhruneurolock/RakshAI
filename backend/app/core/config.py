@@ -26,7 +26,6 @@ class Settings(BaseSettings):
     REDIS_ENABLED: bool = True
     CELERY_ENABLED: bool = True
     OLLAMA_ENABLED: bool = True
-    NEO4J_ENABLED: bool = True
     MINIO_ENABLED: bool = True
     
     # Redis
@@ -38,12 +37,8 @@ class Settings(BaseSettings):
     
     # Ollama
     OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL: str = "qwen2.5:latest"
+    OLLAMA_MODEL: str = "llama3.2:1b"
     
-    # Neo4j
-    NEO4J_URI: str = "bolt://localhost:7687"
-    NEO4J_USER: str = "neo4j"
-    NEO4J_PASSWORD: str = "RakshAI123"
     
     # Storage
     STORAGE_TYPE: str = "minio"  # minio or local

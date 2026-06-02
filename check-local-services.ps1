@@ -1,4 +1,4 @@
-﻿# RakshAI - Local Services Health Check
+# RakshAI - Local Services Health Check
 # Robust checker for local development dependencies and apps.
 
 $ErrorActionPreference = "Continue"
@@ -84,12 +84,6 @@ Write-ServiceStatus -Name "Redis (6379)" -IsUp $redisUp -DetailWhenDown "Start M
 if (-not $redisUp) { $allHealthy = $false }
 Write-Host ""
 
-# 3) Neo4j (accept either browser http or bolt listener)
-$neo4jBrowserStatus = Get-HttpStatus -Url "http://localhost:7474"
-$neo4jBoltUp = Test-TcpPort -Port 7687
-$neo4jUp = $neo4jBoltUp -or ($neo4jBrowserStatus -in @(200, 401))
-Write-ServiceStatus -Name "Neo4j (7474/7687)" -IsUp $neo4jUp -DetailWhenUp ("HTTP=" + $neo4jBrowserStatus + ", BOLT=" + $neo4jBoltUp) -DetailWhenDown "Start Neo4j from D:\neo4j\...\bin\neo4j.bat"
-if (-not $neo4jUp) { $allHealthy = $false }
 Write-Host ""
 
 # 4) Ollama

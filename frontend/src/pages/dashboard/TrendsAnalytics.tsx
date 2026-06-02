@@ -12,7 +12,7 @@ export default function TrendsAnalytics() {
     retry: 1,
   })
 
-  const { data: trends, isLoading: trendsLoading } = useQuery({
+  const { isLoading: trendsLoading } = useQuery({
     queryKey: ['dashboard-trends', timeRange],
     queryFn: () => dashboardAPI.trends(timeRange),
     retry: 1,
