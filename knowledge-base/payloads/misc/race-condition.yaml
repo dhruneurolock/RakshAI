@@ -1,0 +1,137 @@
+# Race Condition & Business Logic Exploits
+# The payloads that make you money on bug bounties
+# These bypass rate limits, duplicate transactions, and break business logic
+
+payload_category: "race-condition"
+owasp_2025: "A04"
+cwe: "CWE-362"
+severity: "HIGH"
+
+# ===== TOCTOU (Time-of-Check to Time-of-Use) =====
+toctou:
+  coupon_reuse:
+    description: "Apply same discount coupon multiple times simultaneously"
+    technique:
+      - "Send 20+ parallel POST /apply-coupon requests with same code"
+      - "Use HTTP/2 single-packet attack for true simultaneity"
+      - "Check if discount applied multiple times"
+
+  balance_manipulation:
+    description: "Double-spend by sending simultaneous transfer requests"
+    technique:
+      - "Account has $100. Send 5 parallel transfer requests of $100 each"
+      - "If race succeeds, $500 transferred from $100 balance"
+
+  vote_manipulation:
+    description: "Vote/like multiple times by racing the duplicate check"
+    technique:
+      - "Send 50 parallel POST /vote requests"
+      - "Check if vote count increased by more than 1"
+
+# ===== LIMIT BYPASS =====
+limit_bypass:
+  rate_limit_bypass:
+    description: "Bypass login rate limiting"
+    technique:
+      - "Send batch of login attempts in single HTTP/2 connection"
+      - "Use HTTP pipelining on HTTP/1.1"
+      - "Add X-Forwarded-For with different IPs per request"
+      - "Rotate User-Agent per request"
+
+  otp_brute_force:
+    description: "Brute force OTP by racing the lockout mechanism"
+    technique:
+      - "Send 1000 parallel OTP verification requests"
+      - "Each request has different OTP code"
+      - "Lockout check happens after verification in race window"
+
+  file_upload_race:
+    description: "Upload malicious file, access it before validation deletes it"
+    technique:
+      - "Thread 1: Repeatedly upload shell.php"
+      - "Thread 2: Repeatedly request /uploads/shell.php"
+      - "Race between upload and security scan/deletion"
+
+# ===== HTTP/2 SINGLE-PACKET ATTACK =====
+single_packet_attack:
+  description: "True race condition via HTTP/2 — all requests arrive in exactly 1 TCP packet"
+  technique:
+    - "Withhold all request frames until ready"
+    - "Send all frames in a single TCP packet"
+    - "Eliminates network jitter — true simultaneous arrival"
+    - "Use Turbo Intruder in Burp Suite"
+
+  turbo_intruder_script: |
+    def queueRequests(target, wordlists):
+        engine = RequestEngine(endpoint=target.endpoint,
+                              concurrentConnections=1,
+                              engine=Engine.HTTP2)
+        for i in range(20):
+            engine.queue(target.req, gate='race1')
+        engine.openGate('race1')
+
+# ===== PAYMENT / E-COMMERCE =====
+payment_race:
+  double_charge:
+    - "Send 2 simultaneous payment confirmations"
+    - "Check if charged twice but only 1 order created"
+
+  price_manipulation:
+    - "Thread 1: Add item to cart at $100"
+    - "Thread 2: Change price to $1 (if admin)"
+    - "Thread 1: Checkout (race to use old price)"
+
+  inventory_bypass:
+    - "Item has 1 left in stock"
+    - "Send 10 parallel purchase requests"
+    - "Check if more than 1 succeeds"
+
+  gift_card_race:
+    - "Redeem same gift card code in parallel requests"
+    - "Check if balance credited multiple times"
+
+# ===== ACCOUNT OPERATIONS =====
+account_race:
+  email_change_takeover:
+    - "Thread 1: Change email to attacker@evil.com"
+    - "Thread 2: Request password reset (uses original email)"
+    - "Race: reset token sent to old email after email changed to new"
+
+  registration_race:
+    - "Register same username in parallel"
+    - "Check for duplicate accounts or merged privileges"
+
+  permission_race:
+    - "Thread 1: Admin revokes user's access"
+    - "Thread 2: User performs privileged action"
+    - "Race window between revocation and action"
+
+# ===== DETECTION METHODOLOGY =====
+detection:
+  indicators:
+    - "Successful duplicate operations (2+ coupons applied)"
+    - "Balance inconsistencies"
+    - "Duplicate database entries"
+    - "Transaction count > expected"
+    - "HTTP 200 on multiple parallel requests that should be one-time"
+
+  tools:
+    - "Burp Suite Turbo Intruder"
+    - "Race-The-Web (Go tool)"
+    - "Python asyncio with aiohttp"
+    - "curl --parallel (HTTP/2)"
+
+prevention:
+  - "Use database-level locking (SELECT FOR UPDATE)"
+  - "Implement idempotency keys for mutations"
+  - "Use atomic operations for balance/inventory changes"
+  - "Apply rate limiting at the application level (not just network)"
+  - "Use optimistic locking with version numbers"
+  - "Implement proper transaction isolation levels"
+  - "Use UNIQUE constraints in database"
+
+references:
+  - "OWASP Top 10:2025 A04 (Insecure Design)"
+  - "CWE-362: Race Condition"
+  - "PortSwigger: Race Conditions"
+  - "James Kettle: Smashing the State Machine"

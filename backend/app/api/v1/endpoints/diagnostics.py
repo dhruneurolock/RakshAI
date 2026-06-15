@@ -329,10 +329,10 @@ def _check_orchestrator_pipeline() -> Dict[str, Any]:
     }
 
     try:
-        from app.services.orchestrator import OrchestratorService
+        from app.services.orchestrator import OrchestratorService, get_orchestrator
         result["importable"] = True
 
-        orch = OrchestratorService()
+        orch = get_orchestrator()
         result["instantiable"] = True
         result["has_start_scan"] = hasattr(orch, "start_scan") and callable(getattr(orch, "start_scan"))
 

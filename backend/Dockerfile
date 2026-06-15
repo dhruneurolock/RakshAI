@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
     wget \
     curl \
     libpcap-dev \
+    libpq-dev \
+    gcc \
     && rm -rf /var/lib/apt/lists/*
 
 # Set up Go environment

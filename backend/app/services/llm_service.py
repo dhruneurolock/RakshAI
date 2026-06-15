@@ -125,73 +125,284 @@ class LLMService:
             self.llm_analysis = None
     
     async def initialize_knowledge_base(self):
-        """Load knowledge base YAML files into vector database"""
+        """Load knowledge base YAML files into vector database.
+        
+        The existing knowledge-base lives at the PROJECT ROOT level
+        (e.g. ``knowledge-base/payloads/injection/xss.yaml``).
+
+        Payload YAML files use a deeply-nested structure::
+
+            payload_category: "xss"
+            basic_payloads:
+              - "<script>alert('XSS')</script>"
+              - "<svg onload=alert('XSS')>"
+            filter_bypass:
+              no_script_tag:
+                - "<img src=x onerror=alert('XSS')>"
+
+        This loader walks the entire YAML tree, extracts every leaf
+        string that looks like a payload, and inserts it into ChromaDB
+        with a rich semantic description built from:
+          • the file-level ``payload_category`` and ``owasp_2025``
+          • the YAML key path (e.g. ``filter_bypass > no_script_tag``)
+
+        This enables Agentic RAG: vector search → LLM selection.
+        """
         try:
-            # Resolve KB path: settings → env var → relative to backend dir → Docker fallback
+            import yaml
             import os
+            
+            # ── Resolve KB path ────────────────────────────────────────────
+            # The KB is at the PROJECT ROOT, one level above backend/
             backend_dir = Path(__file__).resolve().parents[2]  # .../backend
+            project_root = backend_dir.parent                  # .../NeuroPentWeb
             candidates = [
-                backend_dir / os.getenv("KNOWLEDGE_BASE_PATH", "./knowledge-base"),
-                backend_dir / "knowledge-base",
-                Path("/app/knowledge-base"),  # Docker fallback
+                project_root / os.getenv("KNOWLEDGE_BASE_PATH", "knowledge-base"),
+                project_root / "knowledge-base",
+                backend_dir / "knowledge-base",                # legacy fallback
+                Path("/app/knowledge-base"),                   # Docker fallback
             ]
             kb_path = next((p for p in candidates if p.exists()), None)
             
             if kb_path is None:
                 logger.warning(f"Knowledge base not found in any of: {[str(c) for c in candidates]}")
                 return
-            
-            # Load all YAML files from knowledge base
-            documents = []
-            
-            for yaml_file in kb_path.rglob("*.yaml"):
+
+            logger.info(f"Loading knowledge base from: {kb_path}")
+
+            # ── Recursive payload extractor ────────────────────────────────
+            def _extract_payloads(node, key_path: list, category: str, owasp: str):
+                """Walk the YAML tree and yield (description, payload_str) tuples."""
+                if isinstance(node, str):
+                    # Leaf string — this is a payload
+                    path_label = " > ".join(key_path) if key_path else "general"
+                    desc = (
+                        f"{category} {path_label} payload"
+                        f"{' (OWASP ' + owasp + ')' if owasp else ''}"
+                    )
+                    yield (desc, node, category)
+
+                elif isinstance(node, list):
+                    for idx, item in enumerate(node):
+                        yield from _extract_payloads(item, key_path, category, owasp)
+
+                elif isinstance(node, dict):
+                    for key, value in node.items():
+                        # Skip non-payload metadata keys
+                        if key in (
+                            "payload_category", "owasp_2025", "cwe", "severity",
+                            "version", "description", "prevention", "tools",
+                            "references", "testing_steps", "note", "comment",
+                            "csp_bypass",
+                        ):
+                            continue
+                        yield from _extract_payloads(
+                            value, key_path + [str(key)], category, owasp
+                        )
+
+            # ── Walk all YAML files under payloads/ ────────────────────────
+            payload_texts = []
+            payload_metadatas = []
+            general_documents = []
+
+            payloads_dir = kb_path / "payloads"
+            all_yaml_files = list(kb_path.rglob("*.yaml"))
+
+            for yaml_file in all_yaml_files:
                 try:
-                    with open(yaml_file, 'r') as f:
-                        content = f.read()
-                        documents.append({
+                    with open(yaml_file, "r", encoding="utf-8") as f:
+                        data = yaml.safe_load(f)
+
+                    if not isinstance(data, dict):
+                        continue
+
+                    # Check if this is a payload/test-case file
+                    test_cases_dir = kb_path / "test-cases"
+                    is_payload_file = (
+                        "payload_category" in data
+                        or "test_category" in data
+                        or "test_cases" in data
+                        or str(yaml_file).startswith(str(payloads_dir))
+                        or str(yaml_file).startswith(str(test_cases_dir))
+                    )
+
+                    if is_payload_file:
+                        category = (
+                            data.get("payload_category")
+                            or data.get("test_category")
+                            or data.get("subcategory")
+                            or yaml_file.stem
+                        )
+                        owasp = data.get("owasp_2025", "")
+
+                        count = 0
+                        for desc, payload_str, cat in _extract_payloads(data, [], category, owasp):
+                            # Skip very short strings that are probably labels
+                            if len(payload_str) < 2:
+                                continue
+                            payload_texts.append(desc)
+                            payload_metadatas.append({
+                                "source": str(yaml_file.relative_to(kb_path)),
+                                "type": "payload",
+                                "payload": payload_str,
+                                "category": cat.upper(),
+                            })
+                            count += 1
+
+                        logger.info(
+                            f"Extracted {count} payloads from "
+                            f"{yaml_file.relative_to(kb_path)} "
+                            f"(category={category})"
+                        )
+                    else:
+                        # General KB document — chunk as text
+                        with open(yaml_file, "r", encoding="utf-8") as f:
+                            content = f.read()
+                        general_documents.append({
                             "content": content,
                             "metadata": {
                                 "source": str(yaml_file.relative_to(kb_path)),
-                                "type": "knowledge_base"
-                            }
+                                "type": "knowledge_base",
+                            },
                         })
+
                 except Exception as e:
                     logger.error(f"Failed to load {yaml_file}: {e}")
-            
-            if documents:
-                # Split documents into chunks
+
+            # ── Build text + metadata lists for ChromaDB ───────────────────
+            texts = list(payload_texts)
+            metadatas = list(payload_metadatas)
+
+            if general_documents and RecursiveCharacterTextSplitter:
                 text_splitter = RecursiveCharacterTextSplitter(
                     chunk_size=1000,
-                    chunk_overlap=200
+                    chunk_overlap=200,
                 )
-                
-                texts = []
-                metadatas = []
-                
-                for doc in documents:
+                for doc in general_documents:
                     chunks = text_splitter.split_text(doc["content"])
                     texts.extend(chunks)
                     metadatas.extend([doc["metadata"]] * len(chunks))
-                
-                # Create vector store
-                chroma_client = chromadb.HttpClient(host="chromadb", port=8000)
-                
-                self.vector_store = Chroma(
-                    client=chroma_client,
-                    collection_name="rakshaidb_knowledge",
-                    embedding_function=self.embeddings
-                )
-                
+
+            if texts:
+                # Create vector store (in-memory fallback if server unavailable)
+                try:
+                    chroma_client = chromadb.HttpClient(host="chromadb", port=8000)
+                    self.vector_store = Chroma(
+                        client=chroma_client,
+                        collection_name="rakshaidb_knowledge",
+                        embedding_function=self.embeddings,
+                    )
+                except Exception:
+                    logger.warning("ChromaDB server unavailable — using in-memory vector store")
+                    self.vector_store = Chroma(
+                        collection_name="rakshaidb_knowledge",
+                        embedding_function=self.embeddings,
+                    )
+
                 # Add documents
                 self.vector_store.add_texts(
                     texts=texts,
-                    metadatas=metadatas
+                    metadatas=metadatas,
                 )
-                
-                logger.info(f"Loaded {len(documents)} documents ({len(texts)} chunks) into knowledge base")
+
+                logger.info(
+                    f"Loaded {len(payload_texts)} payloads + "
+                    f"{len(texts) - len(payload_texts)} KB chunks into vector store"
+                )
                 
         except Exception as e:
             logger.error(f"Failed to initialize knowledge base: {e}")
+
+    # ── Agentic RAG: Retrieve → Think → Select ──────────────────────────
+
+    async def get_agentic_rag_payloads(
+        self,
+        context: str,
+        k_retrieve: int = 10,
+        k_select: int = 3,
+    ) -> List[str]:
+        """Agentic RAG payload selection.
+
+        Phase 1 — Retrieve:
+            Fast vector similarity search pulls the top *k_retrieve* payload
+            descriptions from ChromaDB and returns their exact payload strings.
+
+        Phase 2 — Think (Agentic):
+            The LLM reviews those candidates against the concrete endpoint
+            context and picks the best *k_select* payloads to actually fire.
+
+        Falls back to pure vector results when the LLM is unavailable.
+        """
+        if not self.vector_store:
+            logger.warning("Vector store not initialized — cannot perform Agentic RAG")
+            return []
+
+        try:
+            # ── Phase 1: Retrieve (vector math — milliseconds) ──────────
+            docs = self.vector_store.similarity_search(
+                context,
+                k=k_retrieve,
+                filter={"type": "payload"},  # only search payload entries
+            )
+            retrieved = [
+                {
+                    "payload": doc.metadata.get("payload", ""),
+                    "description": doc.page_content,
+                    "category": doc.metadata.get("category", ""),
+                }
+                for doc in docs
+                if "payload" in doc.metadata
+            ]
+
+            if not retrieved:
+                logger.info(f"[agentic-rag] No payloads found for context: {context[:80]}")
+                return []
+
+            logger.info(
+                f"[agentic-rag] Retrieved {len(retrieved)} candidate payloads "
+                f"for context: {context[:80]}"
+            )
+
+            # ── Phase 2: Think (LLM reasoning — seconds) ────────────────
+            if self.llm_strategic or self.llm_analysis:
+                selection_prompt = f"""You are an expert penetration tester selecting exploit payloads.
+
+TARGET CONTEXT:
+{context}
+
+CANDIDATE PAYLOADS (retrieved from your validated arsenal):
+{json.dumps(retrieved, indent=2)}
+
+INSTRUCTIONS:
+1. Analyze the target context (parameter name, type, technology hints).
+2. Select exactly {k_select} payloads from the candidates that are most
+   likely to succeed against this specific target.
+3. Prefer payloads that match the parameter type (string vs integer),
+   the likely database engine, and the injection context.
+
+Return ONLY a JSON array of the selected payload strings, nothing else.
+Example: ["payload1", "payload2", "payload3"]
+"""
+                try:
+                    result = await self.analyze(
+                        selection_prompt,
+                        response_format="json",
+                        use_knowledge_base=False,  # don't re-RAG the prompt
+                    )
+                    if isinstance(result, list):
+                        logger.info(f"[agentic-rag] LLM selected {len(result)} payloads")
+                        return result
+                except Exception as llm_err:
+                    logger.warning(f"[agentic-rag] LLM selection failed, using vector results: {llm_err}")
+
+            # ── Fallback: return top-k from vector search directly ──────
+            fallback = [r["payload"] for r in retrieved[:k_select]]
+            logger.info(f"[agentic-rag] Falling back to top-{k_select} vector results")
+            return fallback
+
+        except Exception as e:
+            logger.error(f"[agentic-rag] Agentic RAG failed: {e}")
+            return []
     
     async def analyze(
         self,

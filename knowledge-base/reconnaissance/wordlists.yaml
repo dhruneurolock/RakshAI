@@ -1,0 +1,206 @@
+# Reconnaissance Wordlists for Directory & File Discovery
+# What a red teamer bruteforces FIRST before testing anything
+
+recon_category: "wordlists"
+version: "1.0"
+
+# ===== HIGH-VALUE TARGETS (Check these FIRST) =====
+critical_paths:
+  source_control:
+    - "/.git/config"
+    - "/.git/HEAD"
+    - "/.git/index"
+    - "/.gitignore"
+    - "/.svn/entries"
+    - "/.svn/wc.db"
+    - "/.hg/requires"
+    - "/.bzr/README"
+
+  environment_files:
+    - "/.env"
+    - "/.env.local"
+    - "/.env.production"
+    - "/.env.staging"
+    - "/.env.development"
+    - "/.env.backup"
+    - "/.env.bak"
+    - "/.env.old"
+    - "/.env.example"
+
+  config_files:
+    - "/config.php"
+    - "/config.yml"
+    - "/config.json"
+    - "/config.xml"
+    - "/configuration.php"
+    - "/wp-config.php"
+    - "/wp-config.php.bak"
+    - "/web.config"
+    - "/application.yml"
+    - "/application.properties"
+    - "/settings.py"
+    - "/settings.json"
+    - "/database.yml"
+    - "/secrets.yml"
+    - "/credentials.json"
+
+  backup_files:
+    - "/backup.sql"
+    - "/backup.zip"
+    - "/backup.tar.gz"
+    - "/db.sql"
+    - "/database.sql"
+    - "/dump.sql"
+    - "/site.zip"
+    - "/www.zip"
+    - "/backup/"
+    - "/old/"
+    - "/temp/"
+
+# ===== ADMIN PANELS =====
+admin_paths:
+  generic:
+    - "/admin"
+    - "/admin/"
+    - "/administrator"
+    - "/admin/login"
+    - "/admin/dashboard"
+    - "/panel"
+    - "/cpanel"
+    - "/management"
+    - "/manager"
+    - "/console"
+    - "/portal"
+    - "/backstage"
+    - "/_admin"
+
+  framework_specific:
+    django: "/admin/"
+    laravel: "/nova"
+    rails: "/rails/info"
+    spring: "/actuator"
+    wordpress: "/wp-admin"
+    drupal: "/admin"
+    joomla: "/administrator"
+
+# ===== API DISCOVERY =====
+api_paths:
+  rest:
+    - "/api"
+    - "/api/"
+    - "/api/v1"
+    - "/api/v2"
+    - "/api/v3"
+    - "/api/users"
+    - "/api/admin"
+    - "/api/config"
+    - "/api/debug"
+    - "/api/health"
+    - "/api/status"
+    - "/api/internal"
+
+  documentation:
+    - "/swagger-ui.html"
+    - "/swagger-ui/"
+    - "/swagger.json"
+    - "/swagger.yaml"
+    - "/api-docs"
+    - "/api-docs/"
+    - "/openapi.json"
+    - "/redoc"
+    - "/graphql"
+    - "/graphiql"
+    - "/altair"
+    - "/playground"
+
+  debug_endpoints:
+    - "/debug"
+    - "/trace"
+    - "/metrics"
+    - "/health"
+    - "/healthcheck"
+    - "/info"
+    - "/status"
+    - "/server-status"
+    - "/server-info"
+    - "/_debug"
+    - "/elmah.axd"
+    - "/phpinfo.php"
+    - "/test.php"
+    - "/info.php"
+
+# ===== MONITORING & DEVOPS =====
+monitoring:
+  spring_actuator:
+    - "/actuator"
+    - "/actuator/env"
+    - "/actuator/health"
+    - "/actuator/info"
+    - "/actuator/mappings"
+    - "/actuator/beans"
+    - "/actuator/configprops"
+    - "/actuator/heapdump"
+    - "/actuator/threaddump"
+    - "/actuator/loggers"
+
+  other:
+    - "/prometheus"
+    - "/grafana"
+    - "/kibana"
+    - "/jenkins"
+    - "/.well-known/security.txt"
+    - "/robots.txt"
+    - "/sitemap.xml"
+    - "/crossdomain.xml"
+    - "/clientaccesspolicy.xml"
+
+# ===== COMMON INTERESTING FILES =====
+interesting_files:
+  - "/README.md"
+  - "/CHANGELOG.md"
+  - "/LICENSE"
+  - "/package.json"
+  - "/composer.json"
+  - "/Gemfile"
+  - "/requirements.txt"
+  - "/Dockerfile"
+  - "/docker-compose.yml"
+  - "/.dockerignore"
+  - "/.htaccess"
+  - "/.htpasswd"
+  - "/nginx.conf"
+  - "/Makefile"
+  - "/Procfile"
+  - "/Vagrantfile"
+
+# ===== FILE EXTENSION BRUTEFORCE =====
+backup_extensions:
+  - ".bak"
+  - ".old"
+  - ".orig"
+  - ".copy"
+  - ".tmp"
+  - ".temp"
+  - ".save"
+  - ".swp"
+  - ".swo"
+  - "~"
+  - ".1"
+  - ".2"
+  - ".zip"
+  - ".tar.gz"
+  - ".gz"
+
+source_extensions:
+  - ".php"
+  - ".php.bak"
+  - ".asp"
+  - ".aspx"
+  - ".jsp"
+  - ".py"
+  - ".rb"
+  - ".js"
+  - ".ts"
+  - ".go"
+  - ".java"
+  - ".cs"

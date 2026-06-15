@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from app.core.database import SessionLocal
 from app.models.models import ScheduledScan, Scan, ScanStatus
-from app.services.orchestrator import OrchestratorService
+from app.services.orchestrator import OrchestratorService, get_orchestrator
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ async def _trigger_scheduled_scan(schedule: ScheduledScan, db: Session) -> None:
         db.refresh(scan)
 
         # Launch via orchestrator
-        orchestrator = OrchestratorService()
+        orchestrator = get_orchestrator()
         result = await orchestrator.start_scan(
             scan_id=scan_id,
             target_url=schedule.target_url,

@@ -88,41 +88,12 @@ if (-not (Test-Path $venvActivate)) {
     exit 1
 }
 
-if (Test-TcpPort -Port 7689) {
-} else {
-    $candidates = @(
-    )
 
-    foreach ($candidate in $candidates) {
-        if (Test-Path $candidate) {
-            break
-        }
-    }
-
-            Select-Object -First 1 -ExpandProperty FullName
-        if ($found) {
-        }
-    }
-
-            Select-Object -First 1 -ExpandProperty FullName
-        if ($found) {
-        }
-    }
-
-        if (Test-Path $desktopDbmss) {
-                Select-Object -First 1 -ExpandProperty FullName
-            if ($found) {
-            }
-        }
-    }
-
-
-        if (Wait-ForPort -Port 7689 -MaxSeconds 35) {
-        } else {
-        }
-    } else {
-    }
-}
+# Start Docker Compose services (MinIO, Redis, AGEDB) if missing
+Write-Host "[INFO] Starting AGEDB, MinIO, Redis..." -ForegroundColor Yellow
+$dockerCmd = "Set-Location '$root'; docker-compose up -d agedb"
+Start-Process powershell -WindowStyle Hidden -ArgumentList "-Command", $dockerCmd | Out-Null
+Start-Sleep -Seconds 5
 
 # Start Ollama (LLM) if missing
 if (Test-TcpPort -Port 11434) {

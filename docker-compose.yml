@@ -39,3 +39,20 @@ services:
       - OLLAMA_MODEL=llama3.2:1b
       
       - PYTHONPATH=/app
+
+  agedb:
+    image: apache/age:latest
+    container_name: neuropent_agedb
+    environment:
+      - POSTGRES_USER=neuropent
+      - POSTGRES_PASSWORD=neuropent_graph_pass
+      - POSTGRES_DB=neuropent_graph
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    ports:
+      - "5433:5432"
+    volumes:
+      - agedb_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  agedb_data:

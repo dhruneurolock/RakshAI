@@ -134,8 +134,18 @@ class ExploitExecutionAgent(BaseAgent):
             _log.info(f"[executor] Building attacks from {len(endpoints)} endpoints")
 
             # Categorize endpoints for attack planning
+            # Cap per-type to avoid sending thousands of HTTP requests
+            MAX_SQLI = 5
+            MAX_XSS = 5
+            MAX_IDOR = 3
+            MAX_AUTH = 2  # auth bypass is expensive (default creds, API probing)
+
             attacks = []
             attack_idx = 0
+            seen_sqli_urls = set()
+            seen_xss_urls = set()
+            seen_auth_urls = set()
+            idor_count = 0
 
             for ep in endpoints:
                 url = ep.url or ""
@@ -143,31 +153,34 @@ class ExploitExecutionAgent(BaseAgent):
                 ep_type = ep.endpoint_type or "page"
                 url_lower = url.lower()
 
-                # SQL Injection — test all endpoints with query params or forms
-                if "?" in url or method == "POST" or ep_type == "form":
+                # SQL Injection — prioritize forms/params, cap total
+                if url not in seen_sqli_urls and len(seen_sqli_urls) < MAX_SQLI:
+                    seen_sqli_urls.add(url)
                     attacks.append({
                         "attack_id": f"{scan_id}_attack_{attack_idx}",
                         "type": "SQLI",
                         "target_url": url,
-                        "priority": 80,
+                        "priority": 80 if ("?" in url or method == "POST" or ep_type == "form") else 60,
                         "tools": ["sqlmap"],
                         "sequence": 3,
                     })
                     attack_idx += 1
 
-                # XSS — test all endpoints (reflected XSS can appear on any page)
-                attacks.append({
-                    "attack_id": f"{scan_id}_attack_{attack_idx}",
-                    "type": "XSS",
-                    "target_url": url,
-                    "priority": 70,
-                    "tools": ["dalfox"],
-                    "sequence": 4,
-                })
-                attack_idx += 1
+                # XSS — cap total
+                if url not in seen_xss_urls and len(seen_xss_urls) < MAX_XSS:
+                    seen_xss_urls.add(url)
+                    attacks.append({
+                        "attack_id": f"{scan_id}_attack_{attack_idx}",
+                        "type": "XSS",
+                        "target_url": url,
+                        "priority": 70,
+                        "tools": ["dalfox"],
+                        "sequence": 4,
+                    })
+                    attack_idx += 1
 
-                # IDOR — test endpoints with numeric IDs in path
-                if any(seg.isdigit() for seg in url.split("/")):
+                # IDOR — test endpoints with numeric IDs in path OR API endpoints
+                if idor_count < MAX_IDOR and (any(seg.isdigit() for seg in url.split("/")) or "/api" in url_lower):
                     attacks.append({
                         "attack_id": f"{scan_id}_attack_{attack_idx}",
                         "type": "IDOR",
@@ -177,18 +190,35 @@ class ExploitExecutionAgent(BaseAgent):
                         "sequence": 2,
                     })
                     attack_idx += 1
+                    idor_count += 1
 
-                # Auth bypass — test login/admin/api endpoints
-                if any(x in url_lower for x in ["/login", "/auth", "/admin", "/api/"]):
+                # Auth bypass — only test a few endpoints (expensive)
+                if url not in seen_auth_urls and len(seen_auth_urls) < MAX_AUTH:
+                    seen_auth_urls.add(url)
                     attacks.append({
                         "attack_id": f"{scan_id}_attack_{attack_idx}",
                         "type": "AUTH_BYPASS",
                         "target_url": url,
-                        "priority": 95,
+                        "priority": 95 if any(x in url_lower for x in ["/login", "/auth", "/admin", "/api/"]) else 50,
                         "tools": ["auth_bypass_tester"],
                         "sequence": 1,
                     })
                     attack_idx += 1
+
+            # ── Security Headers — test the base target URL once ──
+            from urllib.parse import urlparse as _up
+            base_parsed = _up(endpoints[0].url if endpoints else "")
+            base_target = f"{base_parsed.scheme}://{base_parsed.netloc}" if base_parsed.netloc else ""
+            if base_target:
+                attacks.append({
+                    "attack_id": f"{scan_id}_attack_{attack_idx}",
+                    "type": "SECURITY_HEADERS",
+                    "target_url": base_target,
+                    "priority": 40,
+                    "tools": ["security_headers"],
+                    "sequence": 5,
+                })
+                attack_idx += 1
 
             # Sort by priority (highest first)
             attacks.sort(key=lambda a: a["priority"], reverse=True)
@@ -245,6 +275,8 @@ class ExploitExecutionAgent(BaseAgent):
                 return await self._execute_idor(scan_id, attack)
             elif attack_type == "AUTH_BYPASS":
                 return await self._execute_auth_bypass(scan_id, attack)
+            elif attack_type == "SECURITY_HEADERS":
+                return await self._execute_security_headers(scan_id, attack)
             else:
                 return await self._execute_generic(scan_id, attack)
                 
@@ -381,6 +413,32 @@ class ExploitExecutionAgent(BaseAgent):
         """Execute generic attack"""
         return {"success": True, "findings": [], "raw_output": ""}
     
+    async def _execute_security_headers(self, scan_id: str, attack: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute security headers analysis"""
+        target_url = attack.get("target_url")
+        
+        try:
+            result = await self.tool_sandbox.execute("security_headers", {
+                "url": target_url,
+            })
+            
+            if result.success:
+                findings = self._parse_security_headers_output(result.output, target_url)
+                
+                for finding in findings:
+                    await self._create_finding(scan_id, attack, finding)
+                
+                return {
+                    "success": True,
+                    "findings": findings,
+                    "raw_output": result.output
+                }
+            else:
+                return {"success": False, "error": result.error, "findings": []}
+                
+        except Exception as e:
+            return {"success": False, "error": str(e), "findings": []}
+    
     def _parse_sqlmap_output(self, output: str, url: str) -> List[Dict[str, Any]]:
         """Parse SQLMap output for findings"""
         findings = []
@@ -391,28 +449,69 @@ class ExploitExecutionAgent(BaseAgent):
                 "type": "SQL_INJECTION",
                 "severity": "HIGH",
                 "url": url,
-                "description": "SQL injection vulnerability detected",
-                "evidence": output[:500]
+                "description": (
+                    f"SQL Injection vulnerability detected at {url}.\n\n"
+                    "The application fails to properly sanitize user input before incorporating it "
+                    "into SQL queries. An attacker can inject malicious SQL statements to read, "
+                    "modify, or delete database contents.\n\n"
+                    "**Impact:** An attacker can extract sensitive data (usernames, passwords, "
+                    "credit card numbers), modify or delete records, and in some cases execute "
+                    "operating system commands on the database server."
+                ),
+                "evidence": output[:500],
+                "remediation": (
+                    "1. **Immediate:** Use parameterized queries (prepared statements) for all "
+                    "database interactions.\n"
+                    "2. **Input Validation:** Validate and sanitize all user inputs on the server side.\n"
+                    "3. **ORM Usage:** Use an ORM framework that handles query parameterization automatically.\n"
+                    "4. **Least Privilege:** Ensure the database user has minimal required permissions.\n"
+                    "5. **WAF:** Deploy a Web Application Firewall to detect and block SQL injection attempts."
+                ),
             })
         
         return findings
     
     def _parse_dalfox_output(self, output: str, url: str) -> List[Dict[str, Any]]:
-        """Parse Dalfox output for XSS findings"""
+        """Parse Dalfox/XSS simulator output for findings"""
         findings = []
         
         try:
             # Dalfox outputs JSON
             data = json.loads(output) if output else []
             for item in data:
+                param = item.get("param", "unknown")
+                payload = item.get("payload", "")
+
+                # Distinguish between actual reflected XSS and missing-header findings
+                if param == "headers":
+                    # Missing security header — already covered by SECURITY_HEADERS attack
+                    # Skip to avoid duplicates (security headers are handled separately)
+                    continue
+
                 findings.append({
                     "type": "XSS",
                     "severity": "MEDIUM",
-                    "url": url,
-                    "parameter": item.get("param"),
-                    "payload": item.get("payload"),
-                    "description": "Cross-Site Scripting (XSS) vulnerability detected",
-                    "evidence": item.get("evidence")
+                    "url": item.get("url", url),
+                    "parameter": param,
+                    "payload": payload,
+                    "description": (
+                        f"Cross-Site Scripting (XSS) vulnerability detected at {item.get('url', url)} "
+                        f"in the '{param}' parameter.\n\n"
+                        f"The injected payload `{payload[:80]}` was reflected in the response "
+                        "without proper encoding or sanitization. An attacker can inject "
+                        "arbitrary JavaScript code that executes in the context of other users' "
+                        "browser sessions.\n\n"
+                        "**Impact:** Session hijacking, credential theft, defacement, "
+                        "phishing attacks, and malware distribution to legitimate users."
+                    ),
+                    "evidence": item.get("evidence", ""),
+                    "remediation": (
+                        "1. **Output Encoding:** HTML-encode all user-supplied data before rendering.\n"
+                        "2. **Content Security Policy:** Implement a strict CSP header to prevent inline script execution.\n"
+                        "3. **Input Validation:** Reject or strip HTML/JavaScript from user inputs.\n"
+                        "4. **HTTPOnly Cookies:** Set the HttpOnly flag on session cookies to prevent JS access.\n"
+                        "5. **Framework Protection:** Use a templating engine with auto-escaping enabled."
+                    ),
                 })
         except:
             pass
@@ -428,8 +527,23 @@ class ExploitExecutionAgent(BaseAgent):
                 "type": "IDOR",
                 "severity": "HIGH",
                 "url": url,
-                "description": "Insecure Direct Object Reference (IDOR) vulnerability",
-                "evidence": output[:500]
+                "description": (
+                    f"Insecure Direct Object Reference (IDOR) vulnerability detected at {url}.\n\n"
+                    "The application exposes internal object references (e.g., numeric IDs) in URLs "
+                    "and does not verify that the authenticated user is authorized to access the "
+                    "requested resource. By changing the ID parameter, an attacker can access "
+                    "other users' data.\n\n"
+                    "**Impact:** Unauthorized access to sensitive user data, account takeover, "
+                    "data exfiltration, and potential regulatory compliance violations (GDPR, HIPAA)."
+                ),
+                "evidence": output[:500],
+                "remediation": (
+                    "1. **Authorization Checks:** Verify that the authenticated user owns the requested resource on every API call.\n"
+                    "2. **Indirect References:** Use indirect reference maps (UUIDs or tokens) instead of sequential IDs.\n"
+                    "3. **Access Control Layer:** Implement a centralized authorization middleware.\n"
+                    "4. **Rate Limiting:** Rate-limit enumeration attempts on resource endpoints.\n"
+                    "5. **Audit Logging:** Log all access to sensitive resources for anomaly detection."
+                ),
             })
         
         return findings
@@ -439,14 +553,97 @@ class ExploitExecutionAgent(BaseAgent):
         findings = []
         
         if "BYPASS_SUCCESSFUL" in output:
+            # Try to extract methods from the JSON output
+            bypass_methods = []
+            try:
+                json_start = output.index("[")
+                json_end = output.rindex("]") + 1
+                details = json.loads(output[json_start:json_end])
+                bypass_methods = [d.get("method", "unknown") for d in details if isinstance(d, dict)]
+            except Exception:
+                pass
+
+            methods_text = ", ".join(bypass_methods) if bypass_methods else "path traversal / verb tampering / header injection"
+
             findings.append({
                 "type": "AUTH_BYPASS",
                 "severity": "CRITICAL",
                 "url": url,
-                "description": "Authentication bypass vulnerability detected",
-                "evidence": output[:500]
+                "description": (
+                    f"Authentication bypass vulnerability detected on {url}.\n\n"
+                    f"The following bypass techniques were successful: {methods_text}.\n\n"
+                    "An attacker can access protected resources without valid credentials by manipulating "
+                    "the request path, HTTP method, or headers. This allows unauthorized access to "
+                    "administrative panels, user data, and sensitive application functionality.\n\n"
+                    "**Impact:** Complete authentication bypass leading to unauthorized access. "
+                    "An attacker can view, modify, or delete data belonging to other users, "
+                    "escalate privileges, and compromise the entire application."
+                ),
+                "evidence": output[:500],
+                "remediation": (
+                    "1. **Immediate:** Implement server-side authentication checks on every protected route. "
+                    "Do not rely on client-side or path-based access controls.\n"
+                    "2. **Path Normalization:** Normalize all URL paths before evaluating access rules "
+                    "(remove /./, /../, URL-encoded variants).\n"
+                    "3. **Method Enforcement:** Restrict allowed HTTP methods per endpoint; reject OPTIONS/TRACE "
+                    "on sensitive routes.\n"
+                    "4. **Header Validation:** Do not trust X-Forwarded-For, X-Original-URL, or X-Rewrite-URL "
+                    "headers for access control decisions.\n"
+                    "5. **Testing:** Add integration tests that verify 401/403 responses for all protected "
+                    "endpoints when accessed without valid credentials."
+                ),
             })
         
+        return findings
+    
+    def _parse_security_headers_output(self, output: str, url: str) -> List[Dict[str, Any]]:
+        """Parse security headers analysis output"""
+        findings = []
+
+        if "SECURITY_HEADERS_ISSUES" not in output:
+            return findings
+
+        try:
+            # Extract JSON array from the output
+            json_start = output.index("[")
+            json_end = output.rindex("]") + 1
+            issues = json.loads(output[json_start:json_end])
+        except Exception:
+            return findings
+
+        for issue in issues:
+            if not isinstance(issue, dict):
+                continue
+
+            severity = (issue.get("severity", "LOW")).upper()
+            title = issue.get("title", "Security Header Missing")
+            description = issue.get("description", "")
+            issue_type = issue.get("type", "SECURITY_HEADER_MISSING")
+
+            findings.append({
+                "type": issue_type,
+                "severity": severity,
+                "url": url,
+                "description": (
+                    f"{title}\n\n"
+                    f"{description}\n\n"
+                    "**OWASP Category:** A05:2021 - Security Misconfiguration\n\n"
+                    "**Impact:** Missing security headers weaken the application's defense-in-depth "
+                    "posture. While each missing header individually may be low-to-medium risk, "
+                    "the cumulative effect significantly increases the attack surface."
+                ),
+                "evidence": f"Header '{issue.get('header', '')}' not found in HTTP response",
+                "remediation": (
+                    f"Add the missing header to your server configuration:\n\n"
+                    f"**Header:** {issue.get('header', '')}\n\n"
+                    "Configure this in your web server (Nginx, Apache) or application middleware.\n"
+                    "For Nginx: add_header {header} \"value\" always;\n"
+                    "For Apache: Header always set {header} \"value\"\n"
+                    "For Express.js: Use the 'helmet' middleware package."
+                ).format(header=issue.get("header", "")),
+                "owasp_category": "A05",
+            })
+
         return findings
     
     async def _create_finding(self, scan_id: str, attack: Dict[str, Any], finding: Dict[str, Any]) -> None:
@@ -524,13 +721,41 @@ class ExploitExecutionAgent(BaseAgent):
                     "AUTH_BYPASS": "A07",
                     "SSRF": "A10",
                     "PATH_TRAVERSAL": "A01",
+                    "SECURITY_HEADER_MISSING": "A05",
+                    "SERVER_INFO_LEAK": "A05",
+                    "INSECURE_COOKIE": "A05",
                 }
-                owasp_category = owasp_map.get(vuln_type, "A05")
+                # Prefer finding-level owasp_category if set
+                owasp_category = finding.get("owasp_category") or owasp_map.get(vuln_type, "A05")
+
+                cwe_map = {
+                    "SQL_INJECTION": "CWE-89",
+                    "XSS": "CWE-79",
+                    "IDOR": "CWE-639",
+                    "AUTH_BYPASS": "CWE-287",
+                    "SSRF": "CWE-918",
+                    "PATH_TRAVERSAL": "CWE-22",
+                    "SECURITY_HEADER_MISSING": "CWE-693",
+                    "SERVER_INFO_LEAK": "CWE-200",
+                    "INSECURE_COOKIE": "CWE-614",
+                }
+
+                # Use the finding's title if available, otherwise generate from type
+                title_map = {
+                    "SQL_INJECTION": "SQL Injection Vulnerability",
+                    "XSS": "Cross-Site Scripting (XSS)",
+                    "IDOR": "Insecure Direct Object Reference (IDOR)",
+                    "AUTH_BYPASS": "Authentication Bypass",
+                    "SECURITY_HEADER_MISSING": finding.get("description", "").split("\n")[0] if finding.get("description") else "Missing Security Header",
+                    "SERVER_INFO_LEAK": finding.get("description", "").split("\n")[0] if finding.get("description") else "Server Information Disclosure",
+                    "INSECURE_COOKIE": "Insecure Cookie Configuration",
+                }
+                title = title_map.get(vuln_type, f"{vuln_type} vulnerability detected")
 
                 vuln = Vulnerability(
                     scan_id=scan.id,
                     endpoint_id=endpoint_id,
-                    title=f"{vuln_type} vulnerability detected",
+                    title=title,
                     description=finding.get("description", f"{vuln_type} vulnerability found at {finding_url}"),
                     severity=severity_enum,
                     confidence=0.75,
@@ -540,6 +765,8 @@ class ExploitExecutionAgent(BaseAgent):
                     response_evidence=finding.get("evidence", ""),
                     affected_parameter=finding.get("parameter", ""),
                     attack_vector=attack.get("type", ""),
+                    remediation=finding.get("remediation", ""),
+                    cwe_id=cwe_map.get(vuln_type, ""),
                     status="UNVALIDATED",
                 )
                 db.add(vuln)

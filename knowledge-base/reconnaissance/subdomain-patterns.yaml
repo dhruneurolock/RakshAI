@@ -1,0 +1,260 @@
+# Subdomain Discovery Patterns & Methodology
+# A red teamer's attack surface enumeration playbook
+
+recon_category: "subdomain-discovery"
+version: "1.0"
+
+# ===== HIGH-VALUE SUBDOMAINS =====
+# These are where vulnerabilities live — internal tools exposed to the internet
+critical_subdomains:
+  internal_tools:
+    - "admin"
+    - "portal"
+    - "dashboard"
+    - "panel"
+    - "manage"
+    - "console"
+    - "internal"
+    - "intranet"
+    - "backoffice"
+    - "control"
+
+  development:
+    - "dev"
+    - "development"
+    - "staging"
+    - "stage"
+    - "stg"
+    - "uat"
+    - "test"
+    - "testing"
+    - "qa"
+    - "sandbox"
+    - "demo"
+    - "preview"
+    - "beta"
+    - "alpha"
+    - "canary"
+    - "preprod"
+    - "pre-prod"
+
+  api_services:
+    - "api"
+    - "api-v1"
+    - "api-v2"
+    - "api2"
+    - "rest"
+    - "graphql"
+    - "gateway"
+    - "backend"
+    - "service"
+    - "microservice"
+    - "ws"
+    - "websocket"
+    - "grpc"
+    - "rpc"
+
+  infrastructure:
+    - "vpn"
+    - "ssh"
+    - "rdp"
+    - "ftp"
+    - "sftp"
+    - "jump"
+    - "bastion"
+    - "proxy"
+    - "gateway"
+    - "firewall"
+    - "dns"
+    - "ns1"
+    - "ns2"
+
+  monitoring:
+    - "monitoring"
+    - "monitor"
+    - "grafana"
+    - "prometheus"
+    - "kibana"
+    - "elastic"
+    - "elasticsearch"
+    - "logstash"
+    - "splunk"
+    - "nagios"
+    - "zabbix"
+    - "datadog"
+    - "sentry"
+    - "newrelic"
+    - "status"
+    - "uptime"
+
+  ci_cd:
+    - "jenkins"
+    - "ci"
+    - "cd"
+    - "build"
+    - "deploy"
+    - "gitlab"
+    - "github"
+    - "bitbucket"
+    - "bamboo"
+    - "teamcity"
+    - "drone"
+    - "argo"
+    - "argocd"
+    - "harbor"
+    - "registry"
+    - "docker"
+    - "k8s"
+    - "kubernetes"
+    - "rancher"
+
+  databases:
+    - "db"
+    - "database"
+    - "mysql"
+    - "postgres"
+    - "postgresql"
+    - "mongo"
+    - "mongodb"
+    - "redis"
+    - "memcached"
+    - "elasticsearch"
+    - "cassandra"
+    - "phpmyadmin"
+    - "adminer"
+    - "pgadmin"
+
+  email:
+    - "mail"
+    - "email"
+    - "smtp"
+    - "imap"
+    - "pop3"
+    - "webmail"
+    - "outlook"
+    - "exchange"
+    - "mx"
+
+  storage:
+    - "cdn"
+    - "static"
+    - "assets"
+    - "media"
+    - "images"
+    - "img"
+    - "files"
+    - "uploads"
+    - "download"
+    - "s3"
+    - "storage"
+    - "blob"
+    - "backup"
+
+  auth:
+    - "sso"
+    - "auth"
+    - "oauth"
+    - "login"
+    - "signin"
+    - "signup"
+    - "register"
+    - "accounts"
+    - "identity"
+    - "idp"
+    - "cas"
+    - "adfs"
+    - "keycloak"
+
+  misc:
+    - "www"
+    - "app"
+    - "web"
+    - "mobile"
+    - "m"
+    - "blog"
+    - "shop"
+    - "store"
+    - "pay"
+    - "payment"
+    - "checkout"
+    - "billing"
+    - "support"
+    - "help"
+    - "docs"
+    - "wiki"
+    - "jira"
+    - "confluence"
+    - "slack"
+
+# ===== SUBDOMAIN TAKEOVER SIGNATURES =====
+takeover_signatures:
+  - cname: "*.s3.amazonaws.com"
+    indicator: "NoSuchBucket"
+    service: "AWS S3"
+    exploitable: true
+
+  - cname: "*.herokuapp.com"
+    indicator: "No such app"
+    service: "Heroku"
+    exploitable: true
+
+  - cname: "*.ghost.io"
+    indicator: "Site not found"
+    service: "Ghost"
+    exploitable: true
+
+  - cname: "*.github.io"
+    indicator: "There isn't a GitHub Pages site"
+    service: "GitHub Pages"
+    exploitable: true
+
+  - cname: "*.azurewebsites.net"
+    indicator: "404 Web Site not found"
+    service: "Azure"
+    exploitable: true
+
+  - cname: "*.cloudfront.net"
+    indicator: "Bad Request"
+    service: "AWS CloudFront"
+    exploitable: true
+
+  - cname: "*.shopify.com"
+    indicator: "Sorry, this shop is currently unavailable"
+    service: "Shopify"
+    exploitable: true
+
+  - cname: "*.zendesk.com"
+    indicator: "Help Center Closed"
+    service: "Zendesk"
+    exploitable: true
+
+  - cname: "*.surge.sh"
+    indicator: "project not found"
+    service: "Surge.sh"
+    exploitable: true
+
+  - cname: "*.netlify.app"
+    indicator: "Not Found - Request ID"
+    service: "Netlify"
+    exploitable: true
+
+# ===== ENUMERATION TOOLS =====
+tools:
+  passive:
+    - "subfinder -d target.com -o subdomains.txt"
+    - "amass enum -passive -d target.com"
+    - "assetfinder --subs-only target.com"
+    - "crt.sh: https://crt.sh/?q=%.target.com"
+    - "SecurityTrails API"
+    - "Shodan: ssl.cert.subject.cn:target.com"
+
+  active:
+    - "gobuster dns -d target.com -w wordlist.txt"
+    - "ffuf -u http://FUZZ.target.com -w wordlist.txt"
+    - "dnsrecon -d target.com -t brt"
+    - "massdns -r resolvers.txt -t A -o S -w results.txt domains.txt"
+
+  takeover:
+    - "subjack -w subdomains.txt -a -ssl -t 20 -v"
+    - "nuclei -l subdomains.txt -t takeovers/"
+    - "can-i-take-over-xyz (reference list)"

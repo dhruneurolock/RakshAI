@@ -14,7 +14,7 @@ from pathlib import Path
 from app.core.database import get_db
 from app.models.models import Scan, ScanStatus, Report, Vulnerability
 from app.models.schemas import ScanCreate, ScanResponse, ScanUpdate, ReportResponse
-from app.services.orchestrator import OrchestratorService
+from app.services.orchestrator import OrchestratorService, get_orchestrator
 from app.services.report_generator import ReportGeneratorService
 
 router = APIRouter()
@@ -51,7 +51,7 @@ async def create_scan(scan_data: ScanCreate, db: Session = Depends(get_db)):
         db.refresh(scan)
 
         # Launch enterprise orchestrator workflow (Phase 1-7 pipeline)
-        orchestrator = OrchestratorService()
+        orchestrator = get_orchestrator()
         policy = (scan_data.test_config or {})
         result = await orchestrator.start_scan(
             scan_id=new_scan_id,
@@ -167,7 +167,7 @@ async def start_scan(scan_id: str, db: Session = Depends(get_db)):
     
     # For failed/cancelled scans, restart via orchestrator
     try:
-        orchestrator = OrchestratorService()
+        orchestrator = get_orchestrator()
         result = await orchestrator.start_scan(
             scan_id=scan.scan_id,
             target_url=scan.target_url,

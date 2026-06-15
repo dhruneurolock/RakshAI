@@ -1,0 +1,161 @@
+# SSRF & File Inclusion Confirmation Indicators
+# Patterns that confirm SSRF and LFI hits — the difference between P2 and duplicate
+
+validator_category: "SSRF and File Inclusion Indicators"
+version: "1.0"
+
+# ===== SSRF CONFIRMATION =====
+ssrf_indicators:
+  aws_metadata:
+    - pattern: "ami-[a-f0-9]+"
+      confidence: 0.99
+      description: "AWS AMI ID from metadata endpoint"
+    - pattern: "iam/security-credentials"
+      confidence: 0.95
+    - pattern: "AccessKeyId"
+      confidence: 0.99
+      description: "AWS IAM credentials — CRITICAL finding"
+    - pattern: "SecretAccessKey"
+      confidence: 0.99
+    - pattern: "instance-id.*i-[a-f0-9]+"
+      confidence: 0.98
+    - pattern: "availability-zone.*[a-z]+-[a-z]+-\\d+[a-z]"
+      confidence: 0.95
+    - pattern: "security-credentials/\\w+"
+      confidence: 0.90
+
+  gcp_metadata:
+    - pattern: "computeMetadata"
+      confidence: 0.90
+    - pattern: "project/project-id"
+      confidence: 0.95
+    - pattern: "access_token.*ya29\\."
+      confidence: 0.99
+      description: "GCP OAuth token — CRITICAL"
+
+  azure_metadata:
+    - pattern: "\"subscriptionId\""
+      confidence: 0.85
+    - pattern: "\"resourceGroupName\""
+      confidence: 0.85
+    - pattern: "Metadata: true"
+      confidence: 0.70
+
+  internal_services:
+    redis:
+      - pattern: "redis_version:\\d+\\.\\d+"
+        confidence: 0.98
+      - pattern: "connected_clients:\\d+"
+        confidence: 0.95
+
+    elasticsearch:
+      - pattern: "\"cluster_name\""
+        confidence: 0.90
+      - pattern: "\"tagline\".*\"You Know, for Search\""
+        confidence: 0.99
+
+    kubernetes:
+      - pattern: "\"kind\":\"PodList\""
+        confidence: 0.95
+      - pattern: "kube-system"
+        confidence: 0.85
+
+    docker:
+      - pattern: "\"Containers\":\\d+"
+        confidence: 0.90
+
+  internal_network:
+    - pattern: "10\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}"
+      confidence: 0.60
+      note: "Internal IP — needs context"
+    - pattern: "192\\.168\\.\\d{1,3}\\.\\d{1,3}"
+      confidence: 0.60
+    - pattern: "172\\.(1[6-9]|2\\d|3[01])\\.\\d{1,3}\\.\\d{1,3}"
+      confidence: 0.60
+
+  blind_ssrf:
+    dns_callback:
+      - pattern: "DNS query from target IP to attacker domain"
+        confidence: 0.95
+    http_callback:
+      - pattern: "HTTP request from target IP to attacker server"
+        confidence: 0.95
+    timing:
+      - pattern: "Open port: fast response. Closed port: timeout"
+        confidence: 0.70
+
+# ===== LFI CONFIRMATION =====
+lfi_indicators:
+  etc_passwd:
+    - pattern: "root:x:0:0:root:/root:/bin/(bash|sh)"
+      confidence: 0.99
+      description: "Definitive /etc/passwd content"
+    - pattern: "nobody:x:65534:65534"
+      confidence: 0.95
+    - pattern: "www-data:x:33:33:www-data"
+      confidence: 0.95
+    - pattern: "sshd:x:\\d+:\\d+"
+      confidence: 0.90
+
+  etc_shadow:
+    - pattern: "root:\\$[1-9y]\\$[^:]+:\\d+"
+      confidence: 0.99
+      description: "Password hash from /etc/shadow — CRITICAL"
+
+  win_ini:
+    - pattern: "\\[fonts\\]"
+      confidence: 0.90
+    - pattern: "\\[Mail\\]"
+      confidence: 0.85
+    - pattern: "\\[extensions\\]"
+      confidence: 0.85
+
+  boot_ini:
+    - pattern: "\\[boot loader\\]"
+      confidence: 0.95
+    - pattern: "\\[operating systems\\]"
+      confidence: 0.90
+
+  proc_self:
+    - pattern: "DOCUMENT_ROOT="
+      confidence: 0.85
+      description: "/proc/self/environ content"
+    - pattern: "SERVER_SOFTWARE="
+      confidence: 0.85
+    - pattern: "PATH="
+      confidence: 0.70
+
+  source_code:
+    - pattern: "<\\?php"
+      confidence: 0.80
+      description: "PHP source code leaked — confirms file read"
+    - pattern: "require_once|include_once"
+      confidence: 0.75
+    - pattern: "\\$_GET|\\$_POST|\\$_REQUEST"
+      confidence: 0.85
+    - pattern: "DB_PASSWORD|DB_HOST|SECRET_KEY"
+      confidence: 0.95
+      description: "Config file with secrets — CRITICAL"
+
+  base64_encoded:
+    - pattern: "^[A-Za-z0-9+/=]{40,}$"
+      confidence: 0.60
+      note: "php://filter base64 output — needs decode to verify"
+      description: "Possible base64-encoded file content from php://filter"
+
+# ===== FALSE POSITIVE FILTERS =====
+false_positives:
+  ssrf:
+    - "Application legitimately fetching external URLs (webhooks)"
+    - "Internal IP in error messages (not from SSRF)"
+    - "Metadata-like strings in application's own JSON responses"
+
+  lfi:
+    - "Example /etc/passwd content in documentation"
+    - "PHP code snippets in tutorials/help pages"
+    - "File paths in error messages (not actual file content)"
+
+  validation_rules:
+    - "SSRF: confirm source IP matches target, not your own requests"
+    - "LFI: send 2 different file paths, verify both return correct content"
+    - "Blind SSRF: use unique callback URLs per test to avoid confusion"

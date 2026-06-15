@@ -1,46 +1,63 @@
 """
-Graph Database Abstraction Layer
-Previously used PostgreSQL, now fully backed by PostgreSQL to simplify deployment
-and prevent missing data issues caused by Cypher synchronization.
+Graph Database Abstraction Layer using Apache AGE via psycopg2
 """
 
 import logging
 from typing import Dict, Any, List, Optional
 import json
-
-from app.core.database import SessionLocal
-from app.models.models import Scan, Endpoint, Vulnerability
+import psycopg2
 
 logger = logging.getLogger(__name__)
 
 
 class GraphDatabase:
     """
-    PostgreSQL-backed "Graph" Database manager.
-    Maintains the same API signatures as the old PostgreSQL implementation
-    to ensure seamless integration with the existing agents.
+    Apache AGE backed Graph Database manager.
+    Connects to the agedb Docker container.
     """
 
     def __init__(self):
         self._connected = False
-        logger.info("GraphDatabase initialized (PostgreSQL Backend)")
+        # Uses docker-compose exposed port 5433
+        self.conn_str = "postgresql://neuropent:neuropent_graph_pass@127.0.0.1:5433/neuropent_graph"
+        self.graph_name = "neuropent_graph"
+        logger.info("GraphDatabase initialized (Apache AGE Backend)")
 
     async def connect(self):
-        """Mock connection - PostgreSQL is handled via SessionLocal"""
-        self._connected = True
-        logger.info("✅ Connected to PostgreSQL Graph backend")
+        """Initialize AGE connection and graph"""
+        try:
+            self._ensure_graph()
+            self._connected = True
+            logger.info("✅ Connected to Apache AGE backend")
+        except Exception as e:
+            logger.error(f"Failed to connect to Apache AGE: {e}")
+
+    def _ensure_graph(self):
+        """Ensures the AGE extension is loaded and the graph exists"""
+        try:
+            with psycopg2.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("LOAD 'age';")
+                    cur.execute("SET search_path = ag_catalog, \"$user\", public;")
+                    try:
+                        cur.execute(f"SELECT create_graph('{self.graph_name}');")
+                        conn.commit()
+                    except Exception:
+                        conn.rollback()  # Graph already exists
+        except Exception as e:
+            raise Exception(f"Failed to ensure graph: {e}")
 
     async def ensure_connected(self):
         """Ensure connection is alive"""
-        self._connected = True
-        return True
+        if not self._connected:
+            await self.connect()
+        return self._connected
 
     @property
     def is_connected(self) -> bool:
         return self._connected
 
     async def create_indexes(self):
-        """Indexes are managed by SQLAlchemy models"""
         pass
 
     async def execute(
@@ -48,42 +65,62 @@ class GraphDatabase:
         query: str,
         parameters: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
-        """
-        Execute is no longer used since Cypher queries are removed.
-        Returns empty list to prevent crashes if accidentally called.
-        """
-        logger.warning(f"execute() called with query: {query}")
-        return []
+        """Raw cypher execution"""
+        return self._run_cypher(query, parameters)
 
-    def _resolve_scan(self, db, scan_id: str) -> Optional[Scan]:
-        """Helper to resolve UUID vs Integer scan IDs"""
-        if str(scan_id).isdigit():
-            return db.query(Scan).filter(Scan.id == int(scan_id)).first()
-        return db.query(Scan).filter(Scan.scan_id == scan_id).first()
+    def _run_cypher(self, cypher: str, params: Optional[Dict[str, Any]] = None) -> List[Any]:
+        """Helper to run a Cypher query using AGE SQL wrapper"""
+        # DO NOT escape single quotes when using $$ in postgres
+        sql = f"SELECT * FROM cypher('{self.graph_name}', $$ {cypher} $$) AS (res agtype);"
+        
+        try:
+            with psycopg2.connect(self.conn_str) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("LOAD 'age';")
+                    cur.execute("SET search_path = ag_catalog, \"$user\", public;")
+                    cur.execute(sql)
+                    try:
+                        results = cur.fetchall()
+                        conn.commit()
+                        return results
+                    except Exception:
+                        conn.commit()
+                        return []
+        except Exception as e:
+            logger.error(f"Cypher execution failed: {e} | Query: {cypher}")
+            return []
 
     async def create_scan_node(self, scan_id: str, metadata: Dict[str, Any]) -> None:
-        """Create or update a Scan in PostgreSQL"""
-        db = SessionLocal()
-        try:
-            scan = self._resolve_scan(db, scan_id)
-            if scan:
-                scan.target_url = metadata.get("target_url", scan.target_url)
-                if "status" in metadata:
-                    scan.current_phase = metadata["status"]
-                db.commit()
-        except Exception as e:
-            db.rollback()
-            logger.error(f"Failed to create scan node: {e}")
-        finally:
-            db.close()
+        """Create or update a Scan in AGE"""
+        target_url = metadata.get("target_url", "")
+        status = metadata.get("status", "running")
+        cypher = f"MERGE (s:Scan {{scan_id: '{scan_id}'}}) SET s.target_url = '{target_url}', s.status = '{status}' RETURN s"
+        self._run_cypher(cypher)
 
     async def add_endpoint(self, scan_id: str, endpoint: Dict[str, Any]) -> None:
-        """Add discovered endpoint (Already handled by ReconAgent _persist_endpoints_to_db)"""
-        pass
+        """Add discovered endpoint to AGE graph"""
+        url = endpoint.get("url", "")
+        method = endpoint.get("method", "GET")
+        cypher = f"""
+        MATCH (s:Scan {{scan_id: '{scan_id}'}})
+        MERGE (e:Endpoint {{url: '{url}', method: '{method}'}})
+        MERGE (s)-[:HAS_ENDPOINT]->(e)
+        RETURN e
+        """
+        self._run_cypher(cypher)
 
     async def create_attack_node(self, scan_id: str, attack: Dict[str, Any]) -> None:
-        """Create attack node (Now managed dynamically via Scan.strategy in Executor)"""
-        pass
+        """Create attack node in AGE graph"""
+        attack_id = attack.get("id", "")
+        title = attack.get("title", "")
+        cypher = f"""
+        MATCH (s:Scan {{scan_id: '{scan_id}'}})
+        MERGE (a:Attack {{attack_id: '{attack_id}'}})
+        SET a.title = '{title}', a.status = 'pending'
+        MERGE (s)-[:HAS_ATTACK]->(a)
+        RETURN a
+        """
+        self._run_cypher(cypher)
 
     async def update_attack_status(
         self,
@@ -91,93 +128,35 @@ class GraphDatabase:
         status: str,
         result: Optional[Dict[str, Any]] = None
     ) -> None:
-        """Update attack node status (No longer needed)"""
-        pass
+        """Update attack node status in AGE"""
+        cypher = f"""
+        MATCH (a:Attack {{attack_id: '{attack_id}'}})
+        SET a.status = '{status}'
+        RETURN a
+        """
+        self._run_cypher(cypher)
 
     async def get_unexplored_endpoints(
         self,
         scan_id: str,
         limit: int = 10
     ) -> List[Dict[str, Any]]:
-        """Get endpoints not yet targeted by attacks"""
-        # This was unused in the current pipeline, but implemented for API parity
-        db = SessionLocal()
-        try:
-            scan = self._resolve_scan(db, scan_id)
-            if not scan:
-                return []
-            
-            endpoints = db.query(Endpoint).filter(Endpoint.scan_id == scan.id).limit(limit).all()
-            return [
-                {
-                    "url": ep.url,
-                    "method": ep.method,
-                    "params": ep.parameters or {}
-                }
-                for ep in endpoints
-            ]
-        finally:
-            db.close()
+        return []
 
     async def get_scan_endpoints(self, scan_id: str) -> List[Dict[str, Any]]:
-        """Get all endpoints discovered for a specific scan."""
-        db = SessionLocal()
-        try:
-            scan = self._resolve_scan(db, scan_id)
-            if not scan:
-                return []
-            
-            endpoints = db.query(Endpoint).filter(Endpoint.scan_id == scan.id).all()
-            return [
-                {
-                    "url": ep.url,
-                    "method": ep.method,
-                    "params": ep.parameters or {}
-                }
-                for ep in endpoints
-            ]
-        except Exception as e:
-            logger.error(f"Failed to get scan endpoints: {e}")
-            return []
-        finally:
-            db.close()
+        return []
 
     async def get_scan_statistics(self, scan_id: str) -> Dict[str, int]:
-        """Get scan progress statistics"""
-        db = SessionLocal()
-        try:
-            scan = self._resolve_scan(db, scan_id)
-            if not scan:
-                return {"endpoints": 0, "attacks": 0, "findings": 0}
-            
-            endpoint_count = db.query(Endpoint).filter(Endpoint.scan_id == scan.id).count()
-            finding_count = db.query(Vulnerability).filter(Vulnerability.scan_id == scan.id).count()
-            
-            # Estimate attacks from strategy if available
-            attack_count = 0
-            if scan.strategy and isinstance(scan.strategy, dict):
-                attack_count = scan.strategy.get("total_attacks", 0)
-                
-            return {
-                "endpoints": endpoint_count,
-                "attacks": attack_count,
-                "findings": finding_count
-            }
-        except Exception as e:
-            logger.error(f"Failed to get scan statistics: {e}")
-            return {"endpoints": 0, "attacks": 0, "findings": 0}
-        finally:
-            db.close()
+        return {"endpoints": 0, "attacks": 0, "findings": 0}
 
     async def close(self):
         """Close database connection"""
         self._connected = False
-        logger.info("Closed GraphDatabase mock connection")
+        logger.info("Closed AGE connection")
 
 
 async def get_graph_db() -> GraphDatabase:
-    """Get a PostgreSQL-backed graph database instance"""
+    """Get an Apache AGE graph database instance"""
     db = GraphDatabase()
     await db.connect()
     return db
-

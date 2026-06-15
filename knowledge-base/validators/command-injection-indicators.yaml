@@ -1,0 +1,125 @@
+# Command Injection Confirmation Indicators
+# Patterns that PROVE command injection succeeded — not just "maybe"
+# A senior red teamer validates every finding before reporting
+
+validator_category: "Command Injection Indicators"
+version: "1.0"
+
+# ===== LINUX COMMAND OUTPUT PATTERNS =====
+linux_indicators:
+  whoami_output:
+    - pattern: "^(root|www-data|apache|nginx|nobody|daemon|admin|\\w+)$"
+      confidence: 0.95
+      description: "Clean username output from whoami"
+
+  id_output:
+    - pattern: "uid=\\d+\\(\\w+\\)\\s+gid=\\d+\\(\\w+\\)"
+      confidence: 0.98
+      description: "Unix id command output — definitive proof"
+
+  uname_output:
+    - pattern: "Linux\\s+\\S+\\s+\\d+\\.\\d+\\.\\d+"
+      confidence: 0.95
+      description: "Linux kernel version from uname -a"
+
+  etc_passwd:
+    - pattern: "root:x:0:0:root:/root:"
+      confidence: 0.99
+      description: "/etc/passwd first line — definitive proof of LFI or RCE"
+    - pattern: "\\w+:[x*!]:\\d+:\\d+:"
+      confidence: 0.90
+      description: "Generic /etc/passwd line format"
+    - pattern: "daemon:x:1:1:"
+      confidence: 0.95
+    - pattern: "www-data:x:33:33:"
+      confidence: 0.95
+
+  ls_output:
+    - pattern: "^(d|-)r(w|-)(x|-)(r|-)(w|-)(x|-)(r|-)(w|-)(x|-)\\s+"
+      confidence: 0.95
+      description: "ls -la permission format"
+    - pattern: "total\\s+\\d+"
+      confidence: 0.70
+      description: "ls output header — lower confidence alone"
+
+  ifconfig_ip:
+    - pattern: "inet\\s+\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}"
+      confidence: 0.85
+      description: "IP address from ifconfig/ip command"
+
+  proc_version:
+    - pattern: "Linux version \\d+\\.\\d+\\.\\d+"
+      confidence: 0.95
+      description: "/proc/version content"
+
+# ===== WINDOWS COMMAND OUTPUT PATTERNS =====
+windows_indicators:
+  whoami_output:
+    - pattern: "\\w+\\\\\\w+"
+      confidence: 0.80
+      description: "DOMAIN\\username format from whoami"
+    - pattern: "nt authority\\\\system"
+      confidence: 0.99
+      description: "SYSTEM-level access — critical finding"
+
+  ipconfig_output:
+    - pattern: "Windows IP Configuration"
+      confidence: 0.95
+    - pattern: "IPv4 Address.*:\\s*\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}"
+      confidence: 0.90
+
+  dir_output:
+    - pattern: "Directory of [A-Z]:\\\\"
+      confidence: 0.95
+      description: "Windows dir command output"
+    - pattern: "<DIR>"
+      confidence: 0.70
+
+  systeminfo:
+    - pattern: "OS Name:\\s+Microsoft Windows"
+      confidence: 0.98
+    - pattern: "OS Version:\\s+\\d+\\.\\d+"
+      confidence: 0.95
+
+  win_ini:
+    - pattern: "\\[fonts\\]"
+      confidence: 0.90
+      description: "win.ini file content — confirms file read"
+    - pattern: "\\[extensions\\]"
+      confidence: 0.85
+
+  net_user:
+    - pattern: "User accounts for \\\\"
+      confidence: 0.95
+    - pattern: "Administrator\\s+"
+      confidence: 0.80
+
+# ===== BLIND DETECTION =====
+blind_indicators:
+  time_delay:
+    - pattern: "response_time > baseline + 4.5 seconds"
+      confidence: 0.85
+      description: "Sleep/ping delay detected (5s payload)"
+      note: "Must compare against baseline — network latency can cause false positives"
+
+  dns_callback:
+    - pattern: "DNS query received from target IP"
+      confidence: 0.95
+      description: "Out-of-band confirmation via DNS exfiltration"
+
+  http_callback:
+    - pattern: "HTTP request received from target IP"
+      confidence: 0.95
+      description: "Out-of-band confirmation via HTTP callback"
+
+# ===== FALSE POSITIVE FILTERS =====
+false_positives:
+  common_fps:
+    - "Error page that happens to mention 'root' in context"
+    - "Application-level response containing uid= in JSON"
+    - "Stack traces with Linux paths (not from injection)"
+  
+  validation_rules:
+    - "Time-based: requires 3 consistent measurements above threshold"
+    - "Output-based: payload must appear in response, not just error messages"
+    - "Blind: requires out-of-band callback from target IP specifically"

@@ -97,6 +97,8 @@ async def startup_event():
     Base.metadata.create_all(bind=engine)
     ensure_sqlite_schema()
     logger.info("Database tables created")
+    from app.core.redis_client import start_redis_listener
+    await start_redis_listener()
     start_scheduler()
 
 

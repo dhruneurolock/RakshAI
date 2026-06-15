@@ -5,8 +5,8 @@ alembic==1.13.1
 psycopg2-binary==2.9.9
 redis==5.0.1
 celery==5.3.6
-pydantic==2.5.3
-pydantic-settings==2.1.0
+pydantic>=2.7.4
+pydantic-settings>=2.2.0
 python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
@@ -22,10 +22,10 @@ lxml==5.1.0
 requests==2.31.0
 
 # LLM & AI
-langchain>=0.3
-langchain-community>=0.3
-langchain-ollama>=0.2
-langgraph>=1.2
+langchain
+langchain-community
+langchain-ollama
+langgraph
 ollama==0.1.7
 chromadb==0.4.22
 sentence-transformers==2.3.1
@@ -68,3 +68,4 @@ black==23.12.1
 isort==5.13.2
 flake8==7.0.0
 mypy==1.8.0
+apache-age-python==0.0.7

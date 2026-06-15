@@ -1,0 +1,101 @@
+# SSTI Confirmation Indicators
+# Patterns that confirm Server-Side Template Injection — not just reflection
+
+validator_category: "SSTI Indicators"
+version: "1.0"
+
+# ===== MATH EVALUATION PROOF =====
+math_confirmation:
+  - pattern: "49"
+    payload: "{{7*7}}"
+    confidence: 0.90
+    note: "Must verify 49 is NOT already in original response"
+
+  - pattern: "7777777"
+    payload: "{{7*'7'}}"
+    confidence: 0.95
+    description: "String multiplication — Jinja2 specific, very reliable"
+
+  - pattern: "49"
+    payload: "${7*7}"
+    confidence: 0.85
+    description: "Freemarker/Mako/EL expression evaluation"
+
+  - pattern: "49"
+    payload: "<%= 7*7 %>"
+    confidence: 0.90
+    description: "ERB (Ruby) template evaluation"
+
+# ===== ENGINE FINGERPRINTING =====
+engine_fingerprints:
+  jinja2:
+    - pattern: "__class__"
+      payload: "{{''.__class__}}"
+      confidence: 0.98
+      description: "Python class introspection — confirms Jinja2/Mako"
+    - pattern: "<class 'str'>"
+      confidence: 0.99
+
+  twig:
+    - pattern: "Twig_Environment"
+      confidence: 0.99
+    - pattern: "Twig\\\\Environment"
+      confidence: 0.99
+
+  freemarker:
+    - pattern: "freemarker.template"
+      confidence: 0.99
+    - pattern: "FreeMarker template error"
+      confidence: 0.95
+
+  velocity:
+    - pattern: "org.apache.velocity"
+      confidence: 0.99
+
+  smarty:
+    - pattern: "Smarty Compiler"
+      confidence: 0.95
+    - pattern: "Smarty error"
+      confidence: 0.90
+
+  erb:
+    - pattern: "(erb):1:"
+      confidence: 0.90
+    - pattern: "SyntaxError"
+      payload: "<%= foobar %>"
+      confidence: 0.60
+      note: "Low confidence — many things cause SyntaxError"
+
+# ===== RCE CONFIRMATION =====
+rce_confirmation:
+  - pattern: "uid=\\d+"
+    confidence: 0.99
+    description: "id command output via SSTI"
+  
+  - pattern: "root:x:0:0"
+    confidence: 0.99
+    description: "/etc/passwd read via SSTI"
+
+# ===== ERROR-BASED DETECTION =====
+error_indicators:
+  - pattern: "TemplateSyntaxError"
+    confidence: 0.85
+  - pattern: "UndefinedError"
+    confidence: 0.80
+  - pattern: "jinja2.exceptions"
+    confidence: 0.95
+  - pattern: "twig.*error"
+    confidence: 0.90
+  - pattern: "Template render error"
+    confidence: 0.75
+
+# ===== FALSE POSITIVE FILTERS =====
+false_positives:
+  - "49 appearing in page content unrelated to injection (prices, dates, IDs)"
+  - "JavaScript code containing {{}} that is client-side templating"
+  - "AngularJS expressions (these are client-side, not server-side)"
+  
+  validation_rules:
+    - "Subtract response: inject {{7*7}} and {{8*8}}, verify 49 and 64 respectively"
+    - "If both match, SSTI confirmed. If only one, likely false positive"
+    - "Try {{7*'7'}} — result '7777777' is nearly impossible to be false positive"

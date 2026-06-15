@@ -51,8 +51,6 @@ The orchestrator skips these agents to avoid LLM timeouts and uses hardcoded, ru
 
 ---
 
-## Summary
-The pipeline relies heavily on **`orchestrator.py`** and **`advanced_discovery.py`**, falling back to a deterministic, rule-based engine powered by **`payload_engine.py`** and **`validator_engine.py`**. The **`app/agents/*`** directory and the **`llm_service.py`** are largely sidelined to prioritize stability and speed over dynamic agentic execution.
 
 ---
 

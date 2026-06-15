@@ -180,21 +180,27 @@ async def create_poc(vuln_id: int, db: Session = Depends(get_db)):
     if not vuln:
         raise HTTPException(status_code=404, detail="Vulnerability not found")
     
-    if not vuln.is_validated:
-        raise HTTPException(status_code=400, detail="Cannot generate PoC for unvalidated vulnerability")
-    
     try:
         # Generate PoC using new agent
         poc_agent = PoCAgent(f"poc_agent_{vuln_id}")
         await poc_agent.initialize()
+
+        # Build finding dict matching what PoCAgent.generate_poc expects
+        endpoint_url = ""
+        if vuln.endpoint_id:
+            ep = db.query(Endpoint).filter(Endpoint.id == vuln.endpoint_id).first()
+            if ep:
+                endpoint_url = ep.url
         finding_data = {
-            "id": vuln.id,
-            "vulnerability_type": vuln.vulnerability_type,
-            "endpoint_url": vuln.endpoint.url if vuln.endpoint else "",
-            "attack_vector": vuln.attack_vector or {},
-            "evidence": vuln.raw_evidence or {}
+            "finding_id": str(vuln.id),
+            "type": vuln.vulnerability_type,
+            "url": endpoint_url or vuln.endpoint.url if vuln.endpoint else "",
+            "severity": str(vuln.severity.value) if vuln.severity else "medium",
+            "description": vuln.description or "",
+            "evidence": vuln.response_evidence or "",
+            "payload": vuln.request_payload or "",
         }
-        result = await poc_agent.run(str(vuln.scan_id))
+        result = await poc_agent.generate_poc(str(vuln.scan_id), finding_data)
         
         return {
             "message": "PoC generated successfully",
@@ -321,8 +327,8 @@ async def regenerate_poc_steps(vuln_id: int, db: Session = Depends(get_db)):
         endpoint_method = vuln.endpoint.method or "GET"
 
     try:
-        from app.services.orchestrator import OrchestratorService
-        orch = OrchestratorService()
+        from app.services.orchestrator import OrchestratorService, get_orchestrator
+        orch = get_orchestrator()
         poc_steps = orch._build_poc_steps(
             scan=scan,
             vuln=vuln,

